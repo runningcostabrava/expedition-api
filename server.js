@@ -23,11 +23,17 @@ app.get('/setup-db', async (req, res) => {
       CREATE TABLE IF NOT EXISTS tracks (id SERIAL PRIMARY KEY, title TEXT, color TEXT DEFAULT '#FF0000', geojson_data JSONB NOT NULL);
     `);
 
-    // Second, alter tables to add the v2.0 logistics columns if they are missing
+    // Second, alter tables to add ALL potentially missing columns from older versions
     await pool.query(`
       ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS category TEXT;
+      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS description TEXT;
+      
+      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS responsible TEXT;
+      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS characteristics TEXT;
       ALTER TABLE tasks ADD COLUMN IF NOT EXISTS target_group TEXT;
       ALTER TABLE tasks ADD COLUMN IF NOT EXISTS day_label TEXT;
+      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_completed BOOLEAN DEFAULT false;
+      
       ALTER TABLE tracks ADD COLUMN IF NOT EXISTS target_group TEXT;
     `);
 
