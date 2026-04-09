@@ -151,6 +151,16 @@
         </div>
 
         <div class="form-group">
+            <label>Starts At</label>
+            <input type="datetime-local" id="starts-at">
+        </div>
+
+        <div class="form-group">
+            <label>Ends At</label>
+            <input type="datetime-local" id="ends-at">
+        </div>
+
+        <div class="form-group">
             <label>Description / Task Name</label>
             <textarea id="wp-description" rows="2"></textarea>
         </div>
@@ -167,6 +177,8 @@
             <strong>Active Tracks</strong>
             <div id="tracks-container"></div>
         </div>
+
+        <button onclick="syncDbSchema()" style="margin-top:20px; background:#34495e;">Sync DB Schema</button>
     </div>
 
     <div id="map"></div>
@@ -189,6 +201,7 @@
         let activeMarkers = [];
         let activeTrackId = null;
         let ADMIN_KEY = null;
+        let allTracks = [];
 
         async function initializeApp() {
             // 1. Securely fetch the token from your Render backend
@@ -237,6 +250,7 @@
         async function loadTracks() {
             const res = await fetch(`${API_URL}/tracks`);
             const tracks = await res.json();
+            allTracks = tracks;
             const container = document.getElementById('tracks-container');
             container.innerHTML = '';
 
@@ -351,6 +365,8 @@
                     responsible: document.getElementById('responsible').value,
                     target_group: document.getElementById('target-group').value,
                     day_label: document.getElementById('day-label').value,
+                    starts_at: document.getElementById('starts-at').value,
+                    ends_at: document.getElementById('ends-at').value,
                     characteristics: ''
                 }]
             };
@@ -383,7 +399,16 @@
                 title: document.getElementById('wp-title').value,
                 target_group: document.getElementById('target-group').value,
                 geojson_data: data,
-                color: groupColors[document.getElementById('target-group').value]
+                color: groupColors[document.getElementById('target-group').value],
+                tasks: [{
+                    name: document.getElementById('wp-description').value || document.getElementById('wp-title').value,
+                    responsible: document.getElementById('responsible').value,
+                    target_group: document.getElementById('target-group').value,
+                    day_label: document.getElementById('day-label').value,
+                    starts_at: document.getElementById('starts-at').value,
+                    ends_at: document.getElementById('ends-at').value,
+                    characteristics: ''
+                }]
             };
 
             let url = `${API_URL}/tracks`;
@@ -408,8 +433,10 @@
                 activeTrackId = null;
                 document.getElementById('save-track-btn').style.display = 'none';
                 loadTracks();
+                renderProjectView();
                 draw.deleteAll();
                 document.getElementById('wp-title').value = '';
+                document.getElementById('wp-description').value = '';
             }
         };
 
@@ -432,10 +459,14 @@
                 dayEl.innerHTML = `<h3 style="border-bottom:2px solid #3498db; margin-top:20px; padding-bottom:5px;">${day}</h3>`;
                 
                 tasks.forEach(task => {
+                    const startTime = task.starts_at ? new Date(task.starts_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
                     const taskEl = document.createElement('div');
                     taskEl.style.cssText = "background:white; padding:10px; margin-bottom:10px; border-left:4px solid " + (groupColors[task.target_group] || '#ccc') + "; border-radius:4px; box-shadow:0 2px 5px rgba(0,0,0,0.1); cursor:pointer;";
                     taskEl.innerHTML = `
-                        <div style="font-weight:bold; color:#2c3e50;">${task.waypoint}</div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <div style="font-weight:bold; color:#2c3e50;">${task.waypoint}</div>
+                            <div style="font-size:0.8em; color:#3498db; font-weight:bold;">${startTime}</div>
+                        </div>
                         <div style="font-size:0.85em; color:#7f8c8d; margin-top:4px;">${task.task}</div>
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
                             <span style="font-size:0.75em; background:#ecf0f1; padding:2px 6px; border-radius:10px; color:#34495e;">${task.responsible}</span>
@@ -443,7 +474,14 @@
                         </div>
                     `;
                     taskEl.onclick = () => {
-                        if (task.lat && task.lng) {
+                        if (task.linked_track_id) {
+                            const track = allTracks.find(t => t.id === task.linked_track_id);
+                            if (track && track.geojson_data) {
+                                const coordinates = track.geojson_data.features[0].geometry.coordinates;
+                                const bounds = coordinates.reduce((acc, coord) => acc.extend(coord), new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
+                                map.fitBounds(bounds, { padding: 50 });
+                            }
+                        } else if (task.lat && task.lng) {
                             map.flyTo({ center: [task.lng, task.lat], zoom: 16 });
                         }
                     };
@@ -460,6 +498,18 @@
                 renderProjectView();
             } else {
                 view.style.display = 'none';
+            }
+        }
+
+        async function syncDbSchema() {
+            const res = await fetch(`${API_URL}/setup-db`, {
+                headers: { 'x-api-key': ADMIN_KEY }
+            });
+            if (res.ok) {
+                alert("Database schema synchronized successfully!");
+                loadWaypoints();
+            } else {
+                alert("Schema sync failed. Check console for details.");
             }
         }
 
