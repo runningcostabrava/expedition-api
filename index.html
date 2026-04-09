@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Expedition Command Center</title>
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/togeojson/0.16.0/togeojson.min.js"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: sans-serif; display: flex; height: 100vh; background: #1a1a1a; }
+        #sidebar { width: 400px; background: #2c3e50; color: white; padding: 20px; overflow-y: auto; z-index: 1; }
+        #map { flex-grow: 1; }
+        .section { background: #34495e; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        input, textarea { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 4px; border: none; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-blue { background: #2980b9; color: white; }
+        .btn-green { background: #27ae60; color: white; }
+    </style>
+</head>
+<body>
+<div id="sidebar">
+    <h1>Expedition Pro</h1>
+    <div class="section">
+        <h2>1. Route Planning (GPX)</h2>
+        <input type="text" id="trackTitle" placeholder="Track Name">
+        <input type="file" id="gpxFile" accept=".gpx">
+        <button class="btn-blue" onclick="uploadGPX()">Upload to Cloud</button>
+    </div>
+    <div class="section">
+        <h2>2. Project Management</h2>
+        <p><small id="coords">Click map to link location</small></p>
+        <input type="text" id="wpTitle" placeholder="Waypoint Name">
+        <input type="text" id="taskName" placeholder="Task/Responsibility">
+        <input type="text" id="responsible" placeholder="Who is responsible?">
+        <textarea id="characteristics" placeholder="Characteristics/Notes"></textarea>
+        <button class="btn-green" onclick="saveEverything()">Link Task to Map</button>
+    </div>
+</div>
+<div id="map"></div>
+
+<script>
+    const API_URL = 'https://mapbox-api-uz9a.onrender.com';
+    mapboxgl.accessToken = 'YOUR_MAPBOX_ACCESS_TOKEN';
+
+    const map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/outdoors-v12',
+        center: [2.8214, 41.9794],
+        zoom: 11
+    });
+
+    let selectedCoords = null;
+    let marker = new mapboxgl.Marker({ color: 'red' });
+
+    map.on('click', (e) => {
+        selectedCoords = e.lngLat;
+        document.getElementById('coords').innerText = `Lat: ${selectedCoords.lat.toFixed(4)} | Lng: ${selectedCoords.lng.toFixed(4)}`;
+        marker.setLngLat(selectedCoords).addTo(map);
+    });
+
+    async function uploadGPX() {
+        const file = document.getElementById('gpxFile').files[0];
+        const title = document.getElementById('trackTitle').value;
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const geojson = toGeoJSON.gpx(new DOMParser().parseFromString(e.target.result, "text/xml"));
+            await fetch(`${API_URL}/tracks`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, geojson_data: geojson })
+            });
+            alert("Track Synced!");
+        };
+        reader.readAsText(file);
+    }
+
+    async function saveEverything() {
+        const payload = {
+            title: document.getElementById('wpTitle').value,
+            lat: selectedCoords.lat, lng: selectedCoords.lng,
+            description: document.getElementById('characteristics').value,
+            tasks: [{
+                name: document.getElementById('taskName').value,
+                responsible: document.getElementById('responsible').value,
+                characteristics: document.getElementById('characteristics').value
+            }]
+        };
+        const res = await fetch(`${API_URL}/waypoints`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (res.ok) alert("Location linked to Task!");
+    }
+</script>
+</body>
+</html>
