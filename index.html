@@ -1,97 +1,389 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
+
 <head>
-    <meta charset="UTF-8">
-    <title>Expedition Command Center</title>
-    <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
-    <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/togeojson/0.16.0/togeojson.min.js"></script>
+    <meta charset="utf-8">
+    <title>Expedition Ecosystem v2.0 - Logistics Dashboard</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.0/mapbox-gl-draw.css"
+        type="text/css">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.0/mapbox-gl-draw.js"></script>
+    <script src="https://unpkg.com/togeojson@0.16.0/togeojson.js"></script>
     <style>
-        body { margin: 0; padding: 0; font-family: sans-serif; display: flex; height: 100vh; background: #1a1a1a; }
-        #sidebar { width: 400px; background: #2c3e50; color: white; padding: 20px; overflow-y: auto; z-index: 1; }
-        #map { flex-grow: 1; }
-        .section { background: #34495e; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
-        input, textarea { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 4px; border: none; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .btn-blue { background: #2980b9; color: white; }
-        .btn-green { background: #27ae60; color: white; }
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        .sidebar {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 320px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+            z-index: 1;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        h2 {
+            margin-top: 0;
+            font-size: 1.2em;
+        }
+
+        .form-group {
+            margin-bottom: 10px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85em;
+            margin-bottom: 3px;
+            font-weight: bold;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 6px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        .save-btn {
+            background: #27ae60;
+        }
+
+        .save-btn:hover {
+            background: #219150;
+        }
+
+        .track-item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .track-item:hover {
+            background: #f0f0f0;
+        }
+
+        #track-list {
+            margin-top: 15px;
+            border-top: 2px solid #3498db;
+            padding-top: 10px;
+        }
     </style>
 </head>
+
 <body>
-<div id="sidebar">
-    <h1>Expedition Pro</h1>
-    <div class="section">
-        <h2>1. Route Planning (GPX)</h2>
-        <input type="text" id="trackTitle" placeholder="Track Name">
-        <input type="file" id="gpxFile" accept=".gpx">
-        <button class="btn-blue" onclick="uploadGPX()">Upload to Cloud</button>
+
+    <div class="sidebar">
+        <h2>Logistics Dashboard</h2>
+
+        <div class="form-group">
+            <label>Upload GPX Track</label>
+            <input type="file" id="gpx-file" accept=".gpx">
+        </div>
+
+        <hr>
+
+        <div class="form-group">
+            <label>Title</label>
+            <input type="text" id="wp-title" placeholder="Waypoint or Track Title">
+        </div>
+
+        <div class="form-group">
+            <label>Target Group</label>
+            <select id="target-group">
+                <option value="Hikers">Hikers</option>
+                <option value="Runners">Runners</option>
+                <option value="Staff">Staff</option>
+                <option value="Transport">Transport</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Waypoint Category (if pin)</label>
+            <select id="wp-category">
+                <option value="none">N/A (Track)</option>
+                <option value="Restaurant">Restaurant</option>
+                <option value="Accommodation">Accommodation</option>
+                <option value="Checkpoint">Checkpoint</option>
+                <option value="Bus Stop">Bus Stop</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Day Label</label>
+            <input type="text" id="day-label" placeholder="Friday - Day 1">
+        </div>
+
+        <div class="form-group">
+            <label>Description / Task Name</label>
+            <textarea id="wp-description" rows="2"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label>Responsible Person</label>
+            <input type="text" id="responsible" placeholder="Name">
+        </div>
+
+        <button id="save-btn" class="save-btn">Save Waypoint/Task</button>
+        <button id="save-track-btn" style="display:none;">Save Edited Track</button>
+
+        <div id="track-list">
+            <strong>Active Tracks</strong>
+            <div id="tracks-container"></div>
+        </div>
     </div>
-    <div class="section">
-        <h2>2. Project Management</h2>
-        <p><small id="coords">Click map to link location</small></p>
-        <input type="text" id="wpTitle" placeholder="Waypoint Name">
-        <input type="text" id="taskName" placeholder="Task/Responsibility">
-        <input type="text" id="responsible" placeholder="Who is responsible?">
-        <textarea id="characteristics" placeholder="Characteristics/Notes"></textarea>
-        <button class="btn-green" onclick="saveEverything()">Link Task to Map</button>
-    </div>
-</div>
-<div id="map"></div>
 
-<script>
-    const API_URL = 'https://mapbox-api-uz9a.onrender.com';
-    mapboxgl.accessToken = 'YOUR_MAPBOX_ACCESS_TOKEN';
+    <div id="map"></div>
 
-    const map = new mapboxgl.Map({
-        container: 'map',
-        style: 'mapbox://styles/mapbox/outdoors-v12',
-        center: [2.8214, 41.9794],
-        zoom: 11
-    });
+    <script>
+        const API_URL = 'https://mapbox-api-uz9a.onrender.com';
+        let map;
+        let draw;
 
-    let selectedCoords = null;
-    let marker = new mapboxgl.Marker({ color: 'red' });
+        async function initializeApp() {
+            // 1. Securely fetch the token from your Render backend
+            const configRes = await fetch(`${API_URL}/api/config`);
+            const config = await configRes.json();
+            mapboxgl.accessToken = config.MAPBOX_TOKEN;
 
-    map.on('click', (e) => {
-        selectedCoords = e.lngLat;
-        document.getElementById('coords').innerText = `Lat: ${selectedCoords.lat.toFixed(4)} | Lng: ${selectedCoords.lng.toFixed(4)}`;
-        marker.setLngLat(selectedCoords).addTo(map);
-    });
+            // 2. Initialize Map
+            map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/outdoors-v12',
+                center: [2.1734, 41.3851], // Barcelona
+                zoom: 12
+            });
 
-    async function uploadGPX() {
-        const file = document.getElementById('gpxFile').files[0];
-        const title = document.getElementById('trackTitle').value;
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            const geojson = toGeoJSON.gpx(new DOMParser().parseFromString(e.target.result, "text/xml"));
-            await fetch(`${API_URL}/tracks`, {
+            // 3. Initialize Draw Tools
+            draw = new MapboxDraw({
+                displayControlsDefault: false,
+                controls: {
+                    line_string: true,
+                    point: true,
+                    trash: true
+                }
+            });
+            map.addControl(draw);
+
+            // 4. Load Data once map is ready
+            map.on('load', () => {
+                loadTracks();
+                loadWaypoints();
+            });
+        }
+
+        // Boot up the app
+        initializeApp();
+
+        let activeTrackId = null;
+
+        const groupColors = {
+            'Hikers': '#2ecc71',
+            'Runners': '#e67e22',
+            'Staff': '#9b59b6',
+            'Transport': '#f1c40f'
+        };
+
+        async function loadTracks() {
+            const res = await fetch(`${API_URL}/tracks`);
+            const tracks = await res.json();
+            const container = document.getElementById('tracks-container');
+            container.innerHTML = '';
+
+            tracks.forEach(track => {
+                const el = document.createElement('div');
+                el.className = 'track-item';
+                el.innerHTML = `<strong>${track.title}</strong> (${track.target_group})`;
+                el.onclick = () => editTrack(track);
+                container.appendChild(el);
+
+                // Add to map as layer
+                if (map.getSource(`track-${track.id}`)) {
+                    map.removeLayer(`layer-${track.id}`);
+                    map.removeSource(`track-${track.id}`);
+                }
+
+                map.addSource(`track-${track.id}`, {
+                    type: 'geojson',
+                    data: track.geojson_data
+                });
+
+                map.addLayer({
+                    id: `layer-${track.id}`,
+                    type: 'line',
+                    source: `track-${track.id}`,
+                    layout: { 'line-join': 'round', 'line-cap': 'round' },
+                    paint: {
+                        'line-color': groupColors[track.target_group] || track.color || '#3498db',
+                        'line-width': 4
+                    }
+                });
+            });
+        }
+
+        async function loadWaypoints() {
+            const res = await fetch(`${API_URL}/itinerary`);
+            const items = await res.json();
+
+            items.forEach(item => {
+                if (item.lat && item.lng) {
+                    new mapboxgl.Marker({ color: groupColors[item.target_group] || '#FF0000' })
+                        .setLngLat([item.lng, item.lat])
+                        .setPopup(new mapboxgl.Popup().setHTML(`
+                        <strong>${item.waypoint}</strong><br>
+                        Category: ${item.waypoint_category}<br>
+                        Task: ${item.task}<br>
+                        Group: ${item.target_group}<br>
+                        Day: ${item.day_label}
+                    `))
+                        .addTo(map);
+                }
+            });
+        }
+
+        function editTrack(track) {
+            activeTrackId = track.id;
+            draw.deleteAll();
+            const featureIds = draw.add(track.geojson_data);
+            document.getElementById('wp-title').value = track.title;
+            document.getElementById('target-group').value = track.target_group || 'Hikers';
+            document.getElementById('save-track-btn').style.display = 'block';
+
+            // Fit bounds
+            const coordinates = track.geojson_data.features[0].geometry.coordinates;
+            const bounds = coordinates.reduce((acc, coord) => {
+                return acc.extend(coord);
+            }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
+            map.fitBounds(bounds, { padding: 50 });
+        }
+
+        // GPX Upload
+        document.getElementById('gpx-file').addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function (event) {
+                const parser = new DOMParser();
+                const gpx = parser.parseFromString(event.target.result, 'text/xml');
+                const geojson = toGeoJSON.gpx(gpx);
+                draw.add(geojson);
+
+                if (geojson.features.length > 0) {
+                    const coords = geojson.features[0].geometry.coordinates;
+                    map.flyTo({ center: coords[0], zoom: 14 });
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // Save Waypoint/Task
+        document.getElementById('save-btn').onclick = async () => {
+            const data = draw.getAll();
+            const point = data.features.find(f => f.geometry.type === 'Point');
+
+            if (!point) {
+                alert("Please drop a point on the map first for a Waypoint.");
+                return;
+            }
+
+            const payload = {
+                title: document.getElementById('wp-title').value,
+                lat: point.geometry.coordinates[1],
+                lng: point.geometry.coordinates[0],
+                description: document.getElementById('wp-description').value,
+                category: document.getElementById('wp-category').value,
+                tasks: [{
+                    name: document.getElementById('wp-description').value,
+                    responsible: document.getElementById('responsible').value,
+                    target_group: document.getElementById('target-group').value,
+                    day_label: document.getElementById('day-label').value,
+                    characteristics: ''
+                }]
+            };
+
+            const res = await fetch(`${API_URL}/waypoints`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, geojson_data: geojson })
+                body: JSON.stringify(payload)
             });
-            alert("Track Synced!");
-        };
-        reader.readAsText(file);
-    }
 
-    async function saveEverything() {
-        const payload = {
-            title: document.getElementById('wpTitle').value,
-            lat: selectedCoords.lat, lng: selectedCoords.lng,
-            description: document.getElementById('characteristics').value,
-            tasks: [{
-                name: document.getElementById('taskName').value,
-                responsible: document.getElementById('responsible').value,
-                characteristics: document.getElementById('characteristics').value
-            }]
+            if (res.ok) {
+                alert("Waypoint saved!");
+                location.reload();
+            }
         };
-        const res = await fetch(`${API_URL}/waypoints`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        if (res.ok) alert("Location linked to Task!");
-    }
-</script>
+
+        // Save Edited Track
+        document.getElementById('save-track-btn').onclick = async () => {
+            const data = draw.getAll();
+            if (data.features.length === 0) return;
+
+            const payload = {
+                title: document.getElementById('wp-title').value,
+                target_group: document.getElementById('target-group').value,
+                geojson_data: data,
+                color: groupColors[document.getElementById('target-group').value]
+            };
+
+            let url = `${API_URL}/tracks`;
+            let method = 'POST';
+
+            if (activeTrackId) {
+                url = `${API_URL}/tracks/${activeTrackId}`;
+                method = 'PUT';
+            }
+
+            const res = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                alert("Track saved!");
+                activeTrackId = null;
+                document.getElementById('save-track-btn').style.display = 'none';
+                loadTracks();
+            }
+        };
+
+    </script>
+
 </body>
+
 </html>
