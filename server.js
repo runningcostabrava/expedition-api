@@ -118,4 +118,4 @@ app.get('/api/config', (req, res) => {
 app.get('/', (req, res) => res.send("Expedition API is Online"));
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`API online on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`API online on port ${PORT}`));
