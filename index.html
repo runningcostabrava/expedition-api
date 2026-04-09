@@ -187,11 +187,14 @@
         let map;
         let draw;
 
+        let ADMIN_KEY = null;
+
         async function initializeApp() {
             // 1. Securely fetch the token from your Render backend
             const configRes = await fetch(`${API_URL}/api/config`);
             const config = await configRes.json();
             mapboxgl.accessToken = config.MAPBOX_TOKEN;
+            ADMIN_KEY = config.ADMIN_KEY;
 
             // 2. Initialize Map
             map = new mapboxgl.Map({
@@ -350,7 +353,10 @@
 
             const res = await fetch(`${API_URL}/waypoints`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'x-api-key': ADMIN_KEY
+                },
                 body: JSON.stringify(payload)
             });
 
@@ -382,7 +388,10 @@
 
             const res = await fetch(url, {
                 method: method,
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'x-api-key': ADMIN_KEY
+                },
                 body: JSON.stringify(payload)
             });
 

@@ -7,6 +7,13 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
 
+const adminAuth = (req, res, next) => {
+  if (req.headers['x-api-key'] !== process.env.ADMIN_KEY) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+};
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
@@ -51,7 +58,7 @@ app.get('/tracks', async (req, res) => {
   } catch (err) { res.status(500).send({ error: err.message }); }
 });
 
-app.post('/tracks', async (req, res) => {
+app.post('/tracks', adminAuth, async (req, res) => {
   const { title, geojson_data, color, target_group } = req.body;
   try {
     await pool.query('INSERT INTO tracks (title, geojson_data, color, target_group) VALUES ($1, $2, $3, $4)', 
@@ -60,7 +67,7 @@ app.post('/tracks', async (req, res) => {
   } catch (err) { res.status(500).send({ error: err.message }); }
 });
 
-app.put('/tracks/:id', async (req, res) => {
+app.put('/tracks/:id', adminAuth, async (req, res) => {
   const { id } = req.params;
   const { geojson_data, title, color, target_group } = req.body;
   try {
@@ -80,7 +87,7 @@ app.get('/waypoints', async (req, res) => {
   } catch (err) { res.status(500).send({ error: err.message }); }
 });
 
-app.post('/waypoints', async (req, res) => {
+app.post('/waypoints', adminAuth, async (req, res) => {
   const { title, lat, lng, description, category, tasks } = req.body;
   try {
     const wp = await pool.query('INSERT INTO waypoints (title, lat, lng, description, category) VALUES ($1, $2, $3, $4, $5) RETURNING id', 
@@ -118,7 +125,10 @@ app.get('/itinerary', async (req, res) => {
 });
 
 app.get('/api/config', (req, res) => {
-  res.json({ MAPBOX_TOKEN: process.env.MAPBOX_TOKEN });
+  res.json({ 
+    MAPBOX_TOKEN: process.env.MAPBOX_TOKEN,
+    ADMIN_KEY: process.env.ADMIN_KEY
+  });
 });
 
 app.get('/', (req, res) => res.send("Expedition API is Online"));
