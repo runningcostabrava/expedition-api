@@ -186,7 +186,8 @@
         const API_URL = 'https://mapbox-api-uz9a.onrender.com';
         let map;
         let draw;
-
+        let activeMarkers = [];
+        let activeTrackId = null;
         let ADMIN_KEY = null;
 
         async function initializeApp() {
@@ -225,8 +226,6 @@
 
         // Boot up the app
         initializeApp();
-
-        let activeTrackId = null;
 
         const groupColors = {
             'Hikers': '#2ecc71',
@@ -276,9 +275,13 @@
             const res = await fetch(`${API_URL}/itinerary`);
             const items = await res.json();
 
+            // Clear old markers
+            activeMarkers.forEach(m => m.remove());
+            activeMarkers = [];
+
             items.forEach(item => {
                 if (item.lat && item.lng) {
-                    new mapboxgl.Marker({ color: groupColors[item.target_group] || '#FF0000' })
+                    const marker = new mapboxgl.Marker({ color: groupColors[item.target_group] || '#FF0000' })
                         .setLngLat([item.lng, item.lat])
                         .setPopup(new mapboxgl.Popup().setHTML(`
                         <strong>${item.waypoint}</strong><br>
@@ -288,6 +291,7 @@
                         Day: ${item.day_label}
                     `))
                         .addTo(map);
+                    activeMarkers.push(marker);
                 }
             });
         }
@@ -362,7 +366,11 @@
 
             if (res.ok) {
                 alert("Waypoint saved!");
-                location.reload();
+                loadWaypoints();
+                renderProjectView();
+                draw.deleteAll();
+                document.getElementById('wp-title').value = '';
+                document.getElementById('wp-description').value = '';
             }
         };
 
@@ -400,6 +408,8 @@
                 activeTrackId = null;
                 document.getElementById('save-track-btn').style.display = 'none';
                 loadTracks();
+                draw.deleteAll();
+                document.getElementById('wp-title').value = '';
             }
         };
 

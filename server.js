@@ -20,7 +20,7 @@ const pool = new Pool({
 });
 
 // 1. SETUP: Run once at /setup-db
-app.get('/setup-db', async (req, res) => {
+app.get('/setup-db', adminAuth, async (req, res) => {
   try {
     // First, ensure tables exist (for new deployments)
     await pool.query(`
