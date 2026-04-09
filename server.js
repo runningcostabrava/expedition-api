@@ -15,37 +15,26 @@ const pool = new Pool({
 // 1. SETUP: Run once at /setup-db
 app.get('/setup-db', async (req, res) => {
   try {
+    // First, ensure tables exist (for new deployments)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS location_logs (id SERIAL PRIMARY KEY, guide_id TEXT, lat DOUBLE PRECISION, lng DOUBLE PRECISION, timestamp TIMESTAMPTZ DEFAULT NOW());
-      CREATE TABLE IF NOT EXISTS waypoints (
-        id SERIAL PRIMARY KEY, 
-        title TEXT, 
-        description TEXT, 
-        lat DOUBLE PRECISION, 
-        lng DOUBLE PRECISION,
-        category TEXT
-      );
-      CREATE TABLE IF NOT EXISTS tasks (
-        id SERIAL PRIMARY KEY, 
-        waypoint_id INTEGER REFERENCES waypoints(id) ON DELETE CASCADE, 
-        task_name TEXT, 
-        responsible TEXT, 
-        characteristics TEXT, 
-        scheduled_time TIMESTAMPTZ, 
-        is_completed BOOLEAN DEFAULT false,
-        target_group TEXT,
-        day_label TEXT
-      );
-      CREATE TABLE IF NOT EXISTS tracks (
-        id SERIAL PRIMARY KEY, 
-        title TEXT, 
-        color TEXT DEFAULT '#FF0000', 
-        geojson_data JSONB NOT NULL,
-        target_group TEXT
-      );
+      CREATE TABLE IF NOT EXISTS waypoints (id SERIAL PRIMARY KEY, title TEXT, description TEXT, lat DOUBLE PRECISION, lng DOUBLE PRECISION);
+      CREATE TABLE IF NOT EXISTS tasks (id SERIAL PRIMARY KEY, waypoint_id INTEGER REFERENCES waypoints(id) ON DELETE CASCADE, task_name TEXT, responsible TEXT, characteristics TEXT, scheduled_time TIMESTAMPTZ, is_completed BOOLEAN DEFAULT false);
+      CREATE TABLE IF NOT EXISTS tracks (id SERIAL PRIMARY KEY, title TEXT, color TEXT DEFAULT '#FF0000', geojson_data JSONB NOT NULL);
     `);
-    res.send("Database tables created/verified successfully!");
-  } catch (err) { res.status(500).send("Setup Error: " + err.message); }
+
+    // Second, alter tables to add the v2.0 logistics columns if they are missing
+    await pool.query(`
+      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS category TEXT;
+      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS target_group TEXT;
+      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS day_label TEXT;
+      ALTER TABLE tracks ADD COLUMN IF NOT EXISTS target_group TEXT;
+    `);
+
+    res.send("Database tables created and updated successfully with v2.0 columns!");
+  } catch (err) { 
+    res.status(500).send("Setup Error: " + err.message); 
+  }
 });
 
 // 2. TRACKS: GPX Upload & Management
