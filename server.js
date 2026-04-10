@@ -72,17 +72,20 @@ app.get('/tracks', async (req, res) => {
 });
 
 app.post('/tracks', adminAuth, async (req, res) => {
-  const { title, geojson_data, color, target_group, tasks } = req.body;
+  const { title, geojson_data, color, target_group, tasks, existing_task_id } = req.body;
   try {
     const result = await pool.query('INSERT INTO tracks (title, geojson_data, color, target_group) VALUES ($1, $2, $3, $4) RETURNING id', 
       [title, geojson_data, color || '#3498db', target_group]);
     const trackId = result.rows[0].id;
 
-    if (tasks && tasks.length > 0) {
-      const geometryType = geojson_data.features[0].geometry.type;
-      const kind = geometryType === 'Polygon' ? 'polygon' : 'line';
-      const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, track_id) VALUES ($1, $2) RETURNING id', [kind, trackId]);
-      const anchorId = anchorRes.rows[0].id;
+    const geometryType = geojson_data.features[0].geometry.type;
+    const kind = geometryType === 'Polygon' ? 'polygon' : 'line';
+    const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, track_id) VALUES ($1, $2) RETURNING id', [kind, trackId]);
+    const anchorId = anchorRes.rows[0].id;
+
+    if (existing_task_id) {
+        await pool.query('UPDATE tasks SET anchor_id = $1 WHERE id = $2', [anchorId, existing_task_id]);
+    } else if (tasks && tasks.length > 0) {
       for (let t of tasks) {
         await pool.query('INSERT INTO tasks (anchor_id, task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', 
           [anchorId, t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at, t.is_completed || false]);
@@ -95,25 +98,28 @@ app.post('/tracks', adminAuth, async (req, res) => {
 
 app.put('/tracks/:id', adminAuth, async (req, res) => {
   const { id } = req.params;
-  const { geojson_data, title, color, target_group, tasks } = req.body;
+  const { geojson_data, title, color, target_group, tasks, existing_task_id } = req.body;
   try {
     await pool.query(
       'UPDATE tracks SET geojson_data = $1, title = COALESCE($2, title), color = COALESCE($3, color), target_group = COALESCE($4, target_group) WHERE id = $5',
       [geojson_data, title, color, target_group, id]
     );
 
-    if (tasks && tasks.length > 0) {
-        // Find or create anchor
-        let anchorId;
-        const existingAnchor = await pool.query('SELECT id FROM spatial_anchors WHERE track_id = $1', [id]);
-        if (existingAnchor.rows.length > 0) {
-            anchorId = existingAnchor.rows[0].id;
-        } else {
-            const geometryType = geojson_data.features[0].geometry.type;
-            const kind = geometryType === 'Polygon' ? 'polygon' : 'line';
-            const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, track_id) VALUES ($1, $2) RETURNING id', [kind, id]);
-            anchorId = anchorRes.rows[0].id;
-        }
+    // Find or create anchor
+    let anchorId;
+    const existingAnchor = await pool.query('SELECT id FROM spatial_anchors WHERE track_id = $1', [id]);
+    if (existingAnchor.rows.length > 0) {
+        anchorId = existingAnchor.rows[0].id;
+    } else {
+        const geometryType = geojson_data.features[0].geometry.type;
+        const kind = geometryType === 'Polygon' ? 'polygon' : 'line';
+        const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, track_id) VALUES ($1, $2) RETURNING id', [kind, id]);
+        anchorId = anchorRes.rows[0].id;
+    }
+
+    if (existing_task_id) {
+        await pool.query('UPDATE tasks SET anchor_id = $1 WHERE id = $2', [anchorId, existing_task_id]);
+    } else if (tasks && tasks.length > 0) {
         for (let t of tasks) {
           await pool.query('INSERT INTO tasks (anchor_id, task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', 
             [anchorId, t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at, t.is_completed || false]);
@@ -133,7 +139,7 @@ app.get('/waypoints', async (req, res) => {
 });
 
 app.post('/waypoints', adminAuth, async (req, res) => {
-  const { title, lat, lng, description, category, tasks } = req.body;
+  const { title, lat, lng, description, category, tasks, existing_task_id } = req.body;
   try {
     const wp = await pool.query('INSERT INTO waypoints (title, lat, lng, description, category) VALUES ($1, $2, $3, $4, $5) RETURNING id', 
       [title, lat, lng, description, category]);
@@ -142,7 +148,9 @@ app.post('/waypoints', adminAuth, async (req, res) => {
     const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, waypoint_id) VALUES ($1, $2) RETURNING id', ['point', wpId]);
     const anchorId = anchorRes.rows[0].id;
 
-    if (tasks && tasks.length > 0) {
+    if (existing_task_id) {
+        await pool.query('UPDATE tasks SET anchor_id = $1, waypoint_id = $2 WHERE id = $3', [anchorId, wpId, existing_task_id]);
+    } else if (tasks && tasks.length > 0) {
       for (let t of tasks) {
         await pool.query('INSERT INTO tasks (waypoint_id, anchor_id, task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)', 
         [wpId, anchorId, t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at, t.is_completed || false]);
@@ -157,6 +165,7 @@ app.get('/itinerary', async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT 
+        t.id as task_id,
         COALESCE(w_anchor.title, tr_anchor.title, w_legacy.title) as waypoint,
         COALESCE(w_anchor.category, w_legacy.category) as waypoint_category,
         COALESCE(w_anchor.lat, w_legacy.lat) as lat,
