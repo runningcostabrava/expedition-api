@@ -57,7 +57,21 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       ALTER TABLE tasks ADD COLUMN IF NOT EXISTS ends_at TIMESTAMPTZ;
     `);
 
-    res.send("Database tables created and updated successfully with v2.0 columns!");
+    // Phase 3: Task-Centric model & many-to-many
+    await pool.query(`
+      -- Add styling to waypoints
+      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS color TEXT DEFAULT '#e74c3c';
+      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT 'marker';
+      
+      -- Create Junction Table for Many-to-Many relationship
+      CREATE TABLE IF NOT EXISTS task_anchors (
+        task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
+        anchor_id INTEGER REFERENCES spatial_anchors(id) ON DELETE CASCADE,
+        PRIMARY KEY (task_id, anchor_id)
+      );
+    `);
+
+    res.send("Database tables created and updated successfully with v3.0 Task-Centric model!");
   } catch (err) { 
     res.status(500).send("Setup Error: " + err.message); 
   }
@@ -84,11 +98,13 @@ app.post('/tracks', adminAuth, async (req, res) => {
     const anchorId = anchorRes.rows[0].id;
 
     if (existing_task_id) {
-        await pool.query('UPDATE tasks SET anchor_id = $1 WHERE id = $2', [anchorId, existing_task_id]);
+      await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [existing_task_id, anchorId]);
     } else if (tasks && tasks.length > 0) {
       for (let t of tasks) {
-        await pool.query('INSERT INTO tasks (anchor_id, task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', 
-          [anchorId, t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at, t.is_completed || false]);
+        const taskRes = await pool.query('INSERT INTO tasks (task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id', 
+          [t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at, t.is_completed || false]);
+        const newTaskId = taskRes.rows[0].id;
+        await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2)', [newTaskId, anchorId]);
       }
     }
 
@@ -105,35 +121,35 @@ app.put('/tracks/:id', adminAuth, async (req, res) => {
       [geojson_data, title, color, target_group, id]
     );
 
-    // Find or create anchor
     let anchorId;
     const existingAnchor = await pool.query('SELECT id FROM spatial_anchors WHERE track_id = $1', [id]);
     if (existingAnchor.rows.length > 0) {
-        anchorId = existingAnchor.rows[0].id;
+      anchorId = existingAnchor.rows[0].id;
     } else {
-        const geometryType = geojson_data.features[0].geometry.type;
-        const kind = geometryType === 'Polygon' ? 'polygon' : 'line';
-        const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, track_id) VALUES ($1, $2) RETURNING id', [kind, id]);
-        anchorId = anchorRes.rows[0].id;
+      const geometryType = geojson_data.features[0].geometry.type;
+      const kind = geometryType === 'Polygon' ? 'polygon' : 'line';
+      const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, track_id) VALUES ($1, $2) RETURNING id', [kind, id]);
+      anchorId = anchorRes.rows[0].id;
     }
 
     if (existing_task_id) {
-        await pool.query('UPDATE tasks SET anchor_id = $1 WHERE id = $2', [anchorId, existing_task_id]);
+      await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [existing_task_id, anchorId]);
     } else if (tasks && tasks.length > 0) {
-        for (let t of tasks) {
-          const task = t;
-          await pool.query(`
-            UPDATE tasks SET 
-                task_name = COALESCE($1, task_name), 
-                responsible = COALESCE($2, responsible), 
-                target_group = COALESCE($3, target_group), 
-                day_label = COALESCE($4, day_label), 
-                starts_at = $5, 
-                ends_at = $6, 
-                is_completed = COALESCE($7, is_completed)
-            WHERE anchor_id = $8`,
-            [task.name, task.responsible, task.target_group, task.day_label, task.starts_at, task.ends_at, task.is_completed, anchorId]);
-        }
+      for (let t of tasks) {
+        const task = t;
+        // In the many-to-many world, we update the tasks linked to this anchor
+        await pool.query(`
+          UPDATE tasks SET 
+              task_name = COALESCE($1, task_name), 
+              responsible = COALESCE($2, responsible), 
+              target_group = COALESCE($3, target_group), 
+              day_label = COALESCE($4, day_label), 
+              starts_at = $5, 
+              ends_at = $6, 
+              is_completed = COALESCE($7, is_completed)
+          WHERE id IN (SELECT task_id FROM task_anchors WHERE anchor_id = $8)`,
+          [task.name, task.responsible, task.target_group, task.day_label, task.starts_at, task.ends_at, task.is_completed, anchorId]);
+      }
     }
 
     res.status(200).send({ message: "Track updated successfully" });
@@ -149,37 +165,45 @@ app.get('/waypoints', async (req, res) => {
 });
 
 app.post('/waypoints', adminAuth, async (req, res) => {
-  const { title, lat, lng, description, category, tasks, existing_task_id } = req.body;
+  const { title, lat, lng, description, category, tasks, existing_task_id, color, icon } = req.body;
   try {
-    const wp = await pool.query('INSERT INTO waypoints (title, lat, lng, description, category) VALUES ($1, $2, $3, $4, $5) RETURNING id', 
-      [title, lat, lng, description, category]);
+    const wp = await pool.query('INSERT INTO waypoints (title, lat, lng, description, category, color, icon) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id', 
+      [title, lat, lng, description, category, color || '#e74c3c', icon || 'marker']);
     const wpId = wp.rows[0].id;
 
     const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, waypoint_id) VALUES ($1, $2) RETURNING id', ['point', wpId]);
     const anchorId = anchorRes.rows[0].id;
 
     if (existing_task_id) {
-        await pool.query('UPDATE tasks SET anchor_id = $1, waypoint_id = $2 WHERE id = $3', [anchorId, wpId, existing_task_id]);
+      await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [existing_task_id, anchorId]);
     } else if (tasks && tasks.length > 0) {
       for (let t of tasks) {
-        await pool.query('INSERT INTO tasks (waypoint_id, anchor_id, task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)', 
-        [wpId, anchorId, t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at, t.is_completed || false]);
+        const taskRes = await pool.query('INSERT INTO tasks (task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id', 
+        [t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at, t.is_completed || false]);
+        const newTaskId = taskRes.rows[0].id;
+        await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2)', [newTaskId, anchorId]);
       }
     }
-    res.status(200).send({ message: "Project link saved!" });
+    res.status(200).send({ message: "Waypoint created and linked!" });
   } catch (err) { res.status(500).send({ error: err.message }); }
 });
 
 app.put('/waypoints/:id', adminAuth, async (req, res) => {
     const { id } = req.params;
-    const { title, lat, lng, description, category, tasks } = req.body;
+    const { title, lat, lng, description, category, tasks, color, icon } = req.body;
     try {
       await pool.query(
-        'UPDATE waypoints SET title = COALESCE($1, title), lat = COALESCE($2, lat), lng = COALESCE($3, lng), description = COALESCE($4, description), category = COALESCE($5, category) WHERE id = $6',
-        [title, lat, lng, description, category, id]
+        'UPDATE waypoints SET title = COALESCE($1, title), lat = COALESCE($2, lat), lng = COALESCE($3, lng), description = COALESCE($4, description), category = COALESCE($5, category), color = COALESCE($6, color), icon = COALESCE($7, icon) WHERE id = $8',
+        [title, lat, lng, description, category, color, icon, id]
       );
+
+      let anchorId;
+      const existingAnchor = await pool.query('SELECT id FROM spatial_anchors WHERE waypoint_id = $1', [id]);
+      if (existingAnchor.rows.length > 0) {
+        anchorId = existingAnchor.rows[0].id;
+      }
   
-      if (tasks && tasks.length > 0) {
+      if (anchorId && tasks && tasks.length > 0) {
           for (let t of tasks) {
             const task = t;
             await pool.query(`
@@ -191,8 +215,8 @@ app.put('/waypoints/:id', adminAuth, async (req, res) => {
                   starts_at = $5, 
                   ends_at = $6, 
                   is_completed = COALESCE($7, is_completed)
-              WHERE waypoint_id = $8`,
-              [task.name, task.responsible, task.target_group, task.day_label, task.starts_at, task.ends_at, task.is_completed, id]);
+              WHERE id IN (SELECT task_id FROM task_anchors WHERE anchor_id = $8)`,
+              [task.name, task.responsible, task.target_group, task.day_label, task.starts_at, task.ends_at, task.is_completed, anchorId]);
           }
       }
   
@@ -203,24 +227,25 @@ app.put('/waypoints/:id', adminAuth, async (req, res) => {
 // 4. ITINERARY: View Project Plan
 app.get('/itinerary', async (req, res) => {
   try {
+    // Note: Due to many-to-many, a task can appear multiple times if it has multiple anchors.
+    // For the UI, we'll join via task_anchors.
     const result = await pool.query(`
       SELECT 
         t.id as task_id,
-        COALESCE(w_anchor.title, tr_anchor.title, w_legacy.title) as waypoint,
-        COALESCE(w_anchor.category, w_legacy.category) as waypoint_category,
-        COALESCE(w_anchor.lat, w_legacy.lat) as lat,
-        COALESCE(w_anchor.lng, w_legacy.lng) as lng,
-        COALESCE(w_anchor.id, w_legacy.id) as waypoint_id,
-        tr_anchor.id as linked_track_id,
+        COALESCE(w.title, tr.title) as waypoint,
+        w.category as waypoint_category,
+        w.lat, w.lng,
+        w.id as waypoint_id,
+        tr.id as linked_track_id,
         sa.id as anchor_id,
         sa.kind as anchor_kind,
         t.task_name as task, t.responsible, t.target_group, t.day_label,
         t.starts_at, t.ends_at, t.is_completed
       FROM tasks t
-      LEFT JOIN spatial_anchors sa ON t.anchor_id = sa.id
-      LEFT JOIN waypoints w_anchor ON sa.waypoint_id = w_anchor.id
-      LEFT JOIN tracks tr_anchor ON sa.track_id = tr_anchor.id
-      LEFT JOIN waypoints w_legacy ON t.waypoint_id = w_legacy.id
+      LEFT JOIN task_anchors ta ON t.id = ta.task_id
+      LEFT JOIN spatial_anchors sa ON ta.anchor_id = sa.id
+      LEFT JOIN waypoints w ON sa.waypoint_id = w.id
+      LEFT JOIN tracks tr ON sa.track_id = tr.id
       ORDER BY t.starts_at ASC NULLS LAST, t.day_label ASC
     `);
     res.json(result.rows);
