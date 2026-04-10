@@ -8,6 +8,8 @@
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.0/mapbox-gl-draw.css"
         type="text/css">
+    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css" type="text/css">
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.0/mapbox-gl-draw.js"></script>
     <script src="https://unpkg.com/togeojson@0.16.0/togeojson.js"></script>
@@ -490,7 +492,45 @@
             });
             map.addControl(draw);
 
+            const geocoder = new MapboxGeocoder({
+                accessToken: mapboxgl.accessToken,
+                mapboxgl: mapboxgl,
+                marker: false // We will handle our own markers
+            });
+            map.addControl(geocoder, 'top-right');
+
+            geocoder.on('result', (e) => {
+                const coords = e.result.center;
+                const placeName = e.result.text;
+
+                // Clear drawings and add the searched point
+                draw.deleteAll();
+                draw.add({ type: 'Point', coordinates: coords });
+
+                resetForm();
+                document.getElementById('color-picker-group').style.display = 'block';
+                document.getElementById('wp-title').value = placeName;
+                document.getElementById('modal-title').innerText = "Save Searched Location";
+                openModal();
+            });
+
             map.on('load', () => {
+                map.addSource('mapbox-dem', {
+                    'type': 'raster-dem',
+                    'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                    'tileSize': 512,
+                    'maxzoom': 14
+                });
+                map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
+                map.addLayer({
+                    'id': 'sky',
+                    'type': 'sky',
+                    'paint': {
+                        'sky-type': 'atmosphere',
+                        'sky-atmosphere-sun': [0.0, 0.0],
+                        'sky-atmosphere-sun-intensity': 15
+                    }
+                });
                 refreshData();
             });
 
@@ -563,22 +603,50 @@
                     const renderColor = geom.color || groupColors[task.target_group] || '#3498db';
 
                     if (geom.kind === 'point' && geom.lat && geom.lng) {
+                        const popupHtml = `
+                            <div style="padding: 5px;">
+                                <h4 style="margin: 0 0 5px 0;">📍 ${geom.title}</h4>
+                                <p style="margin: 0 0 10px 0; font-size: 0.9em; color: #666;">Task: ${task.task}</p>
+                                <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="padding: 5px 10px; width: 100%;">Edit Location</button>
+                            </div>
+                        `;
+                        const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(popupHtml);
                         const marker = new mapboxgl.Marker({ color: renderColor })
                             .setLngLat([geom.lng, geom.lat])
+                            .setPopup(popup)
                             .addTo(map);
                         activeMarkers.push(marker);
                     } else if ((geom.kind === 'line' || geom.kind === 'polygon') && geom.geojson) {
                         const sourceId = `track-${geom.track_id}`;
+                        const layerId = `layer-${geom.track_id}`;
                         if (!map.getSource(sourceId)) {
                             map.addSource(sourceId, { type: 'geojson', data: geom.geojson });
                             map.addLayer({
-                                id: `layer-${geom.track_id}`,
+                                id: layerId,
                                 type: geom.kind === 'polygon' ? 'fill' : 'line',
                                 source: sourceId,
                                 paint: geom.kind === 'polygon'
                                     ? { 'fill-color': renderColor, 'fill-opacity': 0.4 }
                                     : { 'line-color': renderColor, 'line-width': 4 }
                             });
+
+                            map.on('click', layerId, (e) => {
+                                const emoji = geom.kind === 'polygon' ? '🛑' : '📈';
+                                const popupHtml = `
+                                    <div style="padding: 5px;">
+                                        <h4 style="margin: 0 0 5px 0;">${emoji} ${geom.title}</h4>
+                                        <p style="margin: 0 0 10px 0; font-size: 0.9em; color: #666;">Task: ${task.task}</p>
+                                        <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="padding: 5px 10px; width: 100%;">Edit Location</button>
+                                    </div>
+                                `;
+                                new mapboxgl.Popup()
+                                    .setLngLat(e.lngLat)
+                                    .setHTML(popupHtml)
+                                    .addTo(map);
+                            });
+
+                            map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
+                            map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
                         }
                     }
                 });
