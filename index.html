@@ -41,11 +41,6 @@
             padding: 20px;
         }
 
-        #map {
-            flex: 1;
-            position: relative;
-        }
-
         /* Persistent Map Tools */
         .floating-tools {
             position: absolute;
@@ -256,11 +251,16 @@
         <div id="asana-container"></div>
     </div>
 
-    <div id="map">
+    <div id="map-wrapper" style="flex: 1; position: relative;">
+        <div id="map" style="position: absolute; top: 0; bottom: 0; width: 100%;"></div>
         <div class="floating-tools">
             <button onclick="draw.changeMode('draw_point')">📍 Add Waypoint</button>
             <button onclick="draw.changeMode('draw_line_string')">📈 Add Track</button>
             <button onclick="draw.changeMode('draw_polygon')">🛑 Add Zone</button>
+            <label style="cursor: pointer; padding: 8px 15px; background: #fff; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;">
+                📁 Upload GPX
+                <input type="file" id="gpx-file" accept=".gpx" style="display: none;">
+            </label>
         </div>
     </div>
 
@@ -454,7 +454,7 @@
                         <div class="task-cell name" onclick="zoomToTask(${task.task_id})">${doneUI}${task.task}</div>
                         <div class="task-cell"><div class="assignee-icon" style="background:${groupColors[task.target_group]}">${initials}</div></div>
                         <div class="task-cell time">${startTime}</div>
-                        <div class="task-cell"><button class="edit-btn" onclick="event.stopPropagation(); startEdit(${JSON.stringify(task).replace(/"/g, '"')})">✏️</button></div>
+                        <div class="task-cell"><button class="edit-btn" onclick="event.stopPropagation(); startEdit(${task.task_id})">✏️</button></div>
                     `;
                     section.appendChild(taskEl);
                 });
@@ -480,11 +480,14 @@
             }
         }
 
-        function startEdit(task) {
+        function startEdit(taskId) {
+            const task = allItinerary.find(t => t.task_id === taskId);
+            if (!task) return;
+
             activeTaskId = task.task_id;
             activeAnchorId = task.anchor_id;
             activeWaypointId = task.waypoint_id;
-            
+
             document.getElementById('wp-title').value = task.waypoint;
             document.getElementById('target-group').value = task.target_group;
             document.getElementById('day-label').value = task.day_label || '';
@@ -570,6 +573,25 @@
             const res = await fetch(`${API_URL}/setup-db`, { headers: { 'x-api-key': ADMIN_KEY } });
             if (res.ok) alert("Synced!");
         }
+
+        document.getElementById('gpx-file').addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function (event) {
+                const parser = new DOMParser();
+                const gpx = parser.parseFromString(event.target.result, 'text/xml');
+                const geojson = toGeoJSON.gpx(gpx);
+                draw.add(geojson);
+
+                if (geojson.features.length > 0) {
+                    const coords = geojson.features[0].geometry.coordinates;
+                    // Basic zoom to the start of the GPX track
+                    map.flyTo({ center: coords[0], zoom: 14 });
+                }
+            };
+            reader.readAsText(file);
+        });
 
         initializeApp();
     </script>
