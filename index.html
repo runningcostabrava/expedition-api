@@ -314,6 +314,17 @@
                 <label><input type="checkbox" id="is-completed"> Mark Task as Completed</label>
             </div>
 
+            <div class="form-group" id="color-picker-group" style="border-top: 1px solid #eee; padding-top: 15px; margin-top: 15px; display: none;">
+                <label>Location Color</label>
+                <input type="color" id="geom-color" value="#3498db" style="padding: 0; height: 40px; cursor: pointer;">
+            </div>
+
+            <div class="form-group">
+                <label>Attached Locations</label>
+                <div id="attached-locations-list" style="font-size: 0.85em; background: #f8f9fa; padding: 10px; border-radius: 6px;">
+                </div>
+            </div>
+
             <button id="unified-save-btn" class="save-btn">Save changes</button>
             <button class="cancel-btn" onclick="closeModal()">Cancel</button>
             
@@ -359,6 +370,7 @@
 
                 // Prepare the form for a clean entry
                 resetForm();
+                document.getElementById('color-picker-group').style.display = 'block';
 
                 // Pre-fill a contextual default title based on the geometry type
                 const titleInput = document.getElementById('wp-title');
@@ -376,54 +388,69 @@
         }
 
         async function refreshData() {
-            await Promise.all([loadTracks(), loadWaypoints()]);
+            const res = await fetch(`${API_URL}/itinerary`);
+            allItinerary = await res.json();
+
+            // Refresh dropdown
+            const dropdown = document.getElementById('existing-task');
+            dropdown.innerHTML = '<option value="">-- Create New Task --</option>';
+            allItinerary.forEach(t => {
+                const option = document.createElement('option');
+                option.value = t.task_id;
+                option.textContent = t.task;
+                dropdown.appendChild(option);
+            });
+
             renderProjectView();
+            renderMapGeometries();
         }
 
         const groupColors = {
             'Hikers': '#2ecc71', 'Runners': '#e67e22', 'Staff': '#9b59b6', 'Transport': '#f1c40f'
         };
 
-        async function loadTracks() {
-            const res = await fetch(`${API_URL}/tracks`);
-            allTracks = await res.json();
-            allTracks.forEach(track => {
-                if (map.getSource(`track-${track.id}`)) {
-                    map.removeLayer(`layer-${track.id}`);
-                    map.removeSource(`track-${track.id}`);
-                }
-                map.addSource(`track-${track.id}`, { type: 'geojson', data: track.geojson_data });
-                const isPolygon = track.geojson_data.features[0].geometry.type === 'Polygon';
-                map.addLayer({
-                    id: `layer-${track.id}`,
-                    type: isPolygon ? 'fill' : 'line',
-                    source: `track-${track.id}`,
-                    paint: isPolygon ? { 'fill-color': groupColors[track.target_group] || '#3498db', 'fill-opacity': 0.4 } : { 'line-color': groupColors[track.target_group] || '#3498db', 'line-width': 4 }
-                });
-            });
-        }
-
-        async function loadWaypoints() {
-            const res = await fetch(`${API_URL}/itinerary`);
-            allItinerary = await res.json();
+        function renderMapGeometries() {
+            // Clear old markers
             activeMarkers.forEach(m => m.remove());
             activeMarkers = [];
 
-            const dropdown = document.getElementById('existing-task');
-            dropdown.innerHTML = '<option value="">-- Create New Task --</option>';
+            // Clear old track layers/sources
+            const style = map.getStyle();
+            if (style && style.layers) {
+                style.layers.forEach(layer => {
+                    if (layer.id.startsWith('layer-')) {
+                        map.removeLayer(layer.id);
+                        if (map.getSource(layer.source)) map.removeSource(layer.source);
+                    }
+                });
+            }
 
-            allItinerary.forEach(item => {
-                const option = document.createElement('option');
-                option.value = item.task_id;
-                option.textContent = item.task;
-                dropdown.appendChild(option);
+            // Render new geometries
+            allItinerary.forEach(task => {
+                if (!task.geometries) return;
+                task.geometries.forEach(geom => {
+                    const renderColor = geom.color || groupColors[task.target_group] || '#3498db';
 
-                if (item.lat && item.lng) {
-                    const marker = new mapboxgl.Marker({ color: groupColors[item.target_group] || '#FF0000' })
-                        .setLngLat([item.lng, item.lat])
-                        .addTo(map);
-                    activeMarkers.push(marker);
-                }
+                    if (geom.kind === 'point' && geom.lat && geom.lng) {
+                        const marker = new mapboxgl.Marker({ color: renderColor })
+                            .setLngLat([geom.lng, geom.lat])
+                            .addTo(map);
+                        activeMarkers.push(marker);
+                    } else if ((geom.kind === 'line' || geom.kind === 'polygon') && geom.geojson) {
+                        const sourceId = `track-${geom.track_id}`;
+                        if (!map.getSource(sourceId)) {
+                            map.addSource(sourceId, { type: 'geojson', data: geom.geojson });
+                            map.addLayer({
+                                id: `layer-${geom.track_id}`,
+                                type: geom.kind === 'polygon' ? 'fill' : 'line',
+                                source: sourceId,
+                                paint: geom.kind === 'polygon'
+                                    ? { 'fill-color': renderColor, 'fill-opacity': 0.4 }
+                                    : { 'line-color': renderColor, 'line-width': 4 }
+                            });
+                        }
+                    }
+                });
             });
         }
 
@@ -486,19 +513,17 @@
 
         function zoomToTask(taskId) {
             const task = allItinerary.find(t => t.task_id === taskId);
-            if (!task) return;
+            if (!task || !task.geometries || task.geometries.length === 0) return;
 
-            if (task.linked_track_id) {
-                const track = allTracks.find(t => t.id === task.linked_track_id);
-                if (track) {
-                    const coords = track.geojson_data.features[0].geometry.coordinates;
-                    const bounds = track.geojson_data.features[0].geometry.type === 'Polygon'
-                        ? coords[0].reduce((acc, c) => acc.extend(c), new mapboxgl.LngLatBounds(coords[0][0], coords[0][0]))
-                        : coords.reduce((acc, c) => acc.extend(c), new mapboxgl.LngLatBounds(coords[0], coords[0]));
-                    map.fitBounds(bounds, { padding: 50 });
-                }
-            } else if (task.lat) {
-                map.flyTo({ center: [task.lng, task.lat], zoom: 16 });
+            const first = task.geometries[0];
+            if (first.kind === 'point') {
+                map.flyTo({ center: [first.lng, first.lat], zoom: 16 });
+            } else if (first.geojson) {
+                const coords = first.geojson.features[0].geometry.coordinates;
+                const bounds = first.geojson.features[0].geometry.type === 'Polygon'
+                    ? coords[0].reduce((acc, c) => acc.extend(c), new mapboxgl.LngLatBounds(coords[0][0], coords[0][0]))
+                    : coords.reduce((acc, c) => acc.extend(c), new mapboxgl.LngLatBounds(coords[0], coords[0]));
+                map.fitBounds(bounds, { padding: 50 });
             }
         }
 
@@ -507,25 +532,24 @@
             if (!task) return;
 
             activeTaskId = task.task_id;
-            activeAnchorId = task.anchor_id;
-            activeWaypointId = task.waypoint_id;
 
-            document.getElementById('wp-title').value = task.waypoint;
+            document.getElementById('wp-description').value = task.task;
             document.getElementById('target-group').value = task.target_group;
             document.getElementById('day-label').value = task.day_label || '';
             document.getElementById('starts-at').value = task.starts_at ? task.starts_at.substring(0, 16) : '';
-            document.getElementById('wp-description').value = task.task;
             document.getElementById('responsible').value = task.responsible || '';
             document.getElementById('is-completed').checked = task.is_completed;
             document.getElementById('existing-task').style.display = 'none';
-            
+            document.getElementById('color-picker-group').style.display = 'none';
+
+            const list = document.getElementById('attached-locations-list');
+            list.innerHTML = '';
+            task.geometries.forEach(g => {
+                const emoji = g.kind === 'point' ? '📍' : (g.kind === 'polygon' ? '🛑' : '📈');
+                list.innerHTML += `<div>${emoji} ${g.title}</div>`;
+            });
+
             draw.deleteAll();
-            if (task.linked_track_id) {
-                const track = allTracks.find(t => t.id === task.linked_track_id);
-                if (track) draw.add(track.geojson_data);
-            } else if (task.lat) {
-                draw.add({ type: 'Feature', geometry: { type: 'Point', coordinates: [task.lng, task.lat] }, properties: {} });
-            }
             openModal();
         }
 
@@ -556,50 +580,52 @@
 
         document.getElementById('unified-save-btn').onclick = async () => {
             const data = draw.getAll();
-            if (data.features.length === 0) return alert("Draw something on map!");
+            const color = document.getElementById('geom-color').value;
+            const existingTaskId = document.getElementById('existing-task').value || activeTaskId;
 
-            const feature = data.features[data.features.length - 1];
-            const isPoint = feature.geometry.type === 'Point';
-            const existingTaskId = document.getElementById('existing-task').value || null;
-
-            let payload = {
-                title: document.getElementById('wp-title').value,
-                target_group: document.getElementById('target-group').value,
-                existing_task_id: existingTaskId || activeTaskId,
-                tasks: [{
-                    name: document.getElementById('wp-description').value || document.getElementById('wp-title').value,
+            if (data.features.length === 0) {
+                // FLOW A: Saving Task Details only
+                const payload = {
+                    task_name: document.getElementById('wp-description').value || "New Task",
                     responsible: document.getElementById('responsible').value,
                     target_group: document.getElementById('target-group').value,
                     day_label: document.getElementById('day-label').value,
                     starts_at: document.getElementById('starts-at').value || null,
                     is_completed: document.getElementById('is-completed').checked
-                }]
-            };
-
-            let endpoint = isPoint ? '/waypoints' : '/tracks';
-            if (isPoint) {
-                payload.lat = feature.geometry.coordinates[1];
-                payload.lng = feature.geometry.coordinates[0];
-                if (activeWaypointId) endpoint += `/${activeWaypointId}`;
+                };
+                const method = activeTaskId ? 'PUT' : 'POST';
+                const endpoint = activeTaskId ? `/tasks/${activeTaskId}` : '/tasks';
+                const res = await fetch(`${API_URL}${endpoint}`, {
+                    method,
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) { closeModal(); refreshData(); }
             } else {
-                payload.geojson_data = data;
-                if (activeAnchorId) {
-                   const track = allTracks.find(t => t.id === allItinerary.find(i => i.task_id === activeTaskId).linked_track_id);
-                   if (track) endpoint += `/${track.id}`;
+                // FLOW B: Saving a Location
+                const feature = data.features[data.features.length - 1];
+                const isPoint = feature.geometry.type === 'Point';
+                let endpoint = isPoint ? '/waypoints' : '/tracks';
+                let payload = {
+                    title: document.getElementById('wp-title').value || (isPoint ? "New Waypoint" : "New Track"),
+                    color: color,
+                    existing_task_id: existingTaskId,
+                    target_group: document.getElementById('target-group').value
+                };
+
+                if (isPoint) {
+                    payload.lat = feature.geometry.coordinates[1];
+                    payload.lng = feature.geometry.coordinates[0];
+                } else {
+                    payload.geojson_data = data;
                 }
-            }
 
-            const method = (activeTaskId || (activeWaypointId && isPoint)) ? 'PUT' : 'POST';
-            const res = await fetch(`${API_URL}${endpoint}`, {
-                method: method,
-                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
-                body: JSON.stringify(payload)
-            });
-
-            if (res.ok) {
-                alert("Success!");
-                closeModal();
-                refreshData();
+                const res = await fetch(`${API_URL}${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) { closeModal(); refreshData(); }
             }
         };
 
@@ -625,17 +651,18 @@
                 draw.deleteAll();
                 draw.add(geojson);
 
-                if (geojson.features.length > 0) {
-                    const coords = geojson.features[0].geometry.coordinates;
-                    // Handle both simple lines and multi-lines for zooming
-                    const startCoord = Array.isArray(coords[0][0]) ? coords[0][0] : coords[0];
-                    map.flyTo({ center: startCoord, zoom: 14 });
+            if (geojson.features.length > 0) {
+                const coords = geojson.features[0].geometry.coordinates;
+                // Handle both simple lines and multi-lines for zooming
+                const startCoord = Array.isArray(coords[0][0]) ? coords[0][0] : coords[0];
+                map.flyTo({ center: startCoord, zoom: 14 });
 
-                    // Prepare the Modal
-                    resetForm();
-                    document.getElementById('wp-title').value = defaultTitle;
-                    openModal();
-                }
+                // Prepare the Modal
+                resetForm();
+                document.getElementById('color-picker-group').style.display = 'block';
+                document.getElementById('wp-title').value = defaultTitle;
+                openModal();
+            }
 
                 // Reset the file input so the same file can be uploaded again if needed
                 e.target.value = '';
