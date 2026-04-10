@@ -127,6 +127,80 @@
             font-size: 0.85em;
         }
 
+        .task-accordion {
+            display: none;
+            background: #fff;
+            border-bottom: 1px solid #f0f0f0;
+            padding: 10px 15px 15px 40px;
+            border-left: 3px solid #3498db;
+        }
+
+        .task-accordion.open {
+            display: block;
+        }
+
+        .geom-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            background: #f8f9fa;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+
+        .geom-row:hover {
+            background: #e9ecef;
+            cursor: pointer;
+        }
+
+        .geom-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .color-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .edit-geom-btn {
+            background: none;
+            border: none;
+            color: #7f8c8d;
+            cursor: pointer;
+            font-size: 1.1em;
+            padding: 2px;
+        }
+
+        .edit-geom-btn:hover {
+            color: #3498db;
+        }
+
+        .task-header-fields {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .inline-edit-input {
+            border: 1px solid transparent;
+            background: transparent;
+            padding: 4px;
+            border-radius: 4px;
+            font-family: inherit;
+        }
+
+        .inline-edit-input:hover,
+        .inline-edit-input:focus {
+            border: 1px solid #ddd;
+            background: #fff;
+        }
+
         .assignee-icon {
             width: 24px;
             height: 24px;
@@ -280,38 +354,40 @@
                 <input type="text" id="wp-title" placeholder="Title">
             </div>
 
-            <div class="form-group">
-                <label>Target Group</label>
-                <select id="target-group">
-                    <option value="Hikers">Hikers</option>
-                    <option value="Runners">Runners</option>
-                    <option value="Staff">Staff</option>
-                    <option value="Transport">Transport</option>
-                </select>
-            </div>
+            <div id="task-fields-container">
+                <div class="form-group">
+                    <label>Target Group</label>
+                    <select id="target-group">
+                        <option value="Hikers">Hikers</option>
+                        <option value="Runners">Runners</option>
+                        <option value="Staff">Staff</option>
+                        <option value="Transport">Transport</option>
+                    </select>
+                </div>
 
-            <div class="form-group">
-                <label>Day Label</label>
-                <input type="text" id="day-label" placeholder="Friday - Day 1">
-            </div>
+                <div class="form-group">
+                    <label>Day Label</label>
+                    <input type="text" id="day-label" placeholder="Friday - Day 1">
+                </div>
 
-            <div class="form-group">
-                <label>Starts At</label>
-                <input type="datetime-local" id="starts-at">
-            </div>
+                <div class="form-group">
+                    <label>Starts At</label>
+                    <input type="datetime-local" id="starts-at">
+                </div>
 
-            <div class="form-group">
-                <label>Description</label>
-                <textarea id="wp-description" rows="2"></textarea>
-            </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="wp-description" rows="2"></textarea>
+                </div>
 
-            <div class="form-group">
-                <label>Responsible Person</label>
-                <input type="text" id="responsible" placeholder="Name">
-            </div>
+                <div class="form-group">
+                    <label>Responsible Person</label>
+                    <input type="text" id="responsible" placeholder="Name">
+                </div>
 
-            <div class="form-group">
-                <label><input type="checkbox" id="is-completed"> Mark Task as Completed</label>
+                <div class="form-group">
+                    <label><input type="checkbox" id="is-completed"> Mark Task as Completed</label>
+                </div>
             </div>
 
             <div class="form-group" id="color-picker-group" style="border-top: 1px solid #eee; padding-top: 15px; margin-top: 15px; display: none;">
@@ -338,6 +414,7 @@
         let activeMarkers = [];
         let allTracks = [], allItinerary = [];
         let activeTaskId = null, activeAnchorId = null, activeWaypointId = null;
+        let isEditingGeometry = false;
         let ADMIN_KEY = null;
 
         async function initializeApp() {
@@ -462,7 +539,7 @@
 
             // Filter
             const filtered = allItinerary.filter(t => {
-                const matchSearch = t.task.toLowerCase().includes(searchTerm) || (t.waypoint && t.waypoint.toLowerCase().includes(searchTerm));
+                const matchSearch = t.task.toLowerCase().includes(searchTerm) || (t.task && t.task.toLowerCase().includes(searchTerm));
                 const matchGroup = !groupFilter || t.target_group === groupFilter;
                 return matchSearch && matchGroup;
             });
@@ -495,17 +572,55 @@
                     const initials = task.responsible ? task.responsible.split(' ').map(n => n[0]).join('').toUpperCase() : '-';
                     const doneUI = task.is_completed ? '✅ ' : '';
 
+                    // Container for both the row and the accordion
+                    const taskContainer = document.createElement('div');
+
+                    // 1. The Main Row
                     const taskEl = document.createElement('div');
                     taskEl.className = 'task-row';
                     if (task.is_completed) taskEl.style.opacity = '0.6';
+                    taskEl.onclick = () => {
+                        const acc = document.getElementById(`acc-${task.task_id}`);
+                        acc.classList.toggle('open');
+                        zoomToTask(task.task_id);
+                    };
 
                     taskEl.innerHTML = `
-                        <div class="task-cell name" onclick="zoomToTask(${task.task_id})">${doneUI}${task.task}</div>
-                        <div class="task-cell"><div class="assignee-icon" style="background:${groupColors[task.target_group]}">${initials}</div></div>
+                        <div class="task-cell name">${doneUI}${task.task}</div>
+                        <div class="task-cell"><div class="assignee-icon" style="background:${groupColors[task.target_group] || '#3498db'}">${initials}</div></div>
                         <div class="task-cell time">${startTime}</div>
                         <div class="task-cell"><button class="edit-btn" onclick="event.stopPropagation(); startEdit(${task.task_id})">✏️</button></div>
                     `;
-                    section.appendChild(taskEl);
+
+                    // 2. The Accordion Details
+                    const accordionEl = document.createElement('div');
+                    accordionEl.className = 'task-accordion';
+                    accordionEl.id = `acc-${task.task_id}`;
+
+                    let geomHtml = '';
+                    if (task.geometries && task.geometries.length > 0) {
+                        task.geometries.forEach(g => {
+                            const emoji = g.kind === 'point' ? '📍' : (g.kind === 'polygon' ? '🛑' : '📈');
+                            const color = g.color || '#3498db';
+                            geomHtml += `
+                                <div class="geom-row" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})">
+                                    <div class="geom-info">
+                                        <span>${emoji}</span>
+                                        <span class="color-dot" style="background-color: ${color}"></span>
+                                        <span>${g.title}</span>
+                                    </div>
+                                    <button class="edit-geom-btn">⚙️</button>
+                                </div>
+                            `;
+                        });
+                    } else {
+                        geomHtml = `<div style="color: #95a5a6; font-size: 0.85em; font-style: italic;">No locations attached.</div>`;
+                    }
+                    accordionEl.innerHTML = geomHtml;
+
+                    taskContainer.appendChild(taskEl);
+                    taskContainer.appendChild(accordionEl);
+                    section.appendChild(taskContainer);
                 });
                 container.appendChild(section);
             }
@@ -531,8 +646,12 @@
             const task = allItinerary.find(t => t.task_id === taskId);
             if (!task) return;
 
+            isEditingGeometry = false;
             activeTaskId = task.task_id;
 
+            document.getElementById('modal-title').innerText = "Command Center";
+            document.getElementById('task-fields-container').style.display = 'block';
+            document.getElementById('wp-title').value = task.task; // In task mode, title is task name
             document.getElementById('wp-description').value = task.task;
             document.getElementById('target-group').value = task.target_group;
             document.getElementById('day-label').value = task.day_label || '';
@@ -541,6 +660,7 @@
             document.getElementById('is-completed').checked = task.is_completed;
             document.getElementById('existing-task').style.display = 'none';
             document.getElementById('color-picker-group').style.display = 'none';
+            document.getElementById('attached-locations-list').parentElement.style.display = 'block';
 
             const list = document.getElementById('attached-locations-list');
             list.innerHTML = '';
@@ -553,10 +673,47 @@
             openModal();
         }
 
+        function startEditGeometry(taskId, anchorId) {
+            const task = allItinerary.find(t => t.task_id === taskId);
+            if (!task) return;
+            const geom = task.geometries.find(g => g.anchor_id === anchorId);
+            if (!geom) return;
+
+            resetForm();
+            isEditingGeometry = true;
+            activeTaskId = taskId;
+            activeAnchorId = anchorId;
+            activeWaypointId = geom.waypoint_id; // Will be null if it's a track
+            activeTrackId = geom.track_id;       // Global scope for use in save
+
+            // Hide Task specific fields, show geometry fields
+            document.getElementById('task-fields-container').style.display = 'none';
+            document.getElementById('color-picker-group').style.display = 'block';
+            document.getElementById('attached-locations-list').parentElement.style.display = 'none';
+
+            document.getElementById('modal-title').innerText = "Edit Location Details";
+            document.getElementById('wp-title').value = geom.title;
+            document.getElementById('geom-color').value = geom.color || '#3498db';
+            document.getElementById('existing-task').value = taskId;
+            document.getElementById('existing-task').style.display = 'block';
+
+            draw.deleteAll();
+            if (geom.kind === 'point') {
+                draw.add({ type: 'Feature', geometry: { type: 'Point', coordinates: [geom.lng, geom.lat] }, properties: {} });
+            } else if (geom.geojson) {
+                draw.add(geom.geojson);
+            }
+            openModal();
+        }
+
+        let activeTrackId = null;
+
         function resetForm() {
             activeTaskId = null;
             activeAnchorId = null;
             activeWaypointId = null;
+            activeTrackId = null;
+            isEditingGeometry = false;
             document.getElementById('wp-title').value = '';
             document.getElementById('target-group').value = 'Hikers';
             document.getElementById('day-label').value = '';
@@ -583,7 +740,30 @@
             const color = document.getElementById('geom-color').value;
             const existingTaskId = document.getElementById('existing-task').value || activeTaskId;
 
-            if (data.features.length === 0) {
+            if (isEditingGeometry) {
+                const isPoint = activeWaypointId !== null;
+                const endpoint = isPoint ? `/waypoints/${activeWaypointId}` : `/tracks/${activeTrackId}`;
+                let payload = {
+                    title: document.getElementById('wp-title').value,
+                    color: color,
+                    existing_task_id: existingTaskId
+                };
+                if (data.features.length > 0) {
+                    const feature = data.features[data.features.length - 1];
+                    if (isPoint) {
+                        payload.lat = feature.geometry.coordinates[1];
+                        payload.lng = feature.geometry.coordinates[0];
+                    } else {
+                        payload.geojson_data = data;
+                    }
+                }
+                const res = await fetch(`${API_URL}${endpoint}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) { closeModal(); refreshData(); }
+            } else if (data.features.length === 0) {
                 // FLOW A: Saving Task Details only
                 const payload = {
                     task_name: document.getElementById('wp-description').value || "New Task",
@@ -602,7 +782,7 @@
                 });
                 if (res.ok) { closeModal(); refreshData(); }
             } else {
-                // FLOW B: Saving a Location
+                // FLOW B: Saving a new Location
                 const feature = data.features[data.features.length - 1];
                 const isPoint = feature.geometry.type === 'Point';
                 let endpoint = isPoint ? '/waypoints' : '/tracks';

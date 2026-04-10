@@ -140,7 +140,7 @@ app.put('/tracks/:id', adminAuth, async (req, res) => {
   const { geojson_data, title, color, target_group, tasks, existing_task_id } = req.body;
   try {
     await pool.query(
-      'UPDATE tracks SET geojson_data = $1, title = COALESCE($2, title), color = COALESCE($3, color), target_group = COALESCE($4, target_group) WHERE id = $5',
+      'UPDATE tracks SET geojson_data = COALESCE($1, geojson_data), title = COALESCE($2, title), color = COALESCE($3, color), target_group = COALESCE($4, target_group) WHERE id = $5',
       [geojson_data, title, color, target_group, id]
     );
 
@@ -155,7 +155,8 @@ app.put('/tracks/:id', adminAuth, async (req, res) => {
       anchorId = anchorRes.rows[0].id;
     }
 
-    if (existing_task_id) {
+    if (existing_task_id && anchorId) {
+      await pool.query('DELETE FROM task_anchors WHERE anchor_id = $1', [anchorId]);
       await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [existing_task_id, anchorId]);
     } else if (tasks && tasks.length > 0) {
       for (let t of tasks) {
@@ -213,7 +214,7 @@ app.post('/waypoints', adminAuth, async (req, res) => {
 
 app.put('/waypoints/:id', adminAuth, async (req, res) => {
     const { id } = req.params;
-    const { title, lat, lng, description, category, tasks, color, icon } = req.body;
+    const { title, lat, lng, description, category, tasks, color, icon, existing_task_id } = req.body;
     try {
       await pool.query(
         'UPDATE waypoints SET title = COALESCE($1, title), lat = COALESCE($2, lat), lng = COALESCE($3, lng), description = COALESCE($4, description), category = COALESCE($5, category), color = COALESCE($6, color), icon = COALESCE($7, icon) WHERE id = $8',
@@ -226,6 +227,11 @@ app.put('/waypoints/:id', adminAuth, async (req, res) => {
         anchorId = existingAnchor.rows[0].id;
       }
   
+      if (existing_task_id && anchorId) {
+        await pool.query('DELETE FROM task_anchors WHERE anchor_id = $1', [anchorId]);
+        await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [existing_task_id, anchorId]);
+      }
+
       if (anchorId && tasks && tasks.length > 0) {
           for (let t of tasks) {
             const task = t;
