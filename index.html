@@ -29,18 +29,16 @@
             background: #f8f9fa;
         }
 
-        #asana-container-wrapper {
-            flex: 1;
-            overflow-y: auto;
-            padding: 15px;
+        #panel-header {
+            padding: 20px;
+            background: white;
+            border-bottom: 1px solid #eee;
         }
 
-        #form-container {
-            padding: 15px;
-            border-top: 2px solid #ddd;
-            background: white;
-            max-height: 60vh;
+        #asana-container {
+            flex: 1;
             overflow-y: auto;
+            padding: 20px;
         }
 
         #map {
@@ -48,83 +46,143 @@
             position: relative;
         }
 
-        h2 {
-            margin-top: 0;
-            font-size: 1.2em;
+        .task-row {
+            background: white;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .task-row:hover {
+            transform: translateX(4px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+        }
+
+        .task-info {
+            flex: 1;
+        }
+
+        .task-name {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 0.95em;
+        }
+
+        .task-meta {
+            font-size: 0.8em;
+            color: #7f8c8d;
+            margin-top: 4px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .assignee-icon {
+            width: 24px;
+            height: 24px;
+            background: #3498db;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7em;
+            font-weight: bold;
+        }
+
+        .edit-btn {
+            background: none;
+            border: none;
+            color: #95a5a6;
+            cursor: pointer;
+            padding: 5px;
+            font-size: 1.1em;
+        }
+
+        .edit-btn:hover {
+            color: #3498db;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
         }
 
         .form-group {
-            margin-bottom: 10px;
+            margin-bottom: 15px;
         }
 
         label {
             display: block;
             font-size: 0.85em;
-            margin-bottom: 3px;
+            margin-bottom: 5px;
             font-weight: bold;
+            color: #34495e;
         }
 
-        input,
-        select,
-        textarea {
+        input, select, textarea {
             width: 100%;
-            padding: 6px;
+            padding: 10px;
             box-sizing: border-box;
-            border: 1px solid #ccc;
-            border-radius: 4px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
         }
 
         button {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             background: #3498db;
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            margin-top: 5px;
+            font-weight: 600;
         }
 
-        button:hover {
-            background: #2980b9;
-        }
-
-        .save-btn {
-            background: #27ae60;
-        }
-
-        .save-btn:hover {
-            background: #219150;
-        }
-
-        .track-item {
-            padding: 8px;
-            border-bottom: 1px solid #eee;
-            cursor: pointer;
-            font-size: 0.9em;
-        }
-
-        .track-item:hover {
-            background: #f0f0f0;
-        }
-
-        #track-list {
-            margin-top: 15px;
-            border-top: 2px solid #3498db;
-            padding-top: 10px;
-        }
+        .save-btn { background: #27ae60; }
+        .cancel-btn { background: #95a5a6; margin-top: 10px; }
 
         .draw-controls {
             display: flex;
-            gap: 5px;
-            margin-bottom: 10px;
+            gap: 8px;
+            margin-bottom: 20px;
         }
 
         .draw-controls button {
-            flex: 1;
-            font-size: 0.8em;
-            padding: 8px 4px;
-            background: #9b59b6;
+            background: #8e44ad;
+            font-size: 0.85em;
+        }
+
+        .add-task-btn {
+            background: #27ae60;
+            margin-bottom: 15px;
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
         }
     </style>
 </head>
@@ -132,14 +190,28 @@
 <body>
 
     <div id="left-panel">
-        <div id="asana-container-wrapper">
-            <h2>Project Plan</h2>
-            <div id="asana-container"></div>
+        <div id="panel-header">
+            <button class="add-task-btn" onclick="openModal()">+ Add Task</button>
+            <div class="filter-bar">
+                <input type="text" id="search-filter" placeholder="Search tasks..." oninput="renderProjectView()">
+                <select id="group-filter" onchange="renderProjectView()">
+                    <option value="">All Groups</option>
+                    <option value="Hikers">Hikers</option>
+                    <option value="Runners">Runners</option>
+                    <option value="Staff">Staff</option>
+                    <option value="Transport">Transport</option>
+                </select>
+            </div>
         </div>
+        <div id="asana-container"></div>
+    </div>
 
-        <div id="form-container">
-            <h2>Command Center</h2>
+    <div id="map"></div>
 
+    <div id="command-modal" class="modal">
+        <div class="modal-content">
+            <h2 id="modal-title">Command Center</h2>
+            
             <div class="draw-controls">
                 <button onclick="draw.changeMode('draw_point')">📍 Waypoint</button>
                 <button onclick="draw.changeMode('draw_line_string')">📈 Track</button>
@@ -155,7 +227,7 @@
 
             <div class="form-group">
                 <label>Title</label>
-                <input type="text" id="wp-title" placeholder="Waypoint or Track Title">
+                <input type="text" id="wp-title" placeholder="Title">
             </div>
 
             <div class="form-group">
@@ -165,17 +237,6 @@
                     <option value="Runners">Runners</option>
                     <option value="Staff">Staff</option>
                     <option value="Transport">Transport</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label>Waypoint Category (if pin)</label>
-                <select id="wp-category">
-                    <option value="none">N/A (Track)</option>
-                    <option value="Restaurant">Restaurant</option>
-                    <option value="Accommodation">Accommodation</option>
-                    <option value="Checkpoint">Checkpoint</option>
-                    <option value="Bus Stop">Bus Stop</option>
                 </select>
             </div>
 
@@ -190,12 +251,7 @@
             </div>
 
             <div class="form-group">
-                <label>Ends At</label>
-                <input type="datetime-local" id="ends-at">
-            </div>
-
-            <div class="form-group">
-                <label>Description / Task Name</label>
+                <label>Description</label>
                 <textarea id="wp-description" rows="2"></textarea>
             </div>
 
@@ -208,32 +264,20 @@
                 <label><input type="checkbox" id="is-completed"> Mark Task as Completed</label>
             </div>
 
-            <button id="unified-save-btn" class="save-btn">Save to Map</button>
-
-            <div class="form-group" style="margin-top:15px;">
-                <label>Upload GPX Track</label>
-                <input type="file" id="gpx-file" accept=".gpx">
-            </div>
-
-            <div id="track-list">
-                <strong>Active Tracks</strong>
-                <div id="tracks-container"></div>
-            </div>
-
+            <button id="unified-save-btn" class="save-btn">Save changes</button>
+            <button class="cancel-btn" onclick="closeModal()">Cancel</button>
+            
             <button onclick="syncDbSchema()" style="margin-top:20px; background:#34495e;">Sync DB Schema</button>
         </div>
     </div>
 
-    <div id="map"></div>
-
     <script>
         const API_URL = 'https://mapbox-api-uz9a.onrender.com';
-        let map;
-        let draw;
+        let map, draw;
         let activeMarkers = [];
-        let activeTrackId = null;
+        let allTracks = [], allItinerary = [];
+        let activeTaskId = null, activeAnchorId = null, activeWaypointId = null;
         let ADMIN_KEY = null;
-        let allTracks = [];
 
         async function initializeApp() {
             const configRes = await fetch(`${API_URL}/api/config`);
@@ -244,85 +288,59 @@
             map = new mapboxgl.Map({
                 container: 'map',
                 style: 'mapbox://styles/mapbox/outdoors-v12',
-                center: [2.1734, 41.3851], // Barcelona
+                center: [2.1734, 41.3851],
                 zoom: 12
             });
 
             draw = new MapboxDraw({
                 displayControlsDefault: false,
-                controls: {
-                    line_string: true,
-                    polygon: true,
-                    point: true,
-                    trash: true
-                }
+                controls: { trash: true }
             });
             map.addControl(draw);
 
             map.on('load', () => {
-                loadTracks();
-                loadWaypoints();
-                renderProjectView();
+                refreshData();
             });
         }
 
-        initializeApp();
+        async function refreshData() {
+            await Promise.all([loadTracks(), loadWaypoints()]);
+            renderProjectView();
+        }
 
         const groupColors = {
-            'Hikers': '#2ecc71',
-            'Runners': '#e67e22',
-            'Staff': '#9b59b6',
-            'Transport': '#f1c40f'
+            'Hikers': '#2ecc71', 'Runners': '#e67e22', 'Staff': '#9b59b6', 'Transport': '#f1c40f'
         };
 
         async function loadTracks() {
             const res = await fetch(`${API_URL}/tracks`);
-            const tracks = await res.json();
-            allTracks = tracks;
-            const container = document.getElementById('tracks-container');
-            container.innerHTML = '';
-
-            tracks.forEach(track => {
-                const el = document.createElement('div');
-                el.className = 'track-item';
-                el.innerHTML = `<strong>${track.title}</strong> (${track.target_group})`;
-                el.onclick = () => editTrack(track);
-                container.appendChild(el);
-
+            allTracks = await res.json();
+            allTracks.forEach(track => {
                 if (map.getSource(`track-${track.id}`)) {
                     map.removeLayer(`layer-${track.id}`);
                     map.removeSource(`track-${track.id}`);
                 }
-
-                map.addSource(`track-${track.id}`, {
-                    type: 'geojson',
-                    data: track.geojson_data
-                });
-
+                map.addSource(`track-${track.id}`, { type: 'geojson', data: track.geojson_data });
                 const isPolygon = track.geojson_data.features[0].geometry.type === 'Polygon';
                 map.addLayer({
                     id: `layer-${track.id}`,
                     type: isPolygon ? 'fill' : 'line',
                     source: `track-${track.id}`,
-                    layout: isPolygon ? {} : { 'line-join': 'round', 'line-cap': 'round' },
-                    paint: isPolygon 
-                        ? { 'fill-color': groupColors[track.target_group] || track.color || '#3498db', 'fill-opacity': 0.4 } 
-                        : { 'line-color': groupColors[track.target_group] || track.color || '#3498db', 'line-width': 4 }
+                    paint: isPolygon ? { 'fill-color': groupColors[track.target_group] || '#3498db', 'fill-opacity': 0.4 } : { 'line-color': groupColors[track.target_group] || '#3498db', 'line-width': 4 }
                 });
             });
         }
 
         async function loadWaypoints() {
             const res = await fetch(`${API_URL}/itinerary`);
-            const items = await res.json();
-
+            allItinerary = await res.json();
             activeMarkers.forEach(m => m.remove());
             activeMarkers = [];
 
             const dropdown = document.getElementById('existing-task');
             dropdown.innerHTML = '<option value="">-- Create New Task --</option>';
 
-            items.forEach(item => {
+            allItinerary.forEach(item => {
                 const option = document.createElement('option');
                 option.value = item.task_id;
                 option.textContent = item.task;
@@ -331,171 +349,149 @@
                 if (item.lat && item.lng) {
                     const marker = new mapboxgl.Marker({ color: groupColors[item.target_group] || '#FF0000' })
                         .setLngLat([item.lng, item.lat])
-                        .setPopup(new mapboxgl.Popup().setHTML(`
-                        <strong>${item.waypoint}</strong><br>
-                        Task: ${item.task}
-                    `))
                         .addTo(map);
                     activeMarkers.push(marker);
                 }
             });
         }
 
-        function editTrack(track) {
-            activeTrackId = track.id;
-            draw.deleteAll();
-            draw.add(track.geojson_data);
-            document.getElementById('wp-title').value = track.title;
-            document.getElementById('target-group').value = track.target_group || 'Hikers';
+        function renderProjectView() {
+            const container = document.getElementById('asana-container');
+            const searchTerm = document.getElementById('search-filter').value.toLowerCase();
+            const groupFilter = document.getElementById('group-filter').value;
+            container.innerHTML = '';
 
-            const coordinates = track.geojson_data.features[0].geometry.coordinates;
-            const bounds = (track.geojson_data.features[0].geometry.type === 'Polygon')
-                ? coordinates[0].reduce((acc, coord) => acc.extend(coord), new mapboxgl.LngLatBounds(coordinates[0][0], coordinates[0][0]))
-                : coordinates.reduce((acc, coord) => acc.extend(coord), new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
-            map.fitBounds(bounds, { padding: 50 });
+            const filtered = allItinerary.filter(t => {
+                const matchSearch = t.task.toLowerCase().includes(searchTerm) || t.waypoint.toLowerCase().includes(searchTerm);
+                const matchGroup = !groupFilter || t.target_group === groupFilter;
+                return matchSearch && matchGroup;
+            });
+
+            filtered.forEach(task => {
+                const startTime = task.starts_at ? new Date(task.starts_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+                const initials = task.responsible ? task.responsible.split(' ').map(n => n[0]).join('').toUpperCase() : '?';
+                
+                const taskEl = document.createElement('div');
+                taskEl.className = 'task-row';
+                if (task.is_completed) taskEl.style.opacity = '0.5';
+                
+                taskEl.innerHTML = `
+                    <div class="assignee-icon" style="background:${groupColors[task.target_group]}">${initials}</div>
+                    <div class="task-info">
+                        <div class="task-name">${task.is_completed ? '✅ ' : ''}${task.task}</div>
+                        <div class="task-meta">
+                            <span>${task.waypoint}</span>
+                            <span>${startTime}</span>
+                        </div>
+                    </div>
+                    <button class="edit-btn" onclick="event.stopPropagation(); startEdit(${JSON.stringify(task).replace(/"/g, '"')})">✏️</button>
+                `;
+                taskEl.onclick = () => {
+                    if (task.linked_track_id) {
+                        const track = allTracks.find(t => t.id === task.linked_track_id);
+                        if (track) {
+                            const coords = track.geojson_data.features[0].geometry.coordinates;
+                            const bounds = track.geojson_data.features[0].geometry.type === 'Polygon' ? coords[0].reduce((acc, c) => acc.extend(c), new mapboxgl.LngLatBounds(coords[0][0], coords[0][0])) : coords.reduce((acc, c) => acc.extend(c), new mapboxgl.LngLatBounds(coords[0], coords[0]));
+                            map.fitBounds(bounds, { padding: 50 });
+                        }
+                    } else if (task.lat) map.flyTo({ center: [task.lng, task.lat], zoom: 16 });
+                };
+                container.appendChild(taskEl);
+            });
         }
 
-        document.getElementById('gpx-file').addEventListener('change', function (e) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = function (event) {
-                const parser = new DOMParser();
-                const gpx = parser.parseFromString(event.target.result, 'text/xml');
-                const geojson = toGeoJSON.gpx(gpx);
-                draw.add(geojson);
-            };
-            reader.readAsText(file);
-        });
+        function startEdit(task) {
+            activeTaskId = task.task_id;
+            activeAnchorId = task.anchor_id;
+            activeWaypointId = task.waypoint_id;
+            
+            document.getElementById('wp-title').value = task.waypoint;
+            document.getElementById('target-group').value = task.target_group;
+            document.getElementById('day-label').value = task.day_label || '';
+            document.getElementById('starts-at').value = task.starts_at ? task.starts_at.substring(0, 16) : '';
+            document.getElementById('wp-description').value = task.task;
+            document.getElementById('responsible').value = task.responsible || '';
+            document.getElementById('is-completed').checked = task.is_completed;
+            document.getElementById('existing-task').style.display = 'none';
+            
+            draw.deleteAll();
+            if (task.linked_track_id) {
+                const track = allTracks.find(t => t.id === task.linked_track_id);
+                if (track) draw.add(track.geojson_data);
+            } else if (task.lat) {
+                draw.add({ type: 'Feature', geometry: { type: 'Point', coordinates: [task.lng, task.lat] }, properties: {} });
+            }
+            openModal();
+        }
+
+        function openModal() {
+            document.getElementById('command-modal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('command-modal').style.display = 'none';
+            activeTaskId = null;
+            activeAnchorId = null;
+            activeWaypointId = null;
+            document.getElementById('existing-task').style.display = 'block';
+            draw.deleteAll();
+        }
 
         document.getElementById('unified-save-btn').onclick = async () => {
             const data = draw.getAll();
-            if (data.features.length === 0) {
-                alert("Please draw something on the map first.");
-                return;
-            }
+            if (data.features.length === 0) return alert("Draw something on map!");
 
             const feature = data.features[data.features.length - 1];
-            const type = feature.geometry.type;
+            const isPoint = feature.geometry.type === 'Point';
             const existingTaskId = document.getElementById('existing-task').value || null;
 
             let payload = {
                 title: document.getElementById('wp-title').value,
                 target_group: document.getElementById('target-group').value,
-                existing_task_id: existingTaskId,
-                tasks: existingTaskId ? [] : [{
+                existing_task_id: existingTaskId || activeTaskId,
+                tasks: [{
                     name: document.getElementById('wp-description').value || document.getElementById('wp-title').value,
                     responsible: document.getElementById('responsible').value,
                     target_group: document.getElementById('target-group').value,
                     day_label: document.getElementById('day-label').value,
                     starts_at: document.getElementById('starts-at').value || null,
-                    ends_at: document.getElementById('ends-at').value || null,
-                    is_completed: document.getElementById('is-completed').checked,
-                    characteristics: ''
+                    is_completed: document.getElementById('is-completed').checked
                 }]
             };
 
-            let endpoint = '';
-            if (type === 'Point') {
-                endpoint = '/waypoints';
+            let endpoint = isPoint ? '/waypoints' : '/tracks';
+            if (isPoint) {
                 payload.lat = feature.geometry.coordinates[1];
                 payload.lng = feature.geometry.coordinates[0];
-                payload.description = document.getElementById('wp-description').value;
-                payload.category = document.getElementById('wp-category').value;
+                if (activeWaypointId) endpoint += `/${activeWaypointId}`;
             } else {
-                endpoint = activeTrackId ? `/tracks/${activeTrackId}` : '/tracks';
                 payload.geojson_data = data;
-                payload.color = groupColors[payload.target_group];
+                if (activeAnchorId) {
+                   const track = allTracks.find(t => t.id === allItinerary.find(i => i.task_id === activeTaskId).linked_track_id);
+                   if (track) endpoint += `/${track.id}`;
+                }
             }
 
+            const method = (activeTaskId || (activeWaypointId && isPoint)) ? 'PUT' : 'POST';
             const res = await fetch(`${API_URL}${endpoint}`, {
-                method: activeTrackId && type !== 'Point' ? 'PUT' : 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'x-api-key': ADMIN_KEY
-                },
+                method: method,
+                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
                 body: JSON.stringify(payload)
             });
 
             if (res.ok) {
-                alert("Saved successfully!");
-                activeTrackId = null;
-                draw.deleteAll();
-                loadTracks();
-                loadWaypoints();
-                renderProjectView();
-                document.getElementById('wp-title').value = '';
-                document.getElementById('wp-description').value = '';
-                document.getElementById('responsible').value = '';
-                document.getElementById('is-completed').checked = false;
+                alert("Success!");
+                closeModal();
+                refreshData();
             }
         };
 
-        async function renderProjectView() {
-            const res = await fetch(`${API_URL}/itinerary`);
-            const items = await res.json();
-            const container = document.getElementById('asana-container');
-            container.innerHTML = '';
-
-            const days = {};
-            items.forEach(item => {
-                const day = item.day_label || 'Unscheduled';
-                if (!days[day]) days[day] = [];
-                days[day].push(item);
-            });
-
-            for (const [day, tasks] of Object.entries(days)) {
-                const dayEl = document.createElement('div');
-                dayEl.innerHTML = `<h3 style="border-bottom:2px solid #3498db; margin-top:20px; padding-bottom:5px;">${day}</h3>`;
-                
-                tasks.forEach(task => {
-                    const startTime = task.starts_at ? new Date(task.starts_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
-                    const taskEl = document.createElement('div');
-                    const statusStyle = task.is_completed ? "opacity:0.6; text-decoration:line-through;" : "";
-                    const checkmark = task.is_completed ? "✅ " : "";
-                    
-                    taskEl.style.cssText = `background:white; padding:10px; margin-bottom:10px; border-left:4px solid ${groupColors[task.target_group] || '#ccc'}; border-radius:4px; box-shadow:0 2px 5px rgba(0,0,0,0.1); cursor:pointer; ${statusStyle}`;
-                    taskEl.innerHTML = `
-                        <div style="display:flex; justify-content:space-between;">
-                            <div style="font-weight:bold; color:#2c3e50;">${checkmark}${task.waypoint}</div>
-                            <div style="font-size:0.8em; color:#3498db; font-weight:bold;">${startTime}</div>
-                        </div>
-                        <div style="font-size:0.85em; color:#7f8c8d; margin-top:4px;">${task.task}</div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
-                            <span style="font-size:0.75em; background:#ecf0f1; padding:2px 6px; border-radius:10px; color:#34495e;">${task.responsible}</span>
-                            <span style="font-size:0.75em; color:${groupColors[task.target_group]}; font-weight:bold;">${task.target_group}</span>
-                        </div>
-                    `;
-                    taskEl.onclick = () => {
-                        if (task.linked_track_id) {
-                            const track = allTracks.find(t => t.id === task.linked_track_id);
-                            if (track && track.geojson_data) {
-                                const coordinates = track.geojson_data.features[0].geometry.coordinates;
-                                const bounds = (track.geojson_data.features[0].geometry.type === 'Polygon')
-                                    ? coordinates[0].reduce((acc, coord) => acc.extend(coord), new mapboxgl.LngLatBounds(coordinates[0][0], coordinates[0][0]))
-                                    : coordinates.reduce((acc, coord) => acc.extend(coord), new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
-                                map.fitBounds(bounds, { padding: 50 });
-                            }
-                        } else if (task.lat && task.lng) {
-                            map.flyTo({ center: [task.lng, task.lat], zoom: 16 });
-                        }
-                    };
-                    dayEl.appendChild(taskEl);
-                });
-                container.appendChild(dayEl);
-            }
-        }
-
         async function syncDbSchema() {
-            const res = await fetch(`${API_URL}/setup-db`, {
-                headers: { 'x-api-key': ADMIN_KEY }
-            });
-            if (res.ok) {
-                alert("Database schema synchronized successfully!");
-                loadWaypoints();
-            } else {
-                alert("Schema sync failed.");
-            }
+            const res = await fetch(`${API_URL}/setup-db`, { headers: { 'x-api-key': ADMIN_KEY } });
+            if (res.ok) alert("Synced!");
         }
+
+        initializeApp();
     </script>
 </body>
 </html>

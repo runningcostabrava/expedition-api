@@ -121,8 +121,18 @@ app.put('/tracks/:id', adminAuth, async (req, res) => {
         await pool.query('UPDATE tasks SET anchor_id = $1 WHERE id = $2', [anchorId, existing_task_id]);
     } else if (tasks && tasks.length > 0) {
         for (let t of tasks) {
-          await pool.query('INSERT INTO tasks (anchor_id, task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', 
-            [anchorId, t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at, t.is_completed || false]);
+          const task = t;
+          await pool.query(`
+            UPDATE tasks SET 
+                task_name = COALESCE($1, task_name), 
+                responsible = COALESCE($2, responsible), 
+                target_group = COALESCE($3, target_group), 
+                day_label = COALESCE($4, day_label), 
+                starts_at = $5, 
+                ends_at = $6, 
+                is_completed = COALESCE($7, is_completed)
+            WHERE anchor_id = $8`,
+            [task.name, task.responsible, task.target_group, task.day_label, task.starts_at, task.ends_at, task.is_completed, anchorId]);
         }
     }
 
@@ -160,6 +170,36 @@ app.post('/waypoints', adminAuth, async (req, res) => {
   } catch (err) { res.status(500).send({ error: err.message }); }
 });
 
+app.put('/waypoints/:id', adminAuth, async (req, res) => {
+    const { id } = req.params;
+    const { title, lat, lng, description, category, tasks } = req.body;
+    try {
+      await pool.query(
+        'UPDATE waypoints SET title = COALESCE($1, title), lat = COALESCE($2, lat), lng = COALESCE($3, lng), description = COALESCE($4, description), category = COALESCE($5, category) WHERE id = $6',
+        [title, lat, lng, description, category, id]
+      );
+  
+      if (tasks && tasks.length > 0) {
+          for (let t of tasks) {
+            const task = t;
+            await pool.query(`
+              UPDATE tasks SET 
+                  task_name = COALESCE($1, task_name), 
+                  responsible = COALESCE($2, responsible), 
+                  target_group = COALESCE($3, target_group), 
+                  day_label = COALESCE($4, day_label), 
+                  starts_at = $5, 
+                  ends_at = $6, 
+                  is_completed = COALESCE($7, is_completed)
+              WHERE waypoint_id = $8`,
+              [task.name, task.responsible, task.target_group, task.day_label, task.starts_at, task.ends_at, task.is_completed, id]);
+          }
+      }
+  
+      res.status(200).send({ message: "Waypoint updated successfully" });
+    } catch (err) { res.status(500).send({ error: err.message }); }
+});
+
 // 4. ITINERARY: View Project Plan
 app.get('/itinerary', async (req, res) => {
   try {
@@ -170,7 +210,10 @@ app.get('/itinerary', async (req, res) => {
         COALESCE(w_anchor.category, w_legacy.category) as waypoint_category,
         COALESCE(w_anchor.lat, w_legacy.lat) as lat,
         COALESCE(w_anchor.lng, w_legacy.lng) as lng,
+        COALESCE(w_anchor.id, w_legacy.id) as waypoint_id,
         tr_anchor.id as linked_track_id,
+        sa.id as anchor_id,
+        sa.kind as anchor_kind,
         t.task_name as task, t.responsible, t.target_group, t.day_label,
         t.starts_at, t.ends_at, t.is_completed
       FROM tasks t
