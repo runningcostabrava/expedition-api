@@ -424,6 +424,7 @@
     </div>
 
     <div id="map-wrapper" style="flex: 1; position: relative;">
+        <div id="loading-overlay" style="position:absolute; inset:0; background:rgba(255,255,255,0.8); z-index:9999; display:flex; justify-content:center; align-items:center; font-size:20px; font-weight:bold; color:#333;">Waking up server (This takes ~50 seconds)...</div>
         <div id="map" style="position: absolute; top: 0; bottom: 0; width: 100%;"></div>
         <div class="floating-tools">
             <button onclick="draw.changeMode('draw_point')">📍 Add Waypoint</button>
@@ -547,6 +548,7 @@
         async function initializeApp() {
             const configRes = await fetch(`${API_URL}/api/config`);
             const config = await configRes.json();
+            document.getElementById('loading-overlay').style.display = 'none';
             mapboxgl.accessToken = config.MAPBOX_TOKEN;
             ADMIN_KEY = config.ADMIN_KEY;
 
@@ -850,6 +852,43 @@
         };
 
         // UI Helpers
+        async function updateTaskInline(taskId, field, value) {
+            const task = allItinerary.find(t => t.task_id === taskId);
+            if (!task || task[field] == value) return;
+            task[field] = value;
+            await fetch(`${API_URL}/tasks/${taskId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY }, body: JSON.stringify(task) });
+            refreshData();
+        }
+
+        async function updateSection(oldDay, newDay) {
+            if (oldDay === newDay) return;
+            await fetch(`${API_URL}/tasks/section/${oldDay}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY }, body: JSON.stringify({ new_label: newDay }) });
+            refreshData();
+        }
+
+        async function deleteSection(day) {
+            if(!confirm(`Delete all tasks in ${day}?`)) return;
+            await fetch(`${API_URL}/tasks/section/${day}`, { method: 'DELETE', headers: { 'x-api-key': ADMIN_KEY } });
+            refreshData();
+        }
+
+        function openTaskEditor(taskId) {
+            const task = allItinerary.find(t => t.task_id === taskId);
+            if (!task) return;
+            resetForm();
+            activeTaskId = taskId;
+            document.getElementById('wp-title').value = task.task;
+            document.getElementById('target-group').value = task.target_group || 'Hikers';
+            document.getElementById('day-label').value = task.day_label || '';
+            document.getElementById('starts-at').value = task.starts_at ? task.starts_at.substring(0,16) : '';
+            document.getElementById('responsible').value = task.responsible || '';
+            document.getElementById('is-completed').checked = task.is_completed;
+            document.getElementById('task-comments').value = task.comments || '';
+            document.getElementById('existing-task').value = taskId;
+            document.getElementById('color-picker-group').style.display = 'none';
+            openModal();
+        }
+
         function renderProjectView() {
             const container = document.getElementById('asana-container');
             const searchTerm = document.getElementById('search-filter').value.toLowerCase();
@@ -869,28 +908,92 @@
                 groups[day].push(task);
             });
 
+            const showAssignee = document.getElementById('col-assignee').checked;
+            const showTime = document.getElementById('col-time').checked;
+            const showGroup = document.getElementById('col-group').checked;
+            
+            let gridCols = '1fr ';
+            if (showAssignee) gridCols += '100px ';
+            if (showTime) gridCols += '120px ';
+            if (showGroup) gridCols += '100px ';
+            gridCols += '80px';
+
             for (const [day, tasks] of Object.entries(groups)) {
                 const section = document.createElement('div');
                 section.className = 'asana-section';
-                section.innerHTML = `<div class="asana-header"><span>▼ ${day}</span></div>`;
+                
+                section.innerHTML = `
+                    <div class="asana-header">
+                        <span>▼ <span class="inline-edit" contenteditable="true" onblur="updateSection('${day}', this.innerText)" onclick="event.stopPropagation()">${day}</span></span>
+                        <button class="delete-btn" onclick="deleteSection('${day}')">🗑️</button>
+                    </div>
+                    <div class="task-table-header" style="grid-template-columns: ${gridCols};">
+                        <div>Task Name</div>
+                        ${showAssignee ? '<div>Assignee</div>' : ''}
+                        ${showTime ? '<div>Start Time</div>' : ''}
+                        ${showGroup ? '<div>Group</div>' : ''}
+                        <div>Actions</div>
+                    </div>
+                `;
+
                 tasks.forEach(task => {
-                    const row = document.createElement('div');
-                    row.className = 'task-row';
-                    row.innerHTML = `
-                        <div class="task-cell name">${task.is_completed ? '✅ ' : ''}${task.task}</div>
-                        <div class="task-cell">${task.responsible || '-'}</div>
-                        <div class="task-cell time">${task.starts_at ? new Date(task.starts_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</div>
+                    const startTime = task.starts_at ? task.starts_at.substring(0,16) : '';
+                    const doneUI = task.is_completed ? '✅ ' : '';
+                    
+                    const taskContainer = document.createElement('div');
+                    
+                    const taskEl = document.createElement('div');
+                    taskEl.className = 'task-row';
+                    if (task.is_completed) taskEl.style.opacity = '0.6';
+                    taskEl.style.gridTemplateColumns = gridCols;
+                    
+                    taskEl.onclick = () => {
+                        const acc = document.getElementById(`acc-${task.task_id}`);
+                        if(acc) acc.classList.toggle('open');
+                        if (task.geometries && task.geometries.length > 0 && task.geometries[0].lat) {
+                            map.flyTo({ center: [task.geometries[0].lng, task.geometries[0].lat], zoom: 14 });
+                        }
+                    };
+
+                    let cellsHtml = `<div class="task-cell name"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">${doneUI}${task.task}</span></div>`;
+                    if (showAssignee) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'responsible', this.innerText)" onclick="event.stopPropagation()">${task.responsible || '-'}</span></div>`;
+                    if (showTime) cellsHtml += `<div class="task-cell time"><input type="datetime-local" class="inline-edit" style="width:100%" value="${startTime}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()"></div>`;
+                    if (showGroup) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'target_group', this.innerText)" onclick="event.stopPropagation()">${task.target_group || '-'}</span></div>`;
+                    
+                    cellsHtml += `
                         <div class="task-cell">
+                            <button class="edit-btn" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
                             <button class="delete-btn" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
                         </div>
                     `;
-                    row.onclick = () => {
-                        if (task.geometries && task.geometries.length > 0) {
-                            const first = task.geometries[0];
-                            if (first.kind === 'point') map.flyTo({ center: [first.lng, first.lat], zoom: 14 });
-                        }
-                    };
-                    section.appendChild(row);
+                    taskEl.innerHTML = cellsHtml;
+
+                    const accordionEl = document.createElement('div');
+                    accordionEl.className = 'task-accordion';
+                    accordionEl.id = `acc-${task.task_id}`;
+                    
+                    let geomHtml = '';
+                    if (task.geometries && task.geometries.length > 0) {
+                        task.geometries.forEach(g => {
+                            const emoji = g.kind === 'point' ? '📍' : (g.kind === 'polygon' ? '🛑' : '📈');
+                            const color = g.color || '#3498db';
+                            geomHtml += `
+                                <div class="geom-row" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})">
+                                    <div class="geom-info">
+                                        <span>${emoji}</span><span class="color-dot" style="background-color: ${color}"></span><span>${g.title}</span>
+                                    </div>
+                                    <button class="delete-btn" onclick="event.stopPropagation(); deleteGeometry('${g.kind}', ${g.waypoint_id || g.track_id})">🗑️</button>
+                                </div>
+                            `;
+                        });
+                    } else {
+                        geomHtml = `<div style="color: #95a5a6; font-size: 0.85em; font-style: italic;">No locations attached.</div>`;
+                    }
+                    accordionEl.innerHTML = geomHtml;
+
+                    taskContainer.appendChild(taskEl);
+                    taskContainer.appendChild(accordionEl);
+                    section.appendChild(taskContainer);
                 });
                 container.appendChild(section);
             }
