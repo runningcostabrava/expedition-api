@@ -78,6 +78,29 @@ app.get('/setup-db', adminAuth, async (req, res) => {
 });
 
 // 2. TRACKS: GPX Upload & Management
+app.post('/tasks', adminAuth, async (req, res) => {
+    const { task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed } = req.body;
+    try {
+        const result = await pool.query(
+            'INSERT INTO tasks (task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+            [task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed || false]
+        );
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/tasks/:id', adminAuth, async (req, res) => {
+    const { id } = req.params;
+    const { task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed } = req.body;
+    try {
+        const result = await pool.query(
+            'UPDATE tasks SET task_name=$1, responsible=$2, target_group=$3, day_label=$4, starts_at=$5, ends_at=$6, is_completed=$7 WHERE id=$8 RETURNING *',
+            [task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed, id]
+        );
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/tracks', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM tracks');
@@ -227,26 +250,31 @@ app.put('/waypoints/:id', adminAuth, async (req, res) => {
 // 4. ITINERARY: View Project Plan
 app.get('/itinerary', async (req, res) => {
   try {
-    // Note: Due to many-to-many, a task can appear multiple times if it has multiple anchors.
-    // For the UI, we'll join via task_anchors.
     const result = await pool.query(`
       SELECT 
-        t.id as task_id,
-        COALESCE(w.title, tr.title) as waypoint,
-        w.category as waypoint_category,
-        w.lat, w.lng,
-        w.id as waypoint_id,
-        tr.id as linked_track_id,
-        sa.id as anchor_id,
-        sa.kind as anchor_kind,
-        t.task_name as task, t.responsible, t.target_group, t.day_label,
-        t.starts_at, t.ends_at, t.is_completed
+        t.id as task_id, t.task_name as task, t.responsible, t.target_group, 
+        t.day_label, t.starts_at, t.ends_at, t.is_completed,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'anchor_id', sa.id,
+              'kind', sa.kind,
+              'waypoint_id', w.id,
+              'track_id', tr.id,
+              'title', COALESCE(w.title, tr.title),
+              'lat', w.lat, 'lng', w.lng,
+              'color', COALESCE(w.color, tr.color),
+              'geojson', tr.geojson_data
+            )
+          ) FILTER (WHERE sa.id IS NOT NULL), '[]'
+        ) as geometries
       FROM tasks t
       LEFT JOIN task_anchors ta ON t.id = ta.task_id
       LEFT JOIN spatial_anchors sa ON ta.anchor_id = sa.id
       LEFT JOIN waypoints w ON sa.waypoint_id = w.id
       LEFT JOIN tracks tr ON sa.track_id = tr.id
-      ORDER BY t.starts_at ASC NULLS LAST, t.day_label ASC
+      GROUP BY t.id
+      ORDER BY t.starts_at ASC NULLS LAST, t.day_label ASC;
     `);
     res.json(result.rows);
   } catch (err) { res.status(500).send({ error: err.message }); }
