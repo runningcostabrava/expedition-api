@@ -506,6 +506,11 @@
                 <div class="form-group">
                     <label><input type="checkbox" id="is-completed"> Mark Task as Completed</label>
                 </div>
+
+                <div class="form-group">
+                    <label>Task Comments</label>
+                    <textarea id="task-comments" rows="3" placeholder="Add notes, codes, or instructions..."></textarea>
+                </div>
             </div>
 
             <div class="form-group" id="color-picker-group" style="border-top: 1px solid #eee; padding-top: 15px; margin-top: 15px; display: none;">
@@ -563,6 +568,8 @@
 
             geocoder.on('result', (e) => {
                 const coords = e.result.center;
+            geocoder.on('result', (e) => {
+                const coords = e.result.center;
                 const placeName = e.result.text;
 
                 // Clear drawings and add the searched point
@@ -574,6 +581,58 @@
                 document.getElementById('wp-title').value = placeName;
                 document.getElementById('modal-title').innerText = "Save Searched Location";
                 openModal();
+            });
+
+            map.on('click', async (e) => {
+                if (isAnalyzingSegment) {
+                    // Find nearest point on the track to the click
+                    const snapped = turf.nearestPointOnLine(activeAnalysisTrack.features[0], [e.lngLat.lng, e.lngLat.lat]);
+                    segmentPoints.push(snapped);
+
+                    if (segmentPoints.length === 2) {
+                        isAnalyzingSegment = false;
+                        map.getCanvas().style.cursor = '';
+
+                        // Slice the line between the two points
+                        const sliced = turf.lineSlice(segmentPoints[0], segmentPoints[1], activeAnalysisTrack.features[0]);
+                        const dist = turf.length(sliced, { units: 'kilometers' }).toFixed(2);
+
+                        // Calculate Elevation Change (if Z data exists)
+                        const coords = sliced.geometry.coordinates;
+                        const startZ = coords[0][2] || 0;
+                        const endZ = coords[coords.length - 1][2] || 0;
+                        const gain = endZ - startZ;
+
+                        alert(`Segment Info:\nDistance: ${dist} km\nElevation Change: ${gain.toFixed(1)}m`);
+                        showElevationProfile({ type: 'FeatureCollection', features: [sliced] }, "Selected Segment");
+                    }
+                    return;
+                }
+
+                if (!isRouting) return;
+                routePoints.push([e.lngLat.lng, e.lngLat.lat]);
+
+                if (routePoints.length === 2) {
+                    isRouting = false;
+                    map.getCanvas().style.cursor = '';
+                    const profile = document.getElementById('route-profile').value;
+                    const coords = `${routePoints[0][0]},${routePoints[0][1]};${routePoints[1][0]},${routePoints[1][1]}`;
+
+                    try {
+                        const res = await fetch(`https://api.mapbox.com/directions/v5/mapbox/${profile}/${coords}?geometries=geojson&access_token=${mapboxgl.accessToken}`);
+                        const data = await res.json();
+                        if (data.routes && data.routes.length > 0) {
+                            const routeGeoJSON = data.routes[0].geometry;
+                            draw.deleteAll();
+                            draw.add(routeGeoJSON);
+
+                            resetForm();
+                            document.getElementById('color-picker-group').style.display = 'block';
+                            document.getElementById('wp-title').value = `New ${profile} route`;
+                            openModal();
+                        } else { alert("No route found between these points."); }
+                    } catch (err) { console.error(err); alert("Routing error"); }
+                }
             });
 
             map.on('load', () => {
@@ -694,11 +753,16 @@
 
                             map.on('click', layerId, (e) => {
                                 const emoji = geom.kind === 'polygon' ? '🛑' : '📈';
+                                const dist = turf.length(geom.geojson, { units: 'kilometers' }).toFixed(2);
                                 const popupHtml = `
                                     <div style="padding: 5px;">
                                         <h4 style="margin: 0 0 5px 0;">${emoji} ${geom.title}</h4>
+                                        <p style="margin: 0 0 5px 0; font-size: 0.9em; color: #666;">Distance: ${dist} km</p>
                                         <p style="margin: 0 0 10px 0; font-size: 0.9em; color: #666;">Task: ${task.task}</p>
-                                        <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="padding: 5px 10px; width: 100%;">Edit Location</button>
+                                        <div style="display: flex; gap: 5px;">
+                                            <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="padding: 5px 10px; flex: 1;">Edit</button>
+                                            <button onclick="startSegmentAnalysis(${JSON.stringify(geom.geojson).replace(/"/g, '"')})" style="padding: 5px 10px; flex: 1;">Analyze</button>
+                                        </div>
                                     </div>
                                 `;
                                 showElevationProfile(geom.geojson, geom.title);
@@ -871,6 +935,7 @@
             document.getElementById('starts-at').value = task.starts_at ? task.starts_at.substring(0, 16) : '';
             document.getElementById('responsible').value = task.responsible || '';
             document.getElementById('is-completed').checked = task.is_completed;
+            document.getElementById('task-comments').value = task.comments || '';
             document.getElementById('existing-task').style.display = 'none';
             document.getElementById('color-picker-group').style.display = 'none';
             document.getElementById('attached-locations-list').parentElement.style.display = 'block';
@@ -934,6 +999,7 @@
             document.getElementById('wp-description').value = '';
             document.getElementById('responsible').value = '';
             document.getElementById('is-completed').checked = false;
+            document.getElementById('task-comments').value = '';
             document.getElementById('existing-task').value = '';
             document.getElementById('existing-task').style.display = 'block';
         }
@@ -984,7 +1050,8 @@
                     target_group: document.getElementById('target-group').value,
                     day_label: document.getElementById('day-label').value,
                     starts_at: document.getElementById('starts-at').value || null,
-                    is_completed: document.getElementById('is-completed').checked
+                    is_completed: document.getElementById('is-completed').checked,
+                    comments: document.getElementById('task-comments').value
                 };
                 const method = activeTaskId ? 'PUT' : 'POST';
                 const endpoint = activeTaskId ? `/tasks/${activeTaskId}` : '/tasks';
@@ -1034,7 +1101,8 @@
                 day_label: task.day_label,
                 starts_at: task.starts_at,
                 ends_at: task.ends_at,
-                is_completed: task.is_completed
+                is_completed: task.is_completed,
+                comments: task.comments
             };
             // Overwrite the specific field we just edited
             payload[field] = value;
@@ -1096,6 +1164,18 @@
             routePoints = [];
             map.getCanvas().style.cursor = 'crosshair';
             alert("Smart Routing: Click your Start Point, then click your End Point.");
+        }
+
+        let isAnalyzingSegment = false;
+        let segmentPoints = [];
+        let activeAnalysisTrack = null;
+
+        function startSegmentAnalysis(geojson) {
+            isAnalyzingSegment = true;
+            segmentPoints = [];
+            activeAnalysisTrack = geojson;
+            map.getCanvas().style.cursor = 'crosshair';
+            alert("Segment Analysis: Click two points along the track line to see distance and elevation change.");
         }
 
         let elevationChart = null;
@@ -1193,33 +1273,6 @@
             };
             reader.readAsText(file);
         });
-
-            map.on('click', async (e) => {
-                if (!isRouting) return;
-                routePoints.push([e.lngLat.lng, e.lngLat.lat]);
-
-                if (routePoints.length === 2) {
-                    isRouting = false;
-                    map.getCanvas().style.cursor = '';
-                    const profile = document.getElementById('route-profile').value;
-                    const coords = `${routePoints[0][0]},${routePoints[0][1]};${routePoints[1][0]},${routePoints[1][1]}`;
-
-                    try {
-                        const res = await fetch(`https://api.mapbox.com/directions/v5/mapbox/${profile}/${coords}?geometries=geojson&access_token=${mapboxgl.accessToken}`);
-                        const data = await res.json();
-                        if (data.routes && data.routes.length > 0) {
-                            const routeGeoJSON = data.routes[0].geometry;
-                            draw.deleteAll();
-                            draw.add(routeGeoJSON);
-
-                            resetForm();
-                            document.getElementById('color-picker-group').style.display = 'block';
-                            document.getElementById('wp-title').value = `New ${profile} route`;
-                            openModal();
-                        } else { alert("No route found between these points."); }
-                    } catch (err) { console.error(err); alert("Routing error"); }
-                }
-            });
 
             initializeApp();
         </script>
