@@ -16,6 +16,7 @@
     <script src="https://unpkg.com/togeojson@0.16.0/togeojson.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -923,6 +924,33 @@
             openModal();
         }
 
+        function exportTaskToGPX(taskId) {
+            const task = allItinerary.find(t => t.task_id === taskId);
+            if(!task || !task.geometries || task.geometries.length === 0) return alert('No locations to export for this task.');
+            
+            let gpx = '<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="ExpeditionDashboard">';
+            task.geometries.forEach(g => {
+                if (g.kind === 'point') {
+                    gpx += `<wpt lat="${g.lat}" lon="${g.lng}"><name>${g.title || 'Waypoint'}</name></wpt>`;
+                } else if (g.geojson) {
+                    gpx += `<trk><name>${g.title || 'Track'}</name><trkseg>`;
+                    const coords = g.geojson.features[0].geometry.coordinates;
+                    const points = g.geojson.features[0].geometry.type === 'Polygon' ? coords[0] : coords;
+                    points.forEach(c => { gpx += `<trkpt lat="${c[1]}" lon="${c[0]}"><ele>${c[2] || 0}</ele></trkpt>`; });
+                    gpx += `</trkseg></trk>`;
+                }
+            });
+            gpx += '</gpx>';
+            
+            const blob = new Blob([gpx], {type: 'application/gpx+xml'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; 
+            a.download = `${task.task.replace(/\s+/g, '_')}_export.gpx`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
         function renderProjectView() {
             const container = document.getElementById('asana-container');
             const searchTerm = document.getElementById('search-filter').value.toLowerCase();
@@ -970,14 +998,22 @@
                     </div>
                 `;
 
+                const taskListContainer = document.createElement('div');
+                taskListContainer.className = 'sortable-task-list';
+                taskListContainer.dataset.section = day;
+
                 tasks.forEach(task => {
+                    if (task.parent_id) return; // Skip subtasks for now, handled in next phase
+
                     const startTime = task.starts_at ? task.starts_at.substring(0,16) : '';
                     const doneUI = task.is_completed ? '✅ ' : '';
                     
                     const taskContainer = document.createElement('div');
+                    taskContainer.className = 'draggable-task'; // Added for Sortable
                     
                     const taskEl = document.createElement('div');
                     taskEl.className = 'task-row';
+                    taskEl.id = `task-row-${task.task_id}`; // ID for dragging
                     if (task.is_completed) taskEl.style.opacity = '0.6';
                     taskEl.style.gridTemplateColumns = gridCols;
                     
@@ -995,9 +1031,10 @@
                     if (showGroup) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'target_group', this.innerText)" onclick="event.stopPropagation()">${task.target_group || '-'}</span></div>`;
                     
                     cellsHtml += `
-                        <div class="task-cell">
-                            <button class="edit-btn" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
-                            <button class="delete-btn" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
+                        <div class="task-cell" style="gap:2px;">
+                            <button class="edit-btn" title="Export GPX" onclick="event.stopPropagation(); exportTaskToGPX(${task.task_id})">💾</button>
+                            <button class="edit-btn" title="Edit Task" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
+                            <button class="delete-btn" title="Delete Task" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
                         </div>
                     `;
                     taskEl.innerHTML = cellsHtml;
@@ -1027,10 +1064,39 @@
 
                     taskContainer.appendChild(taskEl);
                     taskContainer.appendChild(accordionEl);
-                    section.appendChild(taskContainer);
+                    taskListContainer.appendChild(taskContainer);
                 });
+                
+                section.appendChild(taskListContainer);
                 container.appendChild(section);
             }
+
+            // Initialize Sortable JS
+            document.querySelectorAll('.sortable-task-list').forEach(list => {
+                new Sortable(list, {
+                    group: 'shared',
+                    animation: 150,
+                    onEnd: async function (evt) {
+                        const itemEl = evt.item; 
+                        const newSectionList = evt.to; 
+                        const newSectionName = newSectionList.dataset.section;
+                        
+                        const taskRow = itemEl.querySelector('.task-row');
+                        if (!taskRow) return;
+                        const taskId = parseInt(taskRow.id.replace('task-row-', ''));
+                        
+                        const task = allItinerary.find(t => t.task_id === taskId);
+                        if (task && task.day_label !== newSectionName) {
+                            task.day_label = newSectionName === 'Unscheduled' ? null : newSectionName;
+                            await fetch(`${API_URL}/tasks/${taskId}`, { 
+                                method: 'PUT', 
+                                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY }, 
+                                body: JSON.stringify(task) 
+                            });
+                        }
+                    }
+                });
+            });
         }
 
         function startEditGeometry(taskId, anchorId) {

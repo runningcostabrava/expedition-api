@@ -71,6 +71,7 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       );
 
       ALTER TABLE tasks ADD COLUMN IF NOT EXISTS comments TEXT;
+      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE;
     `);
 
     res.send("Database tables created and updated successfully with v3.0 Task-Centric model!");
@@ -81,11 +82,11 @@ app.get('/setup-db', adminAuth, async (req, res) => {
 
 // 2. TRACKS: GPX Upload & Management
 app.post('/tasks', adminAuth, async (req, res) => {
-    const { task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed, comments } = req.body;
+    const { task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed, comments, parent_id } = req.body;
     try {
         const result = await pool.query(
-            'INSERT INTO tasks (task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed, comments) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-            [task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed || false, comments]
+            'INSERT INTO tasks (task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed, comments, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+            [task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed || false, comments, parent_id]
         );
         res.json(result.rows[0]);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -93,11 +94,11 @@ app.post('/tasks', adminAuth, async (req, res) => {
 
 app.put('/tasks/:id', adminAuth, async (req, res) => {
     const { id } = req.params;
-    const { task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed, comments } = req.body;
+    const { task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed, comments, parent_id } = req.body;
     try {
         const result = await pool.query(
-            'UPDATE tasks SET task_name=$1, responsible=$2, target_group=$3, day_label=$4, starts_at=$5, ends_at=$6, is_completed=$7, comments=$8 WHERE id=$9 RETURNING *',
-            [task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed, comments, id]
+            'UPDATE tasks SET task_name=$1, responsible=$2, target_group=$3, day_label=$4, starts_at=$5, ends_at=$6, is_completed=$7, comments=$8, parent_id=$9 WHERE id=$10 RETURNING *',
+            [task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed, comments, parent_id, id]
         );
         res.json(result.rows[0]);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -310,7 +311,7 @@ app.get('/itinerary', async (req, res) => {
     const result = await pool.query(`
       SELECT 
         t.id as task_id, t.task_name as task, t.responsible, t.target_group, 
-        t.day_label, t.starts_at, t.ends_at, t.is_completed, t.comments,
+        t.day_label, t.starts_at, t.ends_at, t.is_completed, t.comments, t.parent_id,
         COALESCE(
           json_agg(
             json_build_object(
