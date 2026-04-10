@@ -277,25 +277,29 @@
             color: #3498db;
         }
 
-        /* Modal Styles */
+        /* Modal Styles - Redesigned as a floating right panel */
         .modal {
             display: none;
             position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.6);
+            top: 0;
+            right: 0;
+            bottom: 0;
+            padding: 20px;
             z-index: 1000;
-            align-items: center;
-            justify-content: center;
+            pointer-events: none; /* Allows the user to click/pan the map behind the form */
+            align-items: flex-start; /* Aligns to the top */
+            justify-content: flex-end;
         }
 
         .modal-content {
             background: white;
-            width: 500px;
-            max-height: 90vh;
+            width: 400px;
+            max-height: calc(100vh - 40px);
             overflow-y: auto;
             border-radius: 12px;
             padding: 25px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            box-shadow: -5px 5px 30px rgba(0, 0, 0, 0.15);
+            pointer-events: auto; /* Re-enables clicking on the form inputs */
         }
 
         .form-group {
