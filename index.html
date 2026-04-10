@@ -351,6 +351,28 @@
             map.on('load', () => {
                 refreshData();
             });
+
+            map.on('draw.create', function (e) {
+                // Get the shape the user just finished drawing
+                const feature = e.features[0];
+                const type = feature.geometry.type;
+
+                // Prepare the form for a clean entry
+                resetForm();
+
+                // Pre-fill a contextual default title based on the geometry type
+                const titleInput = document.getElementById('wp-title');
+                if (type === 'Point') {
+                    titleInput.value = 'New Waypoint';
+                } else if (type === 'LineString') {
+                    titleInput.value = 'New Track';
+                } else if (type === 'Polygon') {
+                    titleInput.value = 'New Zone';
+                }
+
+                // Auto-open the Command Center
+                openModal();
+            });
         }
 
         async function refreshData() {
