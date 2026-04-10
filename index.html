@@ -507,16 +507,28 @@
             openModal();
         }
 
+        function resetForm() {
+            activeTaskId = null;
+            activeAnchorId = null;
+            activeWaypointId = null;
+            document.getElementById('wp-title').value = '';
+            document.getElementById('target-group').value = 'Hikers';
+            document.getElementById('day-label').value = '';
+            document.getElementById('starts-at').value = '';
+            document.getElementById('wp-description').value = '';
+            document.getElementById('responsible').value = '';
+            document.getElementById('is-completed').checked = false;
+            document.getElementById('existing-task').value = '';
+            document.getElementById('existing-task').style.display = 'block';
+        }
+
         function openModal() {
             document.getElementById('command-modal').style.display = 'flex';
         }
 
         function closeModal() {
             document.getElementById('command-modal').style.display = 'none';
-            activeTaskId = null;
-            activeAnchorId = null;
-            activeWaypointId = null;
-            document.getElementById('existing-task').style.display = 'block';
+            resetForm();
             draw.deleteAll();
         }
 
@@ -577,18 +589,34 @@
         document.getElementById('gpx-file').addEventListener('change', function (e) {
             const file = e.target.files[0];
             if (!file) return;
+
+            // Extract name without .gpx extension
+            const defaultTitle = file.name.replace(/\.[^/.]+$/, "");
+
             const reader = new FileReader();
             reader.onload = function (event) {
                 const parser = new DOMParser();
                 const gpx = parser.parseFromString(event.target.result, 'text/xml');
                 const geojson = toGeoJSON.gpx(gpx);
+
+                // Clear old drawings and add new GPX
+                draw.deleteAll();
                 draw.add(geojson);
 
                 if (geojson.features.length > 0) {
                     const coords = geojson.features[0].geometry.coordinates;
-                    // Basic zoom to the start of the GPX track
-                    map.flyTo({ center: coords[0], zoom: 14 });
+                    // Handle both simple lines and multi-lines for zooming
+                    const startCoord = Array.isArray(coords[0][0]) ? coords[0][0] : coords[0];
+                    map.flyTo({ center: startCoord, zoom: 14 });
+
+                    // Prepare the Modal
+                    resetForm();
+                    document.getElementById('wp-title').value = defaultTitle;
+                    openModal();
                 }
+
+                // Reset the file input so the same file can be uploaded again if needed
+                e.target.value = '';
             };
             reader.readAsText(file);
         });
