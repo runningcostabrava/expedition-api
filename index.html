@@ -201,6 +201,54 @@
             background: #fff;
         }
 
+        /* Inline Editing */
+        .inline-edit {
+            padding: 4px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            transition: all 0.2s;
+            outline: none;
+        }
+
+        .inline-edit:hover {
+            border: 1px dashed #ccc;
+            cursor: text;
+        }
+
+        .inline-edit:focus {
+            border: 1px solid #3498db;
+            background: #fff;
+            cursor: text;
+        }
+
+        /* Deletion Tools */
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #e74c3c;
+            cursor: pointer;
+            padding: 4px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .task-row:hover .delete-btn,
+        .geom-row:hover .delete-btn,
+        .asana-header:hover .delete-btn {
+            opacity: 1;
+        }
+
+        /* Dynamic Columns Container */
+        #column-toggles {
+            display: flex;
+            gap: 10px;
+            font-size: 0.85em;
+            margin-top: 10px;
+            padding: 10px;
+            background: #fff;
+            border-bottom: 1px solid #eee;
+        }
+
         .assignee-icon {
             width: 24px;
             height: 24px;
@@ -320,6 +368,12 @@
                     <option value="Staff">Staff</option>
                     <option value="Transport">Transport</option>
                 </select>
+            </div>
+            <div id="column-toggles">
+                <strong>Show Columns:</strong>
+                <label><input type="checkbox" id="col-assignee" checked onchange="renderProjectView()"> Assignee</label>
+                <label><input type="checkbox" id="col-time" checked onchange="renderProjectView()"> Time</label>
+                <label><input type="checkbox" id="col-group" onchange="renderProjectView()"> Group</label>
             </div>
         </div>
         <div id="asana-container"></div>
@@ -537,9 +591,21 @@
             const groupFilter = document.getElementById('group-filter').value;
             container.innerHTML = '';
 
+            // Check column states
+            const showAssignee = document.getElementById('col-assignee').checked;
+            const showTime = document.getElementById('col-time').checked;
+            const showGroup = document.getElementById('col-group').checked;
+
+            // Build dynamic grid template
+            let gridCols = '1fr ';
+            if (showAssignee) gridCols += '100px ';
+            if (showTime) gridCols += '120px ';
+            if (showGroup) gridCols += '100px ';
+            gridCols += '80px'; // For Edit/Delete actions
+
             // Filter
             const filtered = allItinerary.filter(t => {
-                const matchSearch = t.task.toLowerCase().includes(searchTerm) || (t.task && t.task.toLowerCase().includes(searchTerm));
+                const matchSearch = t.task.toLowerCase().includes(searchTerm);
                 const matchGroup = !groupFilter || t.target_group === groupFilter;
                 return matchSearch && matchGroup;
             });
@@ -558,18 +624,20 @@
                 section.className = 'asana-section';
 
                 section.innerHTML = `
-                    <div class="asana-header">▼ ${day}</div>
-                    <div class="task-table-header">
+                    <div class="asana-header">
+                        <span>▼ <span class="inline-edit" contenteditable="true" onblur="updateSection('${day}', this.innerText)" onclick="event.stopPropagation()">${day}</span></span>
+                        <button class="delete-btn" onclick="deleteSection('${day}')">🗑️</button>
+                    </div>
+                    <div class="task-table-header" style="grid-template-columns: ${gridCols};">
                         <div>Task Name</div>
-                        <div>Assignee</div>
-                        <div>Start Time</div>
-                        <div></div>
+                        ${showAssignee ? '<div>Assignee</div>' : ''}
+                        ${showTime ? '<div>Start Time</div>' : ''}
+                        ${showGroup ? '<div>Group</div>' : ''}
+                        <div>Actions</div>
                     </div>
                 `;
 
                 tasks.forEach(task => {
-                    const startTime = task.starts_at ? new Date(task.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
-                    const initials = task.responsible ? task.responsible.split(' ').map(n => n[0]).join('').toUpperCase() : '-';
                     const doneUI = task.is_completed ? '✅ ' : '';
 
                     // Container for both the row and the accordion
@@ -578,6 +646,7 @@
                     // 1. The Main Row
                     const taskEl = document.createElement('div');
                     taskEl.className = 'task-row';
+                    taskEl.style.gridTemplateColumns = gridCols;
                     if (task.is_completed) taskEl.style.opacity = '0.6';
                     taskEl.onclick = () => {
                         const acc = document.getElementById(`acc-${task.task_id}`);
@@ -585,12 +654,22 @@
                         zoomToTask(task.task_id);
                     };
 
-                    taskEl.innerHTML = `
-                        <div class="task-cell name">${doneUI}${task.task}</div>
-                        <div class="task-cell"><div class="assignee-icon" style="background:${groupColors[task.target_group] || '#3498db'}">${initials}</div></div>
-                        <div class="task-cell time">${startTime}</div>
-                        <div class="task-cell"><button class="edit-btn" onclick="event.stopPropagation(); startEdit(${task.task_id})">✏️</button></div>
+                    let cellsHtml = `<div class="task-cell name"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">${doneUI}${task.task}</span></div>`;
+
+                    if (showAssignee) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'responsible', this.innerText)" onclick="event.stopPropagation()">${task.responsible || '-'}</span></div>`;
+
+                    if (showTime) cellsHtml += `<div class="task-cell time"><input type="datetime-local" class="inline-edit" style="width:100%" value="${task.starts_at ? task.starts_at.substring(0, 16) : ''}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()"></div>`;
+
+                    if (showGroup) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'target_group', this.innerText)" onclick="event.stopPropagation()">${task.target_group || '-'}</span></div>`;
+
+                    cellsHtml += `
+                        <div class="task-cell">
+                            <button class="edit-btn" onclick="event.stopPropagation(); startEdit(${task.task_id})">✏️</button>
+                            <button class="delete-btn" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
+                        </div>
                     `;
+
+                    taskEl.innerHTML = cellsHtml;
 
                     // 2. The Accordion Details
                     const accordionEl = document.createElement('div');
@@ -609,7 +688,10 @@
                                         <span class="color-dot" style="background-color: ${color}"></span>
                                         <span>${g.title}</span>
                                     </div>
-                                    <button class="edit-geom-btn">⚙️</button>
+                                    <div>
+                                        <button class="edit-geom-btn">⚙️</button>
+                                        <button class="delete-btn" onclick="event.stopPropagation(); deleteGeometry('${g.kind}', ${g.waypoint_id || g.track_id})">🗑️</button>
+                                    </div>
                                 </div>
                             `;
                         });
@@ -808,6 +890,60 @@
                 if (res.ok) { closeModal(); refreshData(); }
             }
         };
+
+        async function updateTaskInline(taskId, field, value) {
+            const task = allItinerary.find(t => t.task_id === taskId);
+            if (!task || task[field] == value) return; // No change
+            task[field] = value;
+            // Map our UI field names to API field names if necessary
+            const payload = {
+                task_name: task.task,
+                responsible: task.responsible,
+                target_group: task.target_group,
+                day_label: task.day_label,
+                starts_at: task.starts_at,
+                ends_at: task.ends_at,
+                is_completed: task.is_completed
+            };
+            // Overwrite the specific field we just edited
+            payload[field] = value;
+
+            await fetch(`${API_URL}/tasks/${taskId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                body: JSON.stringify(payload)
+            });
+            refreshData();
+        }
+
+        async function updateSection(oldDay, newDay) {
+            if (oldDay === newDay) return;
+            await fetch(`${API_URL}/tasks/section/${oldDay}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                body: JSON.stringify({ new_label: newDay })
+            });
+            refreshData();
+        }
+
+        async function deleteSection(day) {
+            if (!confirm(`Are you sure you want to delete all tasks in ${day}?`)) return;
+            await fetch(`${API_URL}/tasks/section/${day}`, { method: 'DELETE', headers: { 'x-api-key': ADMIN_KEY } });
+            refreshData();
+        }
+
+        async function deleteTask(taskId) {
+            if (!confirm("Delete this task?")) return;
+            await fetch(`${API_URL}/tasks/${taskId}`, { method: 'DELETE', headers: { 'x-api-key': ADMIN_KEY } });
+            refreshData();
+        }
+
+        async function deleteGeometry(kind, id) {
+            if (!confirm("Delete this location?")) return;
+            const endpoint = kind === 'point' ? `/waypoints/${id}` : `/tracks/${id}`;
+            await fetch(`${API_URL}${endpoint}`, { method: 'DELETE', headers: { 'x-api-key': ADMIN_KEY } });
+            refreshData();
+        }
 
         async function syncDbSchema() {
             const res = await fetch(`${API_URL}/setup-db`, { headers: { 'x-api-key': ADMIN_KEY } });

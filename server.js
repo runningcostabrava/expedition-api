@@ -253,6 +253,55 @@ app.put('/waypoints/:id', adminAuth, async (req, res) => {
     } catch (err) { res.status(500).send({ error: err.message }); }
 });
 
+// Delete a specific task
+app.delete('/tasks/:id', adminAuth, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM tasks WHERE id = $1', [req.params.id]);
+        res.json({ message: "Task deleted" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Delete an entire section (by day_label)
+app.delete('/tasks/section/:day_label', adminAuth, async (req, res) => {
+    try {
+        const label = req.params.day_label === 'Unscheduled' ? null : req.params.day_label;
+        if (label === null) {
+            await pool.query('DELETE FROM tasks WHERE day_label IS NULL');
+        } else {
+            await pool.query('DELETE FROM tasks WHERE day_label = $1', [label]);
+        }
+        res.json({ message: "Section deleted" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Rename a section (bulk update day_label)
+app.put('/tasks/section/:old_label', adminAuth, async (req, res) => {
+    try {
+        const oldLabel = req.params.old_label === 'Unscheduled' ? null : req.params.old_label;
+        const { new_label } = req.body;
+        if (oldLabel === null) {
+            await pool.query('UPDATE tasks SET day_label = $1 WHERE day_label IS NULL', [new_label]);
+        } else {
+            await pool.query('UPDATE tasks SET day_label = $1 WHERE day_label = $2', [new_label, oldLabel]);
+        }
+        res.json({ message: "Section renamed" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Delete geometries
+app.delete('/waypoints/:id', adminAuth, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM waypoints WHERE id = $1', [req.params.id]);
+        res.json({ message: "Waypoint deleted" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+app.delete('/tracks/:id', adminAuth, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM tracks WHERE id = $1', [req.params.id]);
+        res.json({ message: "Track deleted" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // 4. ITINERARY: View Project Plan
 app.get('/itinerary', async (req, res) => {
   try {
