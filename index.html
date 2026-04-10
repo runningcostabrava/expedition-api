@@ -585,6 +585,12 @@
 
                 if (isRouting) {
                     routePoints.push([e.lngLat.lng, e.lngLat.lat]);
+                    
+                    if (routePoints.length === 1) {
+                        // Visual feedback for Point A
+                        draw.add({ id: 'temp-start-point', type: 'Feature', geometry: { type: 'Point', coordinates: routePoints[0] } });
+                    }
+                    
                     if (routePoints.length === 2) {
                         const profile = document.getElementById('route-profile').value;
                         const coords = `${routePoints[0][0]},${routePoints[0][1]};${routePoints[1][0]},${routePoints[1][1]}`;
@@ -592,14 +598,20 @@
                             const res = await fetch(`https://api.mapbox.com/directions/v5/mapbox/${profile}/${coords}?geometries=geojson&access_token=${mapboxgl.accessToken}`);
                             const data = await res.json();
                             if (data.routes && data.routes.length > 0) {
-                                draw.deleteAll();
+                                draw.deleteAll(); // This also clears our temp-start-point
                                 draw.add(data.routes[0].geometry);
                                 resetForm();
                                 document.getElementById('color-picker-group').style.display = 'block';
                                 document.getElementById('wp-title').value = `New ${profile} route`;
                                 openModal();
+                            } else {
+                                alert("No valid route found between these two points.");
+                                draw.deleteAll();
                             }
-                        } catch (err) { alert("Routing error"); }
+                        } catch (err) { 
+                            alert("Routing error. Please try again."); 
+                            draw.deleteAll();
+                        }
                         isRouting = false;
                         map.getCanvas().style.cursor = '';
                     }
@@ -619,6 +631,7 @@
             map.on('load', () => {
                 map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
                 map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
+                map.setLight({ anchor: 'map' });
                 map.addLayer({ 'id': 'sky', 'type': 'sky', 'paint': { 'sky-type': 'atmosphere', 'sky-atmosphere-sun-intensity': 15 } });
                 refreshData();
             });
@@ -775,7 +788,15 @@
             alert("Smart Route: Click two points on the map.");
         }
 
-        function changeMapStyle(style) { map.setStyle(style); }
+        function changeMapStyle(style) { 
+            map.setStyle(style); 
+            map.once('style.load', () => {
+                map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
+                map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
+                map.setLight({ anchor: 'map' });
+                map.addLayer({ 'id': 'sky', 'type': 'sky', 'paint': { 'sky-type': 'atmosphere', 'sky-atmosphere-sun-intensity': 15 } });
+            });
+        }
 
         document.getElementById('unified-save-btn').onclick = async () => {
             const taskData = {
