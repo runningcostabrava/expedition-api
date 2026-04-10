@@ -3,6 +3,7 @@
 
 <head>
     <meta charset="utf-8">
+    <link rel="icon" href="data:,">
     <title>Expedition Ecosystem v2.0 - Logistics Dashboard</title>
     <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
@@ -536,9 +537,12 @@
         let map, draw;
         let activeMarkers = [];
         let allTracks = [], allItinerary = [];
-        let activeTaskId = null, activeAnchorId = null, activeWaypointId = null;
-        let isEditingGeometry = false;
-        let ADMIN_KEY = null;
+        let activeTaskId = null, activeAnchorId = null, activeWaypointId = null, activeTrackId = null;
+        let isEditingGeometry = false, isRouting = false, isAnalyzingSegment = false;
+        let routePoints = [], segmentPoints = [], activeAnalysisTrack = null;
+        let ADMIN_KEY = null, elevationChart = null;
+
+        const groupColors = { 'Hikers': '#2ecc71', 'Runners': '#e67e22', 'Staff': '#9b59b6', 'Transport': '#f1c40f' };
 
         async function initializeApp() {
             const configRes = await fetch(`${API_URL}/api/config`);
@@ -553,160 +557,81 @@
                 zoom: 12
             });
 
-            draw = new MapboxDraw({
-                displayControlsDefault: false,
-                controls: { trash: true }
-            });
+            draw = new MapboxDraw({ displayControlsDefault: false, controls: { trash: true } });
             map.addControl(draw);
 
-            const geocoder = new MapboxGeocoder({
-                accessToken: mapboxgl.accessToken,
-                mapboxgl: mapboxgl,
-                marker: false // We will handle our own markers
-            });
+            const geocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, marker: false });
             map.addControl(geocoder, 'top-right');
 
-            geocoder.on('result', (e) => {
-                const coords = e.result.center;
-            geocoder.on('result', (e) => {
-                const coords = e.result.center;
-                const placeName = e.result.text;
-
-                // Clear drawings and add the searched point
-                draw.deleteAll();
-                draw.add({ type: 'Point', coordinates: coords });
-
-                resetForm();
-                document.getElementById('color-picker-group').style.display = 'block';
-                document.getElementById('wp-title').value = placeName;
-                document.getElementById('modal-title').innerText = "Save Searched Location";
-                openModal();
-            });
-
+            // 1. Unified Click Handler for Routing and Analysis
             map.on('click', async (e) => {
-                if (isAnalyzingSegment) {
-                    // Find nearest point on the track to the click
+                if (isAnalyzingSegment && activeAnalysisTrack) {
                     const snapped = turf.nearestPointOnLine(activeAnalysisTrack.features[0], [e.lngLat.lng, e.lngLat.lat]);
                     segmentPoints.push(snapped);
-
                     if (segmentPoints.length === 2) {
-                        isAnalyzingSegment = false;
-                        map.getCanvas().style.cursor = '';
-
-                        // Slice the line between the two points
                         const sliced = turf.lineSlice(segmentPoints[0], segmentPoints[1], activeAnalysisTrack.features[0]);
                         const dist = turf.length(sliced, { units: 'kilometers' }).toFixed(2);
-
-                        // Calculate Elevation Change (if Z data exists)
                         const coords = sliced.geometry.coordinates;
-                        const startZ = coords[0][2] || 0;
-                        const endZ = coords[coords.length - 1][2] || 0;
-                        const gain = endZ - startZ;
-
+                        const gain = (coords[coords.length - 1][2] || 0) - (coords[0][2] || 0);
                         alert(`Segment Info:\nDistance: ${dist} km\nElevation Change: ${gain.toFixed(1)}m`);
                         showElevationProfile({ type: 'FeatureCollection', features: [sliced] }, "Selected Segment");
+                        isAnalyzingSegment = false;
+                        map.getCanvas().style.cursor = '';
                     }
                     return;
                 }
 
-                if (!isRouting) return;
-                routePoints.push([e.lngLat.lng, e.lngLat.lat]);
-
-                if (routePoints.length === 2) {
-                    isRouting = false;
-                    map.getCanvas().style.cursor = '';
-                    const profile = document.getElementById('route-profile').value;
-                    const coords = `${routePoints[0][0]},${routePoints[0][1]};${routePoints[1][0]},${routePoints[1][1]}`;
-
-                    try {
-                        const res = await fetch(`https://api.mapbox.com/directions/v5/mapbox/${profile}/${coords}?geometries=geojson&access_token=${mapboxgl.accessToken}`);
-                        const data = await res.json();
-                        if (data.routes && data.routes.length > 0) {
-                            const routeGeoJSON = data.routes[0].geometry;
-                            draw.deleteAll();
-                            draw.add(routeGeoJSON);
-
-                            resetForm();
-                            document.getElementById('color-picker-group').style.display = 'block';
-                            document.getElementById('wp-title').value = `New ${profile} route`;
-                            openModal();
-                        } else { alert("No route found between these points."); }
-                    } catch (err) { console.error(err); alert("Routing error"); }
+                if (isRouting) {
+                    routePoints.push([e.lngLat.lng, e.lngLat.lat]);
+                    if (routePoints.length === 2) {
+                        const profile = document.getElementById('route-profile').value;
+                        const coords = `${routePoints[0][0]},${routePoints[0][1]};${routePoints[1][0]},${routePoints[1][1]}`;
+                        try {
+                            const res = await fetch(`https://api.mapbox.com/directions/v5/mapbox/${profile}/${coords}?geometries=geojson&access_token=${mapboxgl.accessToken}`);
+                            const data = await res.json();
+                            if (data.routes && data.routes.length > 0) {
+                                draw.deleteAll();
+                                draw.add(data.routes[0].geometry);
+                                resetForm();
+                                document.getElementById('color-picker-group').style.display = 'block';
+                                document.getElementById('wp-title').value = `New ${profile} route`;
+                                openModal();
+                            }
+                        } catch (err) { alert("Routing error"); }
+                        isRouting = false;
+                        map.getCanvas().style.cursor = '';
+                    }
                 }
+            });
+
+            // 2. Geocoder Result
+            geocoder.on('result', (e) => {
+                draw.deleteAll();
+                draw.add({ type: 'Point', coordinates: e.result.center });
+                resetForm();
+                document.getElementById('color-picker-group').style.display = 'block';
+                document.getElementById('wp-title').value = e.result.text;
+                openModal();
             });
 
             map.on('load', () => {
-                map.addSource('mapbox-dem', {
-                    'type': 'raster-dem',
-                    'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
-                    'tileSize': 512,
-                    'maxzoom': 14
-                });
+                map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
                 map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
-                map.addLayer({
-                    'id': 'sky',
-                    'type': 'sky',
-                    'paint': {
-                        'sky-type': 'atmosphere',
-                        'sky-atmosphere-sun': [0.0, 0.0],
-                        'sky-atmosphere-sun-intensity': 15
-                    }
-                });
+                map.addLayer({ 'id': 'sky', 'type': 'sky', 'paint': { 'sky-type': 'atmosphere', 'sky-atmosphere-sun-intensity': 15 } });
                 refreshData();
             });
 
-            map.on('draw.create', function (e) {
-                // Get the shape the user just finished drawing
-                const feature = e.features[0];
-                const type = feature.geometry.type;
-
-                // Prepare the form for a clean entry
+            map.on('draw.create', (e) => {
                 resetForm();
                 document.getElementById('color-picker-group').style.display = 'block';
-
-                // Pre-fill a contextual default title based on the geometry type
-                const titleInput = document.getElementById('wp-title');
-                if (type === 'Point') {
-                    titleInput.value = 'New Waypoint';
-                } else if (type === 'LineString') {
-                    titleInput.value = 'New Track';
-                } else if (type === 'Polygon') {
-                    titleInput.value = 'New Zone';
-                }
-
-                // Auto-open the Command Center
+                document.getElementById('wp-title').value = `New ${e.features[0].geometry.type}`;
                 openModal();
             });
         }
 
-        async function refreshData() {
-            const res = await fetch(`${API_URL}/itinerary`);
-            allItinerary = await res.json();
-
-            // Refresh dropdown
-            const dropdown = document.getElementById('existing-task');
-            dropdown.innerHTML = '<option value="">-- Create New Task --</option>';
-            allItinerary.forEach(t => {
-                const option = document.createElement('option');
-                option.value = t.task_id;
-                option.textContent = t.task;
-                dropdown.appendChild(option);
-            });
-
-            renderProjectView();
-            renderMapGeometries();
-        }
-
-        const groupColors = {
-            'Hikers': '#2ecc71', 'Runners': '#e67e22', 'Staff': '#9b59b6', 'Transport': '#f1c40f'
-        };
-
         function renderMapGeometries() {
-            // Clear old markers
             activeMarkers.forEach(m => m.remove());
             activeMarkers = [];
-
-            // Clear old track layers/sources
             const style = map.getStyle();
             if (style && style.layers) {
                 style.layers.forEach(layer => {
@@ -717,274 +642,89 @@
                 });
             }
 
-            // Render new geometries
             allItinerary.forEach(task => {
                 if (!task.geometries) return;
                 task.geometries.forEach(geom => {
                     const renderColor = geom.color || groupColors[task.target_group] || '#3498db';
-
                     if (geom.kind === 'point' && geom.lat && geom.lng) {
-                        const popupHtml = `
-                            <div style="padding: 5px;">
-                                <h4 style="margin: 0 0 5px 0;">📍 ${geom.title}</h4>
-                                <p style="margin: 0 0 10px 0; font-size: 0.9em; color: #666;">Task: ${task.task}</p>
-                                <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="padding: 5px 10px; width: 100%;">Edit Location</button>
-                            </div>
-                        `;
-                        const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(popupHtml);
                         const marker = new mapboxgl.Marker({ color: renderColor })
                             .setLngLat([geom.lng, geom.lat])
-                            .setPopup(popup)
+                            .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
+                                <h4>📍 ${geom.title}</h4>
+                                <p>Task: ${task.task}</p>
+                                <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})">Edit</button>
+                            `))
                             .addTo(map);
                         activeMarkers.push(marker);
-                    } else if ((geom.kind === 'line' || geom.kind === 'polygon') && geom.geojson) {
-                        const sourceId = `track-${geom.track_id}`;
+                    } else if (geom.geojson) {
                         const layerId = `layer-${geom.track_id}`;
-                        if (!map.getSource(sourceId)) {
-                            map.addSource(sourceId, { type: 'geojson', data: geom.geojson });
-                            map.addLayer({
-                                id: layerId,
-                                type: geom.kind === 'polygon' ? 'fill' : 'line',
-                                source: sourceId,
-                                paint: geom.kind === 'polygon'
-                                    ? { 'fill-color': renderColor, 'fill-opacity': 0.4 }
-                                    : { 'line-color': renderColor, 'line-width': 4 }
-                            });
-
-                            map.on('click', layerId, (e) => {
-                                const emoji = geom.kind === 'polygon' ? '🛑' : '📈';
-                                const dist = turf.length(geom.geojson, { units: 'kilometers' }).toFixed(2);
-                                const popupHtml = `
-                                    <div style="padding: 5px;">
-                                        <h4 style="margin: 0 0 5px 0;">${emoji} ${geom.title}</h4>
-                                        <p style="margin: 0 0 5px 0; font-size: 0.9em; color: #666;">Distance: ${dist} km</p>
-                                        <p style="margin: 0 0 10px 0; font-size: 0.9em; color: #666;">Task: ${task.task}</p>
-                                        <div style="display: flex; gap: 5px;">
-                                            <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="padding: 5px 10px; flex: 1;">Edit</button>
-                                            <button onclick="startSegmentAnalysis(${JSON.stringify(geom.geojson).replace(/"/g, '"')})" style="padding: 5px 10px; flex: 1;">Analyze</button>
-                                        </div>
-                                    </div>
-                                `;
-                                showElevationProfile(geom.geojson, geom.title);
-                                new mapboxgl.Popup()
-                                    .setLngLat(e.lngLat)
-                                    .setHTML(popupHtml)
-                                    .addTo(map);
-                            });
-
-                            map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
-                            map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
-                        }
-                    }
-                });
-            });
-        }
-
-        function renderProjectView() {
-            const container = document.getElementById('asana-container');
-            const searchTerm = document.getElementById('search-filter').value.toLowerCase();
-            const groupFilter = document.getElementById('group-filter').value;
-            container.innerHTML = '';
-
-            // Check column states
-            const showAssignee = document.getElementById('col-assignee').checked;
-            const showTime = document.getElementById('col-time').checked;
-            const showGroup = document.getElementById('col-group').checked;
-
-            // Build dynamic grid template
-            let gridCols = '1fr ';
-            if (showAssignee) gridCols += '100px ';
-            if (showTime) gridCols += '120px ';
-            if (showGroup) gridCols += '100px ';
-            gridCols += '80px'; // For Edit/Delete actions
-
-            // Filter
-            const filtered = allItinerary.filter(t => {
-                const matchSearch = t.task.toLowerCase().includes(searchTerm);
-                const matchGroup = !groupFilter || t.target_group === groupFilter;
-                return matchSearch && matchGroup;
-            });
-
-            // Group by Day Label
-            const groups = {};
-            filtered.forEach(task => {
-                const day = task.day_label || 'Unscheduled';
-                if (!groups[day]) groups[day] = [];
-                groups[day].push(task);
-            });
-
-            // Render HTML
-            for (const [day, tasks] of Object.entries(groups)) {
-                const section = document.createElement('div');
-                section.className = 'asana-section';
-
-                section.innerHTML = `
-                    <div class="asana-header">
-                        <span>▼ <span class="inline-edit" contenteditable="true" onblur="updateSection('${day}', this.innerText)" onclick="event.stopPropagation()">${day}</span></span>
-                        <button class="delete-btn" onclick="deleteSection('${day}')">🗑️</button>
-                    </div>
-                    <div class="task-table-header" style="grid-template-columns: ${gridCols};">
-                        <div>Task Name</div>
-                        ${showAssignee ? '<div>Assignee</div>' : ''}
-                        ${showTime ? '<div>Start Time</div>' : ''}
-                        ${showGroup ? '<div>Group</div>' : ''}
-                        <div>Actions</div>
-                    </div>
-                `;
-
-                tasks.forEach(task => {
-                    const doneUI = task.is_completed ? '✅ ' : '';
-
-                    // Container for both the row and the accordion
-                    const taskContainer = document.createElement('div');
-
-                    // 1. The Main Row
-                    const taskEl = document.createElement('div');
-                    taskEl.className = 'task-row';
-                    taskEl.style.gridTemplateColumns = gridCols;
-                    if (task.is_completed) taskEl.style.opacity = '0.6';
-                    taskEl.onclick = () => {
-                        const acc = document.getElementById(`acc-${task.task_id}`);
-                        acc.classList.toggle('open');
-                        zoomToTask(task.task_id);
-                    };
-
-                    let cellsHtml = `<div class="task-cell name"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">${doneUI}${task.task}</span></div>`;
-
-                    if (showAssignee) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'responsible', this.innerText)" onclick="event.stopPropagation()">${task.responsible || '-'}</span></div>`;
-
-                    if (showTime) cellsHtml += `<div class="task-cell time"><input type="datetime-local" class="inline-edit" style="width:100%" value="${task.starts_at ? task.starts_at.substring(0, 16) : ''}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()"></div>`;
-
-                    if (showGroup) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'target_group', this.innerText)" onclick="event.stopPropagation()">${task.target_group || '-'}</span></div>`;
-
-                    cellsHtml += `
-                        <div class="task-cell">
-                            <button class="edit-btn" onclick="event.stopPropagation(); startEdit(${task.task_id})">✏️</button>
-                            <button class="delete-btn" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
-                        </div>
-                    `;
-
-                    taskEl.innerHTML = cellsHtml;
-
-                    // 2. The Accordion Details
-                    const accordionEl = document.createElement('div');
-                    accordionEl.className = 'task-accordion';
-                    accordionEl.id = `acc-${task.task_id}`;
-
-                    let geomHtml = '';
-                    if (task.geometries && task.geometries.length > 0) {
-                        task.geometries.forEach(g => {
-                            const emoji = g.kind === 'point' ? '📍' : (g.kind === 'polygon' ? '🛑' : '📈');
-                            const color = g.color || '#3498db';
-                            geomHtml += `
-                                <div class="geom-row" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})">
-                                    <div class="geom-info">
-                                        <span>${emoji}</span>
-                                        <span class="color-dot" style="background-color: ${color}"></span>
-                                        <span>${g.title}</span>
-                                    </div>
-                                    <div>
-                                        <button class="edit-geom-btn">⚙️</button>
-                                        <button class="delete-btn" onclick="event.stopPropagation(); deleteGeometry('${g.kind}', ${g.waypoint_id || g.track_id})">🗑️</button>
-                                    </div>
-                                </div>
-                            `;
+                        map.addSource(`track-${geom.track_id}`, { type: 'geojson', data: geom.geojson });
+                        map.addLayer({
+                            id: layerId,
+                            type: geom.kind === 'polygon' ? 'fill' : 'line',
+                            source: `track-${geom.track_id}`,
+                            paint: geom.kind === 'polygon' ? { 'fill-color': renderColor, 'fill-opacity': 0.4 } : { 'line-color': renderColor, 'line-width': 4 }
                         });
-                    } else {
-                        geomHtml = `<div style="color: #95a5a6; font-size: 0.85em; font-style: italic;">No locations attached.</div>`;
+
+                        map.on('click', layerId, (e) => {
+                            const dist = turf.length(geom.geojson, { units: 'kilometers' }).toFixed(2);
+                            new mapboxgl.Popup().setLngLat(e.lngLat).setHTML(`
+                                <h4>${geom.kind === 'polygon' ? '🛑' : '📈'} ${geom.title}</h4>
+                                <p>Dist: ${dist} km | Task: ${task.task}</p>
+                                <div style="display:flex; gap:5px;">
+                                    <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})">Edit</button>
+                                    <button onclick="startSegmentAnalysis(${task.task_id}, ${geom.track_id})">Analyze</button>
+                                </div>
+                            `).addTo(map);
+                            showElevationProfile(geom.geojson, geom.title);
+                        });
                     }
-                    accordionEl.innerHTML = geomHtml;
-
-                    taskContainer.appendChild(taskEl);
-                    taskContainer.appendChild(accordionEl);
-                    section.appendChild(taskContainer);
                 });
-                container.appendChild(section);
-            }
-        }
-
-        function zoomToTask(taskId) {
-            const task = allItinerary.find(t => t.task_id === taskId);
-            if (!task || !task.geometries || task.geometries.length === 0) return;
-
-            const first = task.geometries[0];
-            if (first.kind === 'point') {
-                map.flyTo({ center: [first.lng, first.lat], zoom: 16 });
-            } else if (first.geojson) {
-                const coords = first.geojson.features[0].geometry.coordinates;
-                const bounds = first.geojson.features[0].geometry.type === 'Polygon'
-                    ? coords[0].reduce((acc, c) => acc.extend(c), new mapboxgl.LngLatBounds(coords[0][0], coords[0][0]))
-                    : coords.reduce((acc, c) => acc.extend(c), new mapboxgl.LngLatBounds(coords[0], coords[0]));
-                map.fitBounds(bounds, { padding: 50 });
-            }
-        }
-
-        function startEdit(taskId) {
-            const task = allItinerary.find(t => t.task_id === taskId);
-            if (!task) return;
-
-            isEditingGeometry = false;
-            activeTaskId = task.task_id;
-
-            document.getElementById('modal-title').innerText = "Command Center";
-            document.getElementById('task-fields-container').style.display = 'block';
-            document.getElementById('wp-title').value = task.task; // In task mode, title is task name
-            document.getElementById('wp-description').value = task.task;
-            document.getElementById('target-group').value = task.target_group;
-            document.getElementById('day-label').value = task.day_label || '';
-            document.getElementById('starts-at').value = task.starts_at ? task.starts_at.substring(0, 16) : '';
-            document.getElementById('responsible').value = task.responsible || '';
-            document.getElementById('is-completed').checked = task.is_completed;
-            document.getElementById('task-comments').value = task.comments || '';
-            document.getElementById('existing-task').style.display = 'none';
-            document.getElementById('color-picker-group').style.display = 'none';
-            document.getElementById('attached-locations-list').parentElement.style.display = 'block';
-
-            const list = document.getElementById('attached-locations-list');
-            list.innerHTML = '';
-            task.geometries.forEach(g => {
-                const emoji = g.kind === 'point' ? '📍' : (g.kind === 'polygon' ? '🛑' : '📈');
-                list.innerHTML += `<div>${emoji} ${g.title}</div>`;
             });
-
-            draw.deleteAll();
-            openModal();
         }
 
-        function startEditGeometry(taskId, anchorId) {
+        function startSegmentAnalysis(taskId, trackId) {
             const task = allItinerary.find(t => t.task_id === taskId);
-            if (!task) return;
-            const geom = task.geometries.find(g => g.anchor_id === anchorId);
+            const geom = task?.geometries.find(g => g.track_id === trackId);
             if (!geom) return;
-
-            resetForm();
-            isEditingGeometry = true;
-            activeTaskId = taskId;
-            activeAnchorId = anchorId;
-            activeWaypointId = geom.waypoint_id; // Will be null if it's a track
-            activeTrackId = geom.track_id;       // Global scope for use in save
-
-            // Hide Task specific fields, show geometry fields
-            document.getElementById('task-fields-container').style.display = 'none';
-            document.getElementById('color-picker-group').style.display = 'block';
-            document.getElementById('attached-locations-list').parentElement.style.display = 'none';
-
-            document.getElementById('modal-title').innerText = "Edit Location Details";
-            document.getElementById('wp-title').value = geom.title;
-            document.getElementById('geom-color').value = geom.color || '#3498db';
-            document.getElementById('existing-task').value = taskId;
-            document.getElementById('existing-task').style.display = 'block';
-
-            draw.deleteAll();
-            if (geom.kind === 'point') {
-                draw.add({ type: 'Feature', geometry: { type: 'Point', coordinates: [geom.lng, geom.lat] }, properties: {} });
-            } else if (geom.geojson) {
-                draw.add(geom.geojson);
-            }
-            openModal();
+            isAnalyzingSegment = true;
+            segmentPoints = [];
+            activeAnalysisTrack = geom.geojson;
+            map.getCanvas().style.cursor = 'crosshair';
+            alert("Analysis: Click two points on the track.");
         }
 
-        let activeTrackId = null;
+        function showElevationProfile(geojson, title) {
+            document.getElementById('elevation-panel').style.display = 'block';
+            let distances = [0], elevations = [], cumulative = 0;
+            const coords = geojson.features[0].geometry.type === 'Polygon' ? geojson.features[0].geometry.coordinates[0] : geojson.features[0].geometry.coordinates;
+            coords.forEach((c, i) => {
+                elevations.push(c[2] || 0);
+                if (i > 0) cumulative += turf.distance(turf.point(coords[i - 1]), turf.point(c), { units: 'kilometers' });
+                distances.push(cumulative.toFixed(2));
+            });
+            if (elevationChart) elevationChart.destroy();
+            elevationChart = new Chart(document.getElementById('elevation-chart'), {
+                type: 'line',
+                data: { labels: distances, datasets: [{ label: title, data: elevations, fill: true, tension: 0.4 }] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        async function refreshData() {
+            const res = await fetch(`${API_URL}/itinerary`);
+            allItinerary = await res.json();
+            const dropdown = document.getElementById('existing-task');
+            dropdown.innerHTML = '<option value="">-- Create New Task --</option>';
+            allItinerary.forEach(t => {
+                const option = document.createElement('option');
+                option.value = t.task_id;
+                option.textContent = t.task;
+                dropdown.appendChild(option);
+            });
+            renderProjectView();
+            renderMapGeometries();
+        }
 
         function resetForm() {
             activeTaskId = null;
@@ -1004,277 +744,184 @@
             document.getElementById('existing-task').style.display = 'block';
         }
 
-        function openModal() {
-            document.getElementById('command-modal').style.display = 'flex';
-        }
+        function openModal() { document.getElementById('command-modal').style.display = 'flex'; }
+        function closeModal() { document.getElementById('command-modal').style.display = 'none'; resetForm(); draw.deleteAll(); }
 
-        function closeModal() {
-            document.getElementById('command-modal').style.display = 'none';
-            resetForm();
-            draw.deleteAll();
-        }
-
-        document.getElementById('unified-save-btn').onclick = async () => {
-            const data = draw.getAll();
-            const color = document.getElementById('geom-color').value;
-            const existingTaskId = document.getElementById('existing-task').value || activeTaskId;
-
-            if (isEditingGeometry) {
-                const isPoint = activeWaypointId !== null;
-                const endpoint = isPoint ? `/waypoints/${activeWaypointId}` : `/tracks/${activeTrackId}`;
-                let payload = {
-                    title: document.getElementById('wp-title').value,
-                    color: color,
-                    existing_task_id: existingTaskId
-                };
-                if (data.features.length > 0) {
-                    const feature = data.features[data.features.length - 1];
-                    if (isPoint) {
-                        payload.lat = feature.geometry.coordinates[1];
-                        payload.lng = feature.geometry.coordinates[0];
-                    } else {
-                        payload.geojson_data = data;
-                    }
-                }
-                const res = await fetch(`${API_URL}${endpoint}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
-                    body: JSON.stringify(payload)
-                });
-                if (res.ok) { closeModal(); refreshData(); }
-            } else if (data.features.length === 0) {
-                // FLOW A: Saving Task Details only
-                const payload = {
-                    task_name: document.getElementById('wp-description').value || "New Task",
-                    responsible: document.getElementById('responsible').value,
-                    target_group: document.getElementById('target-group').value,
-                    day_label: document.getElementById('day-label').value,
-                    starts_at: document.getElementById('starts-at').value || null,
-                    is_completed: document.getElementById('is-completed').checked,
-                    comments: document.getElementById('task-comments').value
-                };
-                const method = activeTaskId ? 'PUT' : 'POST';
-                const endpoint = activeTaskId ? `/tasks/${activeTaskId}` : '/tasks';
-                const res = await fetch(`${API_URL}${endpoint}`, {
-                    method,
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
-                    body: JSON.stringify(payload)
-                });
-                if (res.ok) { closeModal(); refreshData(); }
-            } else {
-                // FLOW B: Saving a new Location
-                const feature = data.features[data.features.length - 1];
-                const isPoint = feature.geometry.type === 'Point';
-                let endpoint = isPoint ? '/waypoints' : '/tracks';
-                let payload = {
-                    title: document.getElementById('wp-title').value || (isPoint ? "New Waypoint" : "New Track"),
-                    color: color,
-                    existing_task_id: existingTaskId,
-                    target_group: document.getElementById('target-group').value
-                };
-
-                if (isPoint) {
-                    payload.lat = feature.geometry.coordinates[1];
-                    payload.lng = feature.geometry.coordinates[0];
-                } else {
-                    payload.geojson_data = data;
-                }
-
-                const res = await fetch(`${API_URL}${endpoint}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
-                    body: JSON.stringify(payload)
-                });
-                if (res.ok) { closeModal(); refreshData(); }
-            }
-        };
-
-        async function updateTaskInline(taskId, field, value) {
-            const task = allItinerary.find(t => t.task_id === taskId);
-            if (!task || task[field] == value) return; // No change
-            task[field] = value;
-            // Map our UI field names to API field names if necessary
-            const payload = {
-                task_name: task.task,
-                responsible: task.responsible,
-                target_group: task.target_group,
-                day_label: task.day_label,
-                starts_at: task.starts_at,
-                ends_at: task.ends_at,
-                is_completed: task.is_completed,
-                comments: task.comments
-            };
-            // Overwrite the specific field we just edited
-            payload[field] = value;
-
-            await fetch(`${API_URL}/tasks/${taskId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
-                body: JSON.stringify(payload)
-            });
-            refreshData();
-        }
-
-        async function updateSection(oldDay, newDay) {
-            if (oldDay === newDay) return;
-            await fetch(`${API_URL}/tasks/section/${oldDay}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
-                body: JSON.stringify({ new_label: newDay })
-            });
-            refreshData();
-        }
-
-        async function deleteSection(day) {
-            if (!confirm(`Are you sure you want to delete all tasks in ${day}?`)) return;
-            await fetch(`${API_URL}/tasks/section/${day}`, { method: 'DELETE', headers: { 'x-api-key': ADMIN_KEY } });
-            refreshData();
-        }
-
-        async function deleteTask(taskId) {
+        async function deleteTask(id) {
             if (!confirm("Delete this task?")) return;
-            await fetch(`${API_URL}/tasks/${taskId}`, { method: 'DELETE', headers: { 'x-api-key': ADMIN_KEY } });
-            refreshData();
-        }
-
-        async function deleteGeometry(kind, id) {
-            if (!confirm("Delete this location?")) return;
-            const endpoint = kind === 'point' ? `/waypoints/${id}` : `/tracks/${id}`;
-            await fetch(`${API_URL}${endpoint}`, { method: 'DELETE', headers: { 'x-api-key': ADMIN_KEY } });
-            refreshData();
-        }
-
-        function changeMapStyle(styleUrl) {
-            map.setStyle(styleUrl);
-            map.once('style.load', () => {
-                // Re-add 3D Terrain & Sky
-                map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512, 'maxzoom': 14 });
-                map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
-                map.addLayer({ 'id': 'sky', 'type': 'sky', 'paint': { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0.0, 0.0], 'sky-atmosphere-sun-intensity': 15 } });
-                // Re-render our geometries
-                renderMapGeometries();
+            await fetch(`${API_URL}/tasks/${id}`, { 
+                method: 'DELETE', 
+                headers: { 'x-api-key': ADMIN_KEY } 
             });
+            refreshData();
         }
 
-        let isRouting = false;
-        let routePoints = [];
+        async function deleteGeometry(type, id) {
+            if (!confirm(`Delete this ${type}?`)) return;
+            const endpoint = type === 'point' ? `waypoints/${id}` : `tracks/${id}`;
+            await fetch(`${API_URL}/${endpoint}`, { 
+                method: 'DELETE', 
+                headers: { 'x-api-key': ADMIN_KEY } 
+            });
+            refreshData();
+        }
 
         function startSmartRoute() {
             isRouting = true;
             routePoints = [];
             map.getCanvas().style.cursor = 'crosshair';
-            alert("Smart Routing: Click your Start Point, then click your End Point.");
+            alert("Smart Route: Click two points on the map.");
         }
 
-        let isAnalyzingSegment = false;
-        let segmentPoints = [];
-        let activeAnalysisTrack = null;
+        function changeMapStyle(style) { map.setStyle(style); }
 
-        function startSegmentAnalysis(geojson) {
-            isAnalyzingSegment = true;
-            segmentPoints = [];
-            activeAnalysisTrack = geojson;
-            map.getCanvas().style.cursor = 'crosshair';
-            alert("Segment Analysis: Click two points along the track line to see distance and elevation change.");
-        }
+        document.getElementById('unified-save-btn').onclick = async () => {
+            const taskData = {
+                task_name: document.getElementById('wp-title').value,
+                target_group: document.getElementById('target-group').value,
+                day_label: document.getElementById('day-label').value,
+                starts_at: document.getElementById('starts-at').value || null,
+                responsible: document.getElementById('responsible').value,
+                is_completed: document.getElementById('is-completed').checked,
+                comments: document.getElementById('task-comments').value
+            };
+            const existingTaskId = document.getElementById('existing-task').value || null;
+            const geomColor = document.getElementById('geom-color').value;
+            const features = draw.getAll().features;
+            const headers = { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY };
 
-        let elevationChart = null;
-
-        function showElevationProfile(geojson, title) {
-            const panel = document.getElementById('elevation-panel');
-            panel.style.display = 'block';
-
-            let distances = [0];
-            let elevations = [];
-            let cumulativeDistance = 0;
-
-            // Extract coordinates (handling LineString or Polygon)
-            let coords = geojson.features[0].geometry.type === 'Polygon'
-                ? geojson.features[0].geometry.coordinates[0]
-                : geojson.features[0].geometry.coordinates;
-
-            // Many drawn routes lack elevation data (Z coordinate). 
-            // We check if it exists, otherwise default to 0 to prevent crashes.
-            coords.forEach((coord, i) => {
-                elevations.push(coord.length > 2 ? coord[2] : 0);
-                if (i > 0) {
-                    const from = turf.point(coords[i - 1]);
-                    const to = turf.point(coord);
-                    cumulativeDistance += turf.distance(from, to, { units: 'kilometers' });
-                    distances.push(cumulativeDistance.toFixed(2));
-                }
-            });
-
-            const ctx = document.getElementById('elevation-chart').getContext('2d');
-            if (elevationChart) elevationChart.destroy();
-
-            elevationChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: distances,
-                    datasets: [{
-                        label: `Elevation (m) - ${title}`,
-                        data: elevations,
-                        borderColor: '#3498db',
-                        backgroundColor: 'rgba(52, 152, 219, 0.2)',
-                        fill: true,
-                        pointRadius: 0,
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: { title: { display: true, text: 'Distance (km)' } },
-                        y: { title: { display: true, text: 'Elevation (m)' } }
+            try {
+                if (isEditingGeometry) {
+                    // Flow A: Updating an existing shape
+                    if (activeWaypointId) {
+                        await fetch(`${API_URL}/waypoints/${activeWaypointId}`, {
+                            method: 'PUT', headers,
+                            body: JSON.stringify({
+                                title: taskData.task_name, color: geomColor, existing_task_id: existingTaskId,
+                                lat: features.length > 0 ? features[0].geometry.coordinates[1] : undefined,
+                                lng: features.length > 0 ? features[0].geometry.coordinates[0] : undefined
+                            })
+                        });
+                    } else if (activeTrackId) {
+                        await fetch(`${API_URL}/tracks/${activeTrackId}`, {
+                            method: 'PUT', headers,
+                            body: JSON.stringify({
+                                title: taskData.task_name, color: geomColor, existing_task_id: existingTaskId,
+                                geojson_data: features.length > 0 ? { type: 'FeatureCollection', features } : undefined
+                            })
+                        });
+                    }
+                } else if (features.length > 0) {
+                    // Flow B: Creating a NEW shape
+                    const feat = features[0];
+                    const tasksArr = existingTaskId ? undefined : [{ name: taskData.task_name, ...taskData }];
+                    
+                    if (feat.geometry.type === 'Point') {
+                        await fetch(`${API_URL}/waypoints`, {
+                            method: 'POST', headers,
+                            body: JSON.stringify({
+                                title: taskData.task_name, color: geomColor, existing_task_id: existingTaskId,
+                                lat: feat.geometry.coordinates[1], lng: feat.geometry.coordinates[0], tasks: tasksArr
+                            })
+                        });
+                    } else {
+                        await fetch(`${API_URL}/tracks`, {
+                            method: 'POST', headers,
+                            body: JSON.stringify({
+                                title: taskData.task_name, color: geomColor, existing_task_id: existingTaskId,
+                                geojson_data: { type: 'FeatureCollection', features }, tasks: tasksArr
+                            })
+                        });
+                    }
+                } else {
+                    // Flow C: Saving ONLY a Task (No map shape)
+                    if (existingTaskId) {
+                        await fetch(`${API_URL}/tasks/${existingTaskId}`, { method: 'PUT', headers, body: JSON.stringify(taskData) });
+                    } else {
+                        await fetch(`${API_URL}/tasks`, { method: 'POST', headers, body: JSON.stringify(taskData) });
                     }
                 }
-            });
-        }
-
-        async function syncDbSchema() {
-            const res = await fetch(`${API_URL}/setup-db`, { headers: { 'x-api-key': ADMIN_KEY } });
-            if (res.ok) alert("Synced!");
-        }
-
-        document.getElementById('gpx-file').addEventListener('change', function (e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            // Extract name without .gpx extension
-            const defaultTitle = file.name.replace(/\.[^/.]+$/, "");
-
-            const reader = new FileReader();
-            reader.onload = function (event) {
-                const parser = new DOMParser();
-                const gpx = parser.parseFromString(event.target.result, 'text/xml');
-                const geojson = toGeoJSON.gpx(gpx);
-
-                // Clear old drawings and add new GPX
-                draw.deleteAll();
-                draw.add(geojson);
-
-            if (geojson.features.length > 0) {
-                const coords = geojson.features[0].geometry.coordinates;
-                // Handle both simple lines and multi-lines for zooming
-                const startCoord = Array.isArray(coords[0][0]) ? coords[0][0] : coords[0];
-                map.flyTo({ center: startCoord, zoom: 14 });
-
-                // Prepare the Modal
-                resetForm();
-                document.getElementById('color-picker-group').style.display = 'block';
-                document.getElementById('wp-title').value = defaultTitle;
-                openModal();
+                closeModal();
+                refreshData();
+            } catch (err) {
+                console.error(err);
+                alert("Error saving data. Check console.");
             }
+        };
 
-                // Reset the file input so the same file can be uploaded again if needed
-                e.target.value = '';
-            };
-            reader.readAsText(file);
-        });
+        // UI Helpers
+        function renderProjectView() {
+            const container = document.getElementById('asana-container');
+            const searchTerm = document.getElementById('search-filter').value.toLowerCase();
+            const groupFilter = document.getElementById('group-filter').value;
+            container.innerHTML = '';
 
-            initializeApp();
-        </script>
+            const filtered = allItinerary.filter(t => {
+                const matchSearch = t.task.toLowerCase().includes(searchTerm);
+                const matchGroup = !groupFilter || t.target_group === groupFilter;
+                return matchSearch && matchGroup;
+            });
+
+            const groups = {};
+            filtered.forEach(task => {
+                const day = task.day_label || 'Unscheduled';
+                if (!groups[day]) groups[day] = [];
+                groups[day].push(task);
+            });
+
+            for (const [day, tasks] of Object.entries(groups)) {
+                const section = document.createElement('div');
+                section.className = 'asana-section';
+                section.innerHTML = `<div class="asana-header"><span>▼ ${day}</span></div>`;
+                tasks.forEach(task => {
+                    const row = document.createElement('div');
+                    row.className = 'task-row';
+                    row.innerHTML = `
+                        <div class="task-cell name">${task.is_completed ? '✅ ' : ''}${task.task}</div>
+                        <div class="task-cell">${task.responsible || '-'}</div>
+                        <div class="task-cell time">${task.starts_at ? new Date(task.starts_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</div>
+                        <div class="task-cell">
+                            <button class="delete-btn" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
+                        </div>
+                    `;
+                    row.onclick = () => {
+                        if (task.geometries && task.geometries.length > 0) {
+                            const first = task.geometries[0];
+                            if (first.kind === 'point') map.flyTo({ center: [first.lng, first.lat], zoom: 14 });
+                        }
+                    };
+                    section.appendChild(row);
+                });
+                container.appendChild(section);
+            }
+        }
+
+        function startEditGeometry(taskId, anchorId) {
+            const task = allItinerary.find(t => t.task_id === taskId);
+            const geom = task?.geometries.find(g => g.anchor_id === anchorId);
+            if (!geom) return;
+
+            isEditingGeometry = true;
+            activeTaskId = taskId;
+            activeAnchorId = anchorId;
+            activeWaypointId = geom.waypoint_id;
+            activeTrackId = geom.track_id;
+
+            openModal();
+            document.getElementById('wp-title').value = geom.title;
+            document.getElementById('geom-color').value = geom.color || '#3498db';
+            document.getElementById('existing-task').value = taskId;
+            
+            draw.deleteAll();
+            if (geom.kind === 'point') {
+                draw.add({ type: 'Feature', geometry: { type: 'Point', coordinates: [geom.lng, geom.lat] }, properties: {} });
+            } else if (geom.geojson) {
+                draw.add(geom.geojson);
+            }
+        }
+
+        initializeApp();
+    </script>
 </body>
+
 </html>
