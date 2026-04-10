@@ -575,8 +575,20 @@
                         const dist = turf.length(sliced, { units: 'kilometers' }).toFixed(2);
                         const coords = sliced.geometry.coordinates;
                         const gain = (coords[coords.length - 1][2] || 0) - (coords[0][2] || 0);
+                        
                         alert(`Segment Info:\nDistance: ${dist} km\nElevation Change: ${gain.toFixed(1)}m`);
                         showElevationProfile({ type: 'FeatureCollection', features: [sliced] }, "Selected Segment");
+                        
+                        draw.deleteAll();
+                        draw.add(sliced);
+                        
+                        resetForm();
+                        document.getElementById('color-picker-group').style.display = 'block';
+                        document.getElementById('wp-title').value = `Segment (${dist}km)`;
+                        document.getElementById('existing-task').value = activeTaskId;
+                        
+                        openModal();
+                        
                         isAnalyzingSegment = false;
                         map.getCanvas().style.cursor = '';
                     }
@@ -705,8 +717,9 @@
             isAnalyzingSegment = true;
             segmentPoints = [];
             activeAnalysisTrack = geom.geojson;
+            activeTaskId = taskId; // Set this so we know which task to link the subsection to
             map.getCanvas().style.cursor = 'crosshair';
-            alert("Analysis: Click two points on the track.");
+            alert("Analysis: Click two points on the track to create a subsection.");
         }
 
         function showElevationProfile(geojson, title) {
