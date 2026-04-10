@@ -1044,6 +1044,48 @@
             }
         }
 
+        // GPX Upload Handler
+        document.getElementById('gpx-file').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const gpxString = event.target.result;
+                    const parser = new DOMParser();
+                    const gpxXml = parser.parseFromString(gpxString, "text/xml");
+                    
+                    // Convert GPX to GeoJSON using the imported toGeoJSON library
+                    const geojson = toGeoJSON.gpx(gpxXml);
+
+                    if (geojson && geojson.features.length > 0) {
+                        draw.deleteAll();
+                        draw.add(geojson);
+                        
+                        // Prepare the modal to save the new track
+                        resetForm();
+                        document.getElementById('color-picker-group').style.display = 'block';
+                        // Auto-fill the title with the filename (removing the .gpx extension)
+                        document.getElementById('wp-title').value = file.name.replace('.gpx', '');
+                        openModal();
+                        
+                        // Zoom map to the uploaded track bounds
+                        const bbox = turf.bbox(geojson);
+                        map.fitBounds(bbox, { padding: 50 });
+                    } else {
+                        alert("Could not extract valid track data from this GPX file.");
+                    }
+                } catch (err) {
+                    console.error("GPX Parsing Error:", err);
+                    alert("Error parsing GPX file.");
+                }
+                // Clear the input so the same file can be uploaded again if needed
+                e.target.value = '';
+            };
+            reader.readAsText(file);
+        });
+
         initializeApp();
     </script>
 </body>
