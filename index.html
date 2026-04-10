@@ -46,40 +46,90 @@
             position: relative;
         }
 
-        .task-row {
+        /* Persistent Map Tools */
+        .floating-tools {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            z-index: 10;
+            display: flex;
+            gap: 10px;
             background: white;
-            padding: 12px;
-            margin-bottom: 8px;
-            border-radius: 6px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        .floating-tools button {
+            padding: 8px 15px;
+            width: auto;
+            background: #fff;
+            color: #333;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .floating-tools button:hover {
+            background: #f0f0f0;
+        }
+
+        /* Asana List Styling */
+        .asana-section {
+            margin-bottom: 20px;
+        }
+
+        .asana-header {
+            font-weight: bold;
+            font-size: 1.1em;
+            border-bottom: 2px solid #ddd;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
-            gap: 12px;
+        }
+
+        .task-table-header {
+            display: grid;
+            grid-template-columns: 1fr 100px 120px 40px;
+            padding: 0 12px 8px 12px;
+            color: #7f8c8d;
+            font-size: 0.8em;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 5px;
+        }
+
+        .task-row {
+            display: grid;
+            grid-template-columns: 1fr 100px 120px 40px;
+            align-items: center;
+            padding: 10px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            box-shadow: none;
+            border-radius: 0;
+            gap: 10px;
             cursor: pointer;
-            transition: transform 0.1s;
         }
 
         .task-row:hover {
-            transform: translateX(4px);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+            background: #f9f9f9;
+            transform: none;
+            box-shadow: none;
         }
 
-        .task-info {
-            flex: 1;
-        }
-
-        .task-name {
-            font-weight: 600;
-            color: #2c3e50;
-            font-size: 0.95em;
-        }
-
-        .task-meta {
-            font-size: 0.8em;
-            color: #7f8c8d;
-            margin-top: 4px;
+        .task-cell {
             display: flex;
-            gap: 10px;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+        }
+
+        .task-cell.name {
+            font-weight: 500;
+        }
+
+        .task-cell.time {
+            color: #7f8c8d;
+            font-size: 0.85em;
         }
 
         .assignee-icon {
@@ -206,17 +256,17 @@
         <div id="asana-container"></div>
     </div>
 
-    <div id="map"></div>
+    <div id="map">
+        <div class="floating-tools">
+            <button onclick="draw.changeMode('draw_point')">📍 Add Waypoint</button>
+            <button onclick="draw.changeMode('draw_line_string')">📈 Add Track</button>
+            <button onclick="draw.changeMode('draw_polygon')">🛑 Add Zone</button>
+        </div>
+    </div>
 
     <div id="command-modal" class="modal">
         <div class="modal-content">
             <h2 id="modal-title">Command Center</h2>
-            
-            <div class="draw-controls">
-                <button onclick="draw.changeMode('draw_point')">📍 Waypoint</button>
-                <button onclick="draw.changeMode('draw_line_string')">📈 Track</button>
-                <button onclick="draw.changeMode('draw_polygon')">🛑 Zone</button>
-            </div>
 
             <div class="form-group">
                 <label>Link to Existing Task (Optional)</label>
@@ -361,43 +411,73 @@
             const groupFilter = document.getElementById('group-filter').value;
             container.innerHTML = '';
 
+            // Filter
             const filtered = allItinerary.filter(t => {
-                const matchSearch = t.task.toLowerCase().includes(searchTerm) || t.waypoint.toLowerCase().includes(searchTerm);
+                const matchSearch = t.task.toLowerCase().includes(searchTerm) || (t.waypoint && t.waypoint.toLowerCase().includes(searchTerm));
                 const matchGroup = !groupFilter || t.target_group === groupFilter;
                 return matchSearch && matchGroup;
             });
 
+            // Group by Day Label
+            const groups = {};
             filtered.forEach(task => {
-                const startTime = task.starts_at ? new Date(task.starts_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
-                const initials = task.responsible ? task.responsible.split(' ').map(n => n[0]).join('').toUpperCase() : '?';
-                
-                const taskEl = document.createElement('div');
-                taskEl.className = 'task-row';
-                if (task.is_completed) taskEl.style.opacity = '0.5';
-                
-                taskEl.innerHTML = `
-                    <div class="assignee-icon" style="background:${groupColors[task.target_group]}">${initials}</div>
-                    <div class="task-info">
-                        <div class="task-name">${task.is_completed ? '✅ ' : ''}${task.task}</div>
-                        <div class="task-meta">
-                            <span>${task.waypoint}</span>
-                            <span>${startTime}</span>
-                        </div>
-                    </div>
-                    <button class="edit-btn" onclick="event.stopPropagation(); startEdit(${JSON.stringify(task).replace(/"/g, '"')})">✏️</button>
-                `;
-                taskEl.onclick = () => {
-                    if (task.linked_track_id) {
-                        const track = allTracks.find(t => t.id === task.linked_track_id);
-                        if (track) {
-                            const coords = track.geojson_data.features[0].geometry.coordinates;
-                            const bounds = track.geojson_data.features[0].geometry.type === 'Polygon' ? coords[0].reduce((acc, c) => acc.extend(c), new mapboxgl.LngLatBounds(coords[0][0], coords[0][0])) : coords.reduce((acc, c) => acc.extend(c), new mapboxgl.LngLatBounds(coords[0], coords[0]));
-                            map.fitBounds(bounds, { padding: 50 });
-                        }
-                    } else if (task.lat) map.flyTo({ center: [task.lng, task.lat], zoom: 16 });
-                };
-                container.appendChild(taskEl);
+                const day = task.day_label || 'Unscheduled';
+                if (!groups[day]) groups[day] = [];
+                groups[day].push(task);
             });
+
+            // Render HTML
+            for (const [day, tasks] of Object.entries(groups)) {
+                const section = document.createElement('div');
+                section.className = 'asana-section';
+
+                section.innerHTML = `
+                    <div class="asana-header">▼ ${day}</div>
+                    <div class="task-table-header">
+                        <div>Task Name</div>
+                        <div>Assignee</div>
+                        <div>Start Time</div>
+                        <div></div>
+                    </div>
+                `;
+
+                tasks.forEach(task => {
+                    const startTime = task.starts_at ? new Date(task.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+                    const initials = task.responsible ? task.responsible.split(' ').map(n => n[0]).join('').toUpperCase() : '-';
+                    const doneUI = task.is_completed ? '✅ ' : '';
+
+                    const taskEl = document.createElement('div');
+                    taskEl.className = 'task-row';
+                    if (task.is_completed) taskEl.style.opacity = '0.6';
+
+                    taskEl.innerHTML = `
+                        <div class="task-cell name" onclick="zoomToTask(${task.task_id})">${doneUI}${task.task}</div>
+                        <div class="task-cell"><div class="assignee-icon" style="background:${groupColors[task.target_group]}">${initials}</div></div>
+                        <div class="task-cell time">${startTime}</div>
+                        <div class="task-cell"><button class="edit-btn" onclick="event.stopPropagation(); startEdit(${JSON.stringify(task).replace(/"/g, '"')})">✏️</button></div>
+                    `;
+                    section.appendChild(taskEl);
+                });
+                container.appendChild(section);
+            }
+        }
+
+        function zoomToTask(taskId) {
+            const task = allItinerary.find(t => t.task_id === taskId);
+            if (!task) return;
+
+            if (task.linked_track_id) {
+                const track = allTracks.find(t => t.id === task.linked_track_id);
+                if (track) {
+                    const coords = track.geojson_data.features[0].geometry.coordinates;
+                    const bounds = track.geojson_data.features[0].geometry.type === 'Polygon'
+                        ? coords[0].reduce((acc, c) => acc.extend(c), new mapboxgl.LngLatBounds(coords[0][0], coords[0][0]))
+                        : coords.reduce((acc, c) => acc.extend(c), new mapboxgl.LngLatBounds(coords[0], coords[0]));
+                    map.fitBounds(bounds, { padding: 50 });
+                }
+            } else if (task.lat) {
+                map.flyTo({ center: [task.lng, task.lat], zoom: 16 });
+            }
         }
 
         function startEdit(task) {
