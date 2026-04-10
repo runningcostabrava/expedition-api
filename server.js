@@ -79,11 +79,13 @@ app.post('/tracks', adminAuth, async (req, res) => {
     const trackId = result.rows[0].id;
 
     if (tasks && tasks.length > 0) {
-      const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, track_id) VALUES ($1, $2) RETURNING id', ['line', trackId]);
+      const geometryType = geojson_data.features[0].geometry.type;
+      const kind = geometryType === 'Polygon' ? 'polygon' : 'line';
+      const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, track_id) VALUES ($1, $2) RETURNING id', [kind, trackId]);
       const anchorId = anchorRes.rows[0].id;
       for (let t of tasks) {
-        await pool.query('INSERT INTO tasks (anchor_id, task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', 
-          [anchorId, t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at]);
+        await pool.query('INSERT INTO tasks (anchor_id, task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', 
+          [anchorId, t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at, t.is_completed || false]);
       }
     }
 
@@ -107,12 +109,14 @@ app.put('/tracks/:id', adminAuth, async (req, res) => {
         if (existingAnchor.rows.length > 0) {
             anchorId = existingAnchor.rows[0].id;
         } else {
-            const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, track_id) VALUES ($1, $2) RETURNING id', ['line', id]);
+            const geometryType = geojson_data.features[0].geometry.type;
+            const kind = geometryType === 'Polygon' ? 'polygon' : 'line';
+            const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, track_id) VALUES ($1, $2) RETURNING id', [kind, id]);
             anchorId = anchorRes.rows[0].id;
         }
         for (let t of tasks) {
-          await pool.query('INSERT INTO tasks (anchor_id, task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', 
-            [anchorId, t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at]);
+          await pool.query('INSERT INTO tasks (anchor_id, task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', 
+            [anchorId, t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at, t.is_completed || false]);
         }
     }
 
@@ -140,8 +144,8 @@ app.post('/waypoints', adminAuth, async (req, res) => {
 
     if (tasks && tasks.length > 0) {
       for (let t of tasks) {
-        await pool.query('INSERT INTO tasks (waypoint_id, anchor_id, task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', 
-        [wpId, anchorId, t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at]);
+        await pool.query('INSERT INTO tasks (waypoint_id, anchor_id, task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)', 
+        [wpId, anchorId, t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at, t.is_completed || false]);
       }
     }
     res.status(200).send({ message: "Project link saved!" });
@@ -159,7 +163,7 @@ app.get('/itinerary', async (req, res) => {
         COALESCE(w_anchor.lng, w_legacy.lng) as lng,
         tr_anchor.id as linked_track_id,
         t.task_name as task, t.responsible, t.target_group, t.day_label,
-        t.starts_at, t.ends_at
+        t.starts_at, t.ends_at, t.is_completed
       FROM tasks t
       LEFT JOIN spatial_anchors sa ON t.anchor_id = sa.id
       LEFT JOIN waypoints w_anchor ON sa.waypoint_id = w_anchor.id

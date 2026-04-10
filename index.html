@@ -170,6 +170,10 @@
             <input type="text" id="responsible" placeholder="Name">
         </div>
 
+        <div class="form-group">
+            <label><input type="checkbox" id="is-completed"> Mark Task as Completed</label>
+        </div>
+
         <button id="save-btn" class="save-btn">Save Waypoint/Task</button>
         <button id="save-track-btn" style="display:none;">Save Edited Track</button>
 
@@ -223,6 +227,7 @@
                 displayControlsDefault: false,
                 controls: {
                     line_string: true,
+                    polygon: true,
                     point: true,
                     trash: true
                 }
@@ -272,15 +277,15 @@
                     data: track.geojson_data
                 });
 
+                const isPolygon = track.geojson_data.features[0].geometry.type === 'Polygon';
                 map.addLayer({
                     id: `layer-${track.id}`,
-                    type: 'line',
+                    type: isPolygon ? 'fill' : 'line',
                     source: `track-${track.id}`,
-                    layout: { 'line-join': 'round', 'line-cap': 'round' },
-                    paint: {
-                        'line-color': groupColors[track.target_group] || track.color || '#3498db',
-                        'line-width': 4
-                    }
+                    layout: isPolygon ? {} : { 'line-join': 'round', 'line-cap': 'round' },
+                    paint: isPolygon 
+                        ? { 'fill-color': groupColors[track.target_group] || track.color || '#3498db', 'fill-opacity': 0.4 } 
+                        : { 'line-color': groupColors[track.target_group] || track.color || '#3498db', 'line-width': 4 }
                 });
             });
         }
@@ -320,9 +325,9 @@
 
             // Fit bounds
             const coordinates = track.geojson_data.features[0].geometry.coordinates;
-            const bounds = coordinates.reduce((acc, coord) => {
-                return acc.extend(coord);
-            }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
+            const bounds = (track.geojson_data.features[0].geometry.type === 'Polygon')
+                ? coordinates[0].reduce((acc, coord) => acc.extend(coord), new mapboxgl.LngLatBounds(coordinates[0][0], coordinates[0][0]))
+                : coordinates.reduce((acc, coord) => acc.extend(coord), new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
             map.fitBounds(bounds, { padding: 50 });
         }
 
@@ -338,7 +343,8 @@
 
                 if (geojson.features.length > 0) {
                     const coords = geojson.features[0].geometry.coordinates;
-                    map.flyTo({ center: coords[0], zoom: 14 });
+                    const center = (geojson.features[0].geometry.type === 'Polygon') ? coords[0][0] : coords[0];
+                    map.flyTo({ center: center, zoom: 14 });
                 }
             };
             reader.readAsText(file);
@@ -367,6 +373,7 @@
                     day_label: document.getElementById('day-label').value,
                     starts_at: document.getElementById('starts-at').value || null,
                     ends_at: document.getElementById('ends-at').value || null,
+                    is_completed: document.getElementById('is-completed').checked,
                     characteristics: ''
                 }]
             };
@@ -387,6 +394,7 @@
                 draw.deleteAll();
                 document.getElementById('wp-title').value = '';
                 document.getElementById('wp-description').value = '';
+                document.getElementById('is-completed').checked = false;
             }
         };
 
@@ -407,6 +415,7 @@
                     day_label: document.getElementById('day-label').value,
                     starts_at: document.getElementById('starts-at').value || null,
                     ends_at: document.getElementById('ends-at').value || null,
+                    is_completed: document.getElementById('is-completed').checked,
                     characteristics: ''
                 }]
             };
@@ -437,6 +446,7 @@
                 draw.deleteAll();
                 document.getElementById('wp-title').value = '';
                 document.getElementById('wp-description').value = '';
+                document.getElementById('is-completed').checked = false;
             }
         };
 
@@ -461,10 +471,13 @@
                 tasks.forEach(task => {
                     const startTime = task.starts_at ? new Date(task.starts_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
                     const taskEl = document.createElement('div');
-                    taskEl.style.cssText = "background:white; padding:10px; margin-bottom:10px; border-left:4px solid " + (groupColors[task.target_group] || '#ccc') + "; border-radius:4px; box-shadow:0 2px 5px rgba(0,0,0,0.1); cursor:pointer;";
+                    const statusStyle = task.is_completed ? "opacity:0.6; text-decoration:line-through;" : "";
+                    const checkmark = task.is_completed ? "✅ " : "";
+                    
+                    taskEl.style.cssText = `background:white; padding:10px; margin-bottom:10px; border-left:4px solid ${groupColors[task.target_group] || '#ccc'}; border-radius:4px; box-shadow:0 2px 5px rgba(0,0,0,0.1); cursor:pointer; ${statusStyle}`;
                     taskEl.innerHTML = `
                         <div style="display:flex; justify-content:space-between;">
-                            <div style="font-weight:bold; color:#2c3e50;">${task.waypoint}</div>
+                            <div style="font-weight:bold; color:#2c3e50;">${checkmark}${task.waypoint}</div>
                             <div style="font-size:0.8em; color:#3498db; font-weight:bold;">${startTime}</div>
                         </div>
                         <div style="font-size:0.85em; color:#7f8c8d; margin-top:4px;">${task.task}</div>
@@ -478,7 +491,9 @@
                             const track = allTracks.find(t => t.id === task.linked_track_id);
                             if (track && track.geojson_data) {
                                 const coordinates = track.geojson_data.features[0].geometry.coordinates;
-                                const bounds = coordinates.reduce((acc, coord) => acc.extend(coord), new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
+                                const bounds = (track.geojson_data.features[0].geometry.type === 'Polygon')
+                                    ? coordinates[0].reduce((acc, coord) => acc.extend(coord), new mapboxgl.LngLatBounds(coordinates[0][0], coordinates[0][0]))
+                                    : coordinates.reduce((acc, coord) => acc.extend(coord), new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
                                 map.fitBounds(bounds, { padding: 50 });
                             }
                         } else if (task.lat && task.lng) {
