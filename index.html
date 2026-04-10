@@ -13,6 +13,8 @@
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.0/mapbox-gl-draw.js"></script>
     <script src="https://unpkg.com/togeojson@0.16.0/togeojson.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -251,6 +253,41 @@
             border-bottom: 1px solid #eee;
         }
 
+        /* Map Style Switcher */
+        #style-switcher {
+            position: absolute;
+            bottom: 30px;
+            left: 15px;
+            z-index: 10;
+            background: white;
+            padding: 5px;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Elevation Panel */
+        #elevation-panel {
+            display: none;
+            position: absolute;
+            bottom: 0;
+            left: 450px;
+            right: 0;
+            height: 200px;
+            background: white;
+            z-index: 1000;
+            border-top: 2px solid #ccc;
+            padding: 10px;
+            box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        #close-elevation {
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
         .assignee-icon {
             width: 24px;
             height: 24px;
@@ -391,10 +428,31 @@
             <button onclick="draw.changeMode('draw_point')">📍 Add Waypoint</button>
             <button onclick="draw.changeMode('draw_line_string')">📈 Add Track</button>
             <button onclick="draw.changeMode('draw_polygon')">🛑 Add Zone</button>
-            <label style="cursor: pointer; padding: 8px 15px; background: #fff; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;">
+            <label
+                style="cursor: pointer; padding: 8px 15px; background: #fff; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;">
                 📁 Upload GPX
                 <input type="file" id="gpx-file" accept=".gpx" style="display: none;">
             </label>
+            <select id="route-profile" style="width: auto; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                <option value="driving">🚗 Drive</option>
+                <option value="walking">🚶 Walk</option>
+                <option value="cycling">🚲 Cycle</option>
+            </select>
+            <button id="smart-route-btn" onclick="startSmartRoute()">🛣️ Smart Route</button>
+        </div>
+
+        <div id="style-switcher">
+            <select id="map-style-select" onchange="changeMapStyle(this.value)"
+                style="padding: 5px; border: none; outline: none;">
+                <option value="mapbox://styles/mapbox/outdoors-v12">🏔️ Outdoors (Topo)</option>
+                <option value="mapbox://styles/mapbox/satellite-streets-v12">🛰️ Satellite</option>
+                <option value="mapbox://styles/mapbox/streets-v12">🗺️ Streets</option>
+            </select>
+        </div>
+
+        <div id="elevation-panel">
+            <span id="close-elevation" onclick="document.getElementById('elevation-panel').style.display='none'">❌</span>
+            <canvas id="elevation-chart"></canvas>
         </div>
     </div>
 
@@ -643,6 +701,7 @@
                                         <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="padding: 5px 10px; width: 100%;">Edit Location</button>
                                     </div>
                                 `;
+                                showElevationProfile(geom.geojson, geom.title);
                                 new mapboxgl.Popup()
                                     .setLngLat(e.lngLat)
                                     .setHTML(popupHtml)
@@ -1017,6 +1076,83 @@
             refreshData();
         }
 
+        function changeMapStyle(styleUrl) {
+            map.setStyle(styleUrl);
+            map.once('style.load', () => {
+                // Re-add 3D Terrain & Sky
+                map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512, 'maxzoom': 14 });
+                map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
+                map.addLayer({ 'id': 'sky', 'type': 'sky', 'paint': { 'sky-type': 'atmosphere', 'sky-atmosphere-sun': [0.0, 0.0], 'sky-atmosphere-sun-intensity': 15 } });
+                // Re-render our geometries
+                renderMapGeometries();
+            });
+        }
+
+        let isRouting = false;
+        let routePoints = [];
+
+        function startSmartRoute() {
+            isRouting = true;
+            routePoints = [];
+            map.getCanvas().style.cursor = 'crosshair';
+            alert("Smart Routing: Click your Start Point, then click your End Point.");
+        }
+
+        let elevationChart = null;
+
+        function showElevationProfile(geojson, title) {
+            const panel = document.getElementById('elevation-panel');
+            panel.style.display = 'block';
+
+            let distances = [0];
+            let elevations = [];
+            let cumulativeDistance = 0;
+
+            // Extract coordinates (handling LineString or Polygon)
+            let coords = geojson.features[0].geometry.type === 'Polygon'
+                ? geojson.features[0].geometry.coordinates[0]
+                : geojson.features[0].geometry.coordinates;
+
+            // Many drawn routes lack elevation data (Z coordinate). 
+            // We check if it exists, otherwise default to 0 to prevent crashes.
+            coords.forEach((coord, i) => {
+                elevations.push(coord.length > 2 ? coord[2] : 0);
+                if (i > 0) {
+                    const from = turf.point(coords[i - 1]);
+                    const to = turf.point(coord);
+                    cumulativeDistance += turf.distance(from, to, { units: 'kilometers' });
+                    distances.push(cumulativeDistance.toFixed(2));
+                }
+            });
+
+            const ctx = document.getElementById('elevation-chart').getContext('2d');
+            if (elevationChart) elevationChart.destroy();
+
+            elevationChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: distances,
+                    datasets: [{
+                        label: `Elevation (m) - ${title}`,
+                        data: elevations,
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.2)',
+                        fill: true,
+                        pointRadius: 0,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { title: { display: true, text: 'Distance (km)' } },
+                        y: { title: { display: true, text: 'Elevation (m)' } }
+                    }
+                }
+            });
+        }
+
         async function syncDbSchema() {
             const res = await fetch(`${API_URL}/setup-db`, { headers: { 'x-api-key': ADMIN_KEY } });
             if (res.ok) alert("Synced!");
@@ -1058,7 +1194,34 @@
             reader.readAsText(file);
         });
 
-        initializeApp();
-    </script>
+            map.on('click', async (e) => {
+                if (!isRouting) return;
+                routePoints.push([e.lngLat.lng, e.lngLat.lat]);
+
+                if (routePoints.length === 2) {
+                    isRouting = false;
+                    map.getCanvas().style.cursor = '';
+                    const profile = document.getElementById('route-profile').value;
+                    const coords = `${routePoints[0][0]},${routePoints[0][1]};${routePoints[1][0]},${routePoints[1][1]}`;
+
+                    try {
+                        const res = await fetch(`https://api.mapbox.com/directions/v5/mapbox/${profile}/${coords}?geometries=geojson&access_token=${mapboxgl.accessToken}`);
+                        const data = await res.json();
+                        if (data.routes && data.routes.length > 0) {
+                            const routeGeoJSON = data.routes[0].geometry;
+                            draw.deleteAll();
+                            draw.add(routeGeoJSON);
+
+                            resetForm();
+                            document.getElementById('color-picker-group').style.display = 'block';
+                            document.getElementById('wp-title').value = `New ${profile} route`;
+                            openModal();
+                        } else { alert("No route found between these points."); }
+                    } catch (err) { console.error(err); alert("Routing error"); }
+                }
+            });
+
+            initializeApp();
+        </script>
 </body>
 </html>
