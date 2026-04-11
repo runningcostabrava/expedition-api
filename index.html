@@ -29,18 +29,19 @@
         }
 
         #left-panel {
-            width: 450px;
-            min-width: 250px;
-            max-width: 50vw;
-            resize: horizontal;
+            width: 30vw; /* Default stage */
+            min-width: 0;
             overflow-x: hidden;
             display: flex;
             flex-direction: column;
             border-right: 2px solid #ccc;
             background: #f8f9fa;
-            transition: min-width 0.3s ease;
+            transition: width 0.3s ease;
             position: relative;
         }
+        #left-panel.hidden { width: 0; border: none; }
+        #left-panel.wide { width: 60vw; }
+        #left-panel.hidden > * { display: none; }
         #left-panel.collapsed {
             width: 0 !important;
             min-width: 0 !important;
@@ -131,6 +132,17 @@
             margin-bottom: 10px;
             display: flex;
             align-items: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            gap: 10px;
+        }
+        .section-title-text {
+            max-width: 150px; /* Truncate if space is tight */
+            min-width: 80px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .task-table-header {
@@ -213,11 +225,9 @@
             cursor: pointer;
         }
 
-        .geom-info {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+        .geom-info { display: flex; align-items: center; gap: 8px; }
+        .visibility-btn { background: none; border: none; cursor: pointer; padding: 2px; font-size: 1.1em; color: #bdc3c7; }
+        .visibility-btn.hidden { color: #e74c3c; }
 
         .color-dot {
             width: 12px;
@@ -465,15 +475,27 @@
             </div>
         </div>
         <div id="filter-drawer" class="filter-drawer">
-            <div style="margin-bottom: 10px;">
-                <label style="font-weight: bold; font-size: 0.85em; display:block; margin-bottom: 5px;">Group Filter</label>
-                <select id="group-filter" onchange="renderProjectView()" style="padding: 6px;">
-                    <option value="">All Groups</option>
-                    <option value="Hikers">Hikers</option>
-                    <option value="Runners">Runners</option>
-                    <option value="Staff">Staff</option>
-                    <option value="Transport">Transport</option>
-                </select>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <div style="flex:1;">
+                    <label style="font-weight: bold; font-size: 0.85em; display:block; margin-bottom: 5px;">Group Filter</label>
+                    <select id="group-filter" onchange="renderProjectView()" style="padding: 6px;">
+                        <option value="">All Groups</option>
+                        <option value="Hikers">Hikers</option>
+                        <option value="Runners">Runners</option>
+                        <option value="Staff">Staff</option>
+                        <option value="Transport">Transport</option>
+                    </select>
+                </div>
+                <div style="flex:1;">
+                    <label style="font-weight: bold; font-size: 0.85em; display:block; margin-bottom: 5px;">Type Filter</label>
+                    <select id="type-filter" onchange="renderProjectView()" style="padding: 6px;">
+                        <option value="">All Types</option>
+                        <option value="Transport">🚗 Transport</option>
+                        <option value="Route">🗺️ Route</option>
+                        <option value="Accommodation">🏨 Accommodation</option>
+                        <option value="Activity">🧗 Activity</option>
+                    </select>
+                </div>
             </div>
             <div style="font-size: 0.85em; margin-bottom: 10px;">
                 <strong>Show Columns:</strong><br>
@@ -496,7 +518,7 @@
         <div id="loading-overlay" style="position:absolute; inset:0; background:rgba(255,255,255,0.8); z-index:9999; display:flex; justify-content:center; align-items:center; font-size:20px; font-weight:bold; color:#333;">Waking up server (This takes ~50 seconds)...</div>
         <div id="map" style="position: absolute; top: 0; bottom: 0; width: 100%;"></div>
         <div class="floating-tools">
-            <button onclick="document.getElementById('left-panel').classList.toggle('collapsed')" title="Toggle Sidebar" style="font-weight: bold; font-size: 1.2em; padding: 5px 12px;">☰</button>
+            <button onclick="cycleSidebar()" title="Toggle Sidebar" style="font-weight: bold; font-size: 1.2em; padding: 5px 12px;">☰</button>
             <button onclick="draw.changeMode('draw_point')">📍 Add Waypoint</button>
             <button onclick="draw.changeMode('draw_line_string')">📈 Add Track</button>
             <button onclick="draw.changeMode('draw_polygon')">🛑 Add Zone</button>
@@ -871,6 +893,53 @@
             }
         }
 
+        function toggleLayerVisibility(layerId, btn) {
+            if (!map.getLayer(layerId)) return;
+            
+            // Cycle: 1.0 (👁️) -> 0.6 (◑) -> 0.3 (◔) -> 0.0 (🙈)
+            const opacityField = map.getLayer(layerId).type === 'fill' ? 'fill-opacity' : 'line-opacity';
+            const currentOpacity = map.getPaintProperty(layerId, opacityField) ?? 1.0;
+            
+            let nextOpacity, nextIcon, isHidden = false;
+            
+            if (currentOpacity > 0.6) { nextOpacity = 0.6; nextIcon = '◑'; }
+            else if (currentOpacity > 0.3) { nextOpacity = 0.3; nextIcon = '◔'; }
+            else if (currentOpacity > 0) { nextOpacity = 0; nextIcon = '🙈'; isHidden = true; }
+            else { nextOpacity = 1.0; nextIcon = '👁️'; }
+
+            map.setPaintProperty(layerId, opacityField, nextOpacity);
+            // Also toggle visibility 'none' if 0 to prevent clicks
+            map.setLayoutProperty(layerId, 'visibility', nextOpacity === 0 ? 'none' : 'visible');
+            
+            btn.innerText = nextIcon;
+            btn.classList.toggle('hidden', isHidden);
+        }
+
+        function flyToGeometry(lng, lat, kind, layerId) {
+            if (kind === 'point') { 
+                map.flyTo({ center: [lng, lat], zoom: 16 }); 
+            } else {
+                const source = map.getSource(layerId.replace('layer-', 'track-'));
+                if (source && source._data) {
+                    const bbox = turf.bbox(source._data);
+                    map.fitBounds(bbox, { padding: 80, duration: 1500 });
+                }
+            }
+        }
+
+        function cycleSidebar() {
+            const panel = document.getElementById('left-panel');
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+            } else if (!panel.classList.contains('wide')) {
+                panel.classList.add('wide');
+            } else {
+                panel.classList.add('hidden');
+                panel.classList.remove('wide');
+            }
+            setTimeout(() => map.resize(), 350);
+        }
+
         function focusTaskInSidebar(taskId) {
             const row = document.getElementById(`task-row-${taskId}`);
             if (row) {
@@ -917,7 +986,10 @@
                     maintainAspectRatio: false,
                     interaction: { mode: 'index', intersect: false },
                     plugins: { legend: { display: true } },
-                    scales: { y: { beginAtZero: false, title: { display: true, text: 'Elevation (m)' } }, x: { title: { display: true, text: 'Distance (km)' } } },
+                    scales: { 
+                        y: { beginAtZero: false, ticks: { color: '#000', font: { weight: 'bold' } }, title: { display: true, text: 'Elevation (m)', color: '#000' } }, 
+                        x: { ticks: { color: '#000', font: { weight: 'bold' } }, title: { display: true, text: 'Distance (km)', color: '#000' } } 
+                    },
                     onHover: (e, activeElements) => {
                         if (activeElements.length > 0) {
                             const index = activeElements[0].index;
@@ -1191,16 +1263,30 @@
             const task = allItinerary.find(t => t.task_id === taskId);
             if (!task || task[field] == value) return;
             
-            if (field === 'starts_at' && value) {
-                const isDate = !isNaN(Date.parse(task.day_label)) && task.day_label.includes('-');
-                const datePart = isDate ? task.day_label : new Date().toISOString().split('T')[0];
-                task[field] = `${datePart}T${value}:00Z`; 
+            let payload = { ...task };
+            if (field === 'starts_at') {
+                if (!value) { payload.starts_at = null; }
+                else {
+                    // Robust Date Detection:
+                    // 1. Is day_label a YYYY-MM-DD? 2. Is there an existing date in starts_at? 3. Use Today.
+                    const isIsoDate = (str) => str && /^\d{4}-\d{2}-\d{2}$/.test(str);
+                    let datePart = isIsoDate(task.day_label) ? task.day_label : 
+                                   (task.starts_at ? task.starts_at.split('T')[0] : new Date().toISOString().split('T')[0]);
+                    payload.starts_at = `${datePart}T${value}:00.000Z`;
+                }
             } else {
-                task[field] = value;
+                payload[field] = value;
             }
             
-            await fetch(`${API_URL}/tasks/${taskId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY }, body: JSON.stringify(task) });
-            refreshData();
+            try {
+                const res = await fetch(`${API_URL}/tasks/${taskId}`, { 
+                    method: 'PUT', 
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY }, 
+                    body: JSON.stringify(payload) 
+                });
+                if (!res.ok) throw new Error("Server Error");
+                refreshData();
+            } catch (e) { console.error("Inline Update Failed:", e); }
         }
 
         async function updateSection(oldDay, newDay) {
@@ -1265,10 +1351,13 @@
             const groupFilter = document.getElementById('group-filter').value;
             container.innerHTML = '';
 
+            const typeFilterEl = document.getElementById('type-filter');
+            const typeFilter = typeFilterEl ? typeFilterEl.value : '';
             const filtered = allItinerary.filter(t => {
                 const matchSearch = t.task.toLowerCase().includes(searchTerm);
                 const matchGroup = !groupFilter || t.target_group === groupFilter;
-                return matchSearch && matchGroup;
+                const matchType = !typeFilter || t.task_type === typeFilter;
+                return matchSearch && matchGroup && matchType;
             });
 
             const groups = {};
@@ -1282,11 +1371,12 @@
             const showTime = document.getElementById('col-time').checked;
             const showGroup = document.getElementById('col-group').checked;
             
-            let gridCols = '1fr ';
-            if (showAssignee) gridCols += '100px ';
-            if (showTime) gridCols += '120px ';
-            if (showGroup) gridCols += '100px ';
-            gridCols += '80px';
+            // Grid: Name (1.5fr), Desc (1fr), Assignee (100px), Time (100px), Actions (100px)
+            let gridCols = '1.5fr 1fr ';
+            if (showAssignee) gridCols += '90px ';
+            if (showTime) gridCols += '90px ';
+            if (showGroup) gridCols += '90px ';
+            gridCols += '100px';
 
             for (const [day, tasks] of Object.entries(groups)) {
                 const section = document.createElement('div');
@@ -1298,12 +1388,14 @@
                 const textVal = isDate ? 'Select Date' : day;
 
                 section.innerHTML = `
-                    <div class="asana-header" style="display: flex; align-items: center; gap: 10px;">
+                    <div class="asana-header">
                         <span style="cursor:pointer;" onclick="flyToSection('${day}')">▼</span>
-                        <input type="date" value="${dateVal}" class="inline-edit-input" style="padding:2px; font-size:0.8em; color:#7f8c8d; border:1px solid #ddd; border-radius:4px;" onchange="updateSection('${day}', this.value)">
-                        <span class="inline-edit" contenteditable="true" style="font-weight:bold; flex:1;" onblur="updateSection('${day}', this.innerText)">${textVal}</span>
-                        <button class="edit-btn" title="Center Map on Section" onclick="flyToSection('${day}')">🎯</button>
-                        <button class="delete-btn" title="Delete Section" onclick="deleteSection('${day}')">🗑️</button>
+                        <input type="date" value="${dateVal}" class="inline-edit-input" style="width: 35px; overflow:hidden; padding:0; border:none;" onchange="updateSection('${day}', this.value)">
+                        <span class="inline-edit section-title-text" contenteditable="true" style="font-weight:bold; flex:1;" onblur="updateSection('${day}', this.innerText)">${textVal}</span>
+                        <div style="display:flex; gap:2px; margin-left:auto;">
+                            <button class="edit-btn" title="Center Map" onclick="flyToSection('${day}')">🎯</button>
+                            <button class="delete-btn" title="Delete Section" onclick="deleteSection('${day}')">🗑️</button>
+                        </div>
                     </div>
                     <div class="task-table-header" style="grid-template-columns: ${gridCols};">
                         <div>Task Name</div>
@@ -1319,99 +1411,8 @@
                 taskListContainer.dataset.section = day;
 
                 tasks.forEach(task => {
-                    if (task.parent_id) return; // Skip subtasks for now, handled in next phase
-
-                    const timeOnly = task.starts_at && task.starts_at.length >= 16 ? task.starts_at.substring(11, 16) : '';
-                    const doneUI = task.is_completed ? '✅ ' : '';
-                    
-                    const taskContainer = document.createElement('div');
-                    taskContainer.className = 'draggable-task'; // Added for Sortable
-                    
-                    const taskEl = document.createElement('div');
-                    taskEl.className = 'task-row';
-                    taskEl.id = `task-row-${task.task_id}`; // ID for dragging
-                    if (task.is_completed) taskEl.style.opacity = '0.6';
-                    taskEl.style.gridTemplateColumns = gridCols;
-                    
-                    taskEl.onclick = () => {
-                        // 1. Handle Active Task highlighting
-                        document.querySelectorAll('.task-row').forEach(row => row.classList.remove('active-task'));
-                        taskEl.classList.add('active-task');
-                        
-                        // 2. Set global active task context for Map Drawing (Phase 9B requirement)
-                        activeTaskId = task.task_id; 
-
-                        // 3. Open accordion
-                        const acc = document.getElementById(`acc-${task.task_id}`);
-                        if(acc) acc.classList.toggle('open');
-                        
-                        // 4. Calculate bounding box for all geometries in this task
-                        if (task.geometries && task.geometries.length > 0) {
-                            const features = [];
-                            task.geometries.forEach(g => {
-                                if (g.kind === 'point' && g.lat) features.push(turf.point([g.lng, g.lat]));
-                                else if (g.geojson) features.push(...g.geojson.features);
-                            });
-                            if (features.length > 0) {
-                                const bbox = turf.bbox(turf.featureCollection(features));
-                                map.fitBounds(bbox, { padding: 50, maxZoom: 15, duration: 1500 });
-                            }
-                        }
-                    };
-
-                    let cellsHtml = `<div class="task-cell name"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">${doneUI}${task.task}</span></div>`;
-                    if (showAssignee) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'responsible', this.innerText)" onclick="event.stopPropagation()">${task.responsible || '-'}</span></div>`;
-                    if (showTime) cellsHtml += `<div class="task-cell time"><input type="time" class="inline-edit" style="width:100%" value="${timeOnly}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()"></div>`;
-                    if (showGroup) cellsHtml += `
-                        <div class="task-cell" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                            <select class="inline-edit-input" style="font-size: 0.85em; padding: 0; margin: 0; border: none; background: transparent; color: #7f8c8d;" onchange="updateTaskInline(${task.task_id}, 'task_type', this.value)" onclick="event.stopPropagation()">
-                                <option value="" ${!task.task_type ? 'selected' : ''}>Type...</option>
-                                <option value="Transport" ${task.task_type === 'Transport' ? 'selected' : ''}>🚗 Transport</option>
-                                <option value="Route" ${task.task_type === 'Route' ? 'selected' : ''}>🗺️ Route</option>
-                                <option value="Accommodation" ${task.task_type === 'Accommodation' ? 'selected' : ''}>🏨 Accommodation</option>
-                                <option value="Activity" ${task.task_type === 'Activity' ? 'selected' : ''}>🧗 Activity</option>
-                            </select>
-                            <span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'target_group', this.innerText)" onclick="event.stopPropagation()">${task.target_group || '-'}</span>
-                        </div>`;
-                    
-                    cellsHtml += `
-                        <div class="task-cell" style="gap:2px;">
-                            <button class="edit-btn" title="Export GPX" onclick="event.stopPropagation(); exportTaskToGPX(${task.task_id})">💾</button>
-                            <button class="edit-btn" title="Edit Task" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
-                            <button class="delete-btn" title="Delete Task" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
-                        </div>
-                    `;
-                    taskEl.innerHTML = cellsHtml;
-
-                    const accordionEl = document.createElement('div');
-                    accordionEl.className = 'task-accordion';
-                    accordionEl.id = `acc-${task.task_id}`;
-                    
-                    let geomHtml = '';
-                    if (task.geometries && task.geometries.length > 0) {
-                        task.geometries.forEach(g => {
-                            const emoji = g.kind === 'point' ? '📍' : (g.kind === 'polygon' ? '🛑' : '📈');
-                            const color = g.color || '#3498db';
-                            geomHtml += `
-                                <div class="geom-row">
-                                    <div class="geom-info" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})" style="cursor:pointer; flex:1;">
-                                        <span>${emoji}</span><span class="color-dot" style="background-color: ${color}"></span><span>${g.title}</span>
-                                    </div>
-                                    <div style="display: flex; gap: 5px;">
-                                        <button class="edit-btn" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})">⚙️</button>
-                                        <button class="delete-btn" onclick="event.stopPropagation(); deleteGeometry('${g.kind}', ${g.waypoint_id || g.track_id})">🗑️</button>
-                                    </div>
-                                </div>
-                            `;
-                        });
-                    } else {
-                        geomHtml = `<div style="color: #95a5a6; font-size: 0.85em; font-style: italic;">No locations attached.</div>`;
-                    }
-                    accordionEl.innerHTML = geomHtml;
-
-                    taskContainer.appendChild(taskEl);
-                    taskContainer.appendChild(accordionEl);
-                    taskListContainer.appendChild(taskContainer);
+                    if (task.parent_id) return; 
+                    renderTaskCard(taskListContainer, task, gridCols, allItinerary);
                 });
                 
                 // Inject Inline "+ Add Task" button
@@ -1450,7 +1451,91 @@
                                 method: 'PUT', 
                                 headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY }, 
                                 body: JSON.stringify(task) 
+                            });
+                        }
+                        refreshData();
+                    }
+                });
             });
+        }
+
+        function renderTaskCard(parentContainer, task, gridCols, allTasks) {
+            const timeOnly = (task.starts_at && task.starts_at.length >= 16) ? task.starts_at.substring(11, 16) : '';
+            const doneUI = task.is_completed ? '✅ ' : '';
+            
+            const taskContainer = document.createElement('div');
+            taskContainer.style.marginLeft = task.parent_id ? '20px' : '0';
+            taskContainer.style.borderLeft = task.parent_id ? '2px solid #ddd' : 'none';
+            
+            const taskEl = document.createElement('div');
+            taskEl.className = 'task-row';
+            taskEl.id = `task-row-${task.task_id}`;
+            taskEl.style.gridTemplateColumns = gridCols;
+            if (task.is_completed) taskEl.style.opacity = '0.6';
+            
+            taskEl.onclick = () => {
+                document.querySelectorAll('.task-row').forEach(row => row.classList.remove('active-task'));
+                taskEl.classList.add('active-task');
+                activeTaskId = task.task_id; 
+                const acc = document.getElementById(`acc-${task.task_id}`);
+                if(acc) acc.classList.toggle('open');
+            };
+
+            const showAssignee = document.getElementById('col-assignee').checked;
+            const showTime = document.getElementById('col-time').checked;
+            const showGroup = document.getElementById('col-group').checked;
+
+            let cellsHtml = `<div class="task-cell name"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">${doneUI}${task.task}</span></div>`;
+            if (showAssignee) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'responsible', this.innerText)" onclick="event.stopPropagation()">${task.responsible || '-'}</span></div>`;
+            if (showTime) cellsHtml += `<div class="task-cell time"><input type="time" class="inline-edit" style="width:100%" value="${timeOnly}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()"></div>`;
+            if (showGroup) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'target_group', this.innerText)" onclick="event.stopPropagation()">${task.target_group || '-'}</span></div>`;
+            
+            cellsHtml += `
+                <div class="task-cell" style="gap:2px;">
+                    <button class="edit-btn" title="Add Subtask" onclick="event.stopPropagation(); createSubtask(${task.task_id}, '${task.day_label || ''}')">➕</button>
+                    <button class="edit-btn" title="Edit Task" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
+                    <button class="delete-btn" title="Delete Task" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
+                </div>`;
+            taskEl.innerHTML = cellsHtml;
+
+            const accordionEl = document.createElement('div');
+            accordionEl.className = 'task-accordion';
+            accordionEl.id = `acc-${task.task_id}`;
+            
+            let geomHtml = '';
+            (task.geometries || []).forEach(g => {
+                const emoji = g.kind === 'point' ? '📍' : (g.kind === 'polygon' ? '🛑' : '📈');
+                const layerId = `layer-${g.track_id}`;
+                const isVisible = map.getLayer(layerId) ? map.getLayoutProperty(layerId, 'visibility') !== 'none' : true;
+                geomHtml += `
+                    <div class="geom-row">
+                        <div class="geom-info" onclick="event.stopPropagation(); flyToGeometry(${g.lng}, ${g.lat}, '${g.kind}', '${layerId}')" style="cursor:pointer; flex:1;">
+                            <button class="visibility-btn ${!isVisible ? 'hidden' : ''}" onclick="event.stopPropagation(); toggleLayerVisibility('${layerId}', this)">${isVisible ? '👁️' : '🙈'}</button>
+                            <span>${emoji}</span><span class="color-dot" style="background-color: ${g.color || '#3498db'}"></span><span>${g.title}</span>
+                        </div>
+                        <button class="delete-btn" onclick="event.stopPropagation(); deleteGeometry('${g.kind}', ${g.waypoint_id || g.track_id})">🗑️</button>
+                    </div>`;
+            });
+            accordionEl.innerHTML = geomHtml || `<div style="color: #95a5a6; font-size: 0.85em; font-style: italic;">No locations attached.</div>`;
+
+            taskContainer.appendChild(taskEl);
+            taskContainer.appendChild(accordionEl);
+            parentContainer.appendChild(taskContainer);
+
+            // Recursion: Find and render children
+            const subtasks = allTasks.filter(t => t.parent_id === task.task_id);
+            subtasks.forEach(st => renderTaskCard(parentContainer, st, gridCols, allTasks));
+        }
+
+        async function createSubtask(parentId, dayLabel) {
+            const name = prompt("Enter subtask name:");
+            if (!name) return;
+            await fetch(`${API_URL}/tasks`, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY }, 
+                body: JSON.stringify({ task_name: name, day_label: dayLabel, parent_id: parentId }) 
+            });
+            refreshData();
         }
 
         async function createInlineTask(inputElement, dayLabel) {
@@ -1465,10 +1550,6 @@
                 });
                 refreshData();
             } catch(e) { alert("Error adding task"); inputElement.disabled = false; }
-        }
-                    }
-                });
-            });
         }
 
         function startEditGeometry(taskId, anchorId) {
