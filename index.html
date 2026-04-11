@@ -663,13 +663,9 @@
                         draw.deleteAll();
                         draw.add(sliced);
                         
-                        resetForm();
-                        document.getElementById('color-picker-group').style.display = 'block';
-                        document.getElementById('wp-title').value = `Segment (${dist}km)`;
-                        document.getElementById('existing-task').value = activeTaskId;
-                        document.getElementById('task-comments').value = `📈 Segment Stats:\n- Distance: ${dist} km\n- Elevation Change: ${gain.toFixed(1)}m\n\n`;
-                        
-                        openModal();
+                        const centerIndex = Math.floor(sliced.geometry.coordinates.length / 2);
+                        const centerPoint = sliced.geometry.coordinates[centerIndex];
+                        showGeometryContextPopup(centerPoint, sliced.geometry, `Segment (${dist}km)`, `📈 Segment Stats: Distance ${dist}km, Elev Change ${gain.toFixed(1)}m`);
                         
                         isAnalyzingSegment = false;
                         map.getCanvas().style.cursor = '';
@@ -717,11 +713,9 @@
             // 2. Geocoder Result
             geocoder.on('result', (e) => {
                 draw.deleteAll();
-                draw.add({ type: 'Point', coordinates: e.result.center });
-                resetForm();
-                document.getElementById('color-picker-group').style.display = 'block';
-                document.getElementById('wp-title').value = e.result.text;
-                openModal();
+                const feature = { type: 'Feature', geometry: { type: 'Point', coordinates: e.result.center } };
+                draw.add(feature);
+                showGeometryContextPopup(e.result.center, feature.geometry, e.result.text, '');
             });
 
             // Listen for ENTER to finish Multi-stop Route
@@ -738,12 +732,12 @@
                     draw.deleteAll();
                     draw.add(lastCalculatedRoute.geometry);
                     
-                    resetForm();
-                    document.getElementById('color-picker-group').style.display = 'block';
-                    document.getElementById('wp-title').value = `Multi-stop ${profile} route`;
-                    document.getElementById('task-comments').value = `🚗 Smart Route Stats:\n- Stops: ${routePoints.length}\n- Distance: ${distKm} km\n- Est. Time: ${durationMins} mins\n\n`;
+                    const feature = lastCalculatedRoute.geometry;
+                    // Find middle coordinate for the popup
+                    const centerIndex = Math.floor(feature.coordinates.length / 2);
+                    const centerPoint = feature.coordinates[centerIndex];
                     
-                    openModal();
+                    showGeometryContextPopup(centerPoint, feature, `Multi-stop ${profile} route`, `🚗 Smart Route Stats: Distance ${distKm}km, Time: ${durationMins}m`);
                     lastCalculatedRoute = null;
                 } else if (e.key === 'Escape' && isRouting) {
                     isRouting = false;
@@ -763,10 +757,13 @@
             });
 
             map.on('draw.create', (e) => {
-                resetForm();
-                document.getElementById('color-picker-group').style.display = 'block';
-                document.getElementById('wp-title').value = `New ${e.features[0].geometry.type}`;
-                openModal();
+                const feature = e.features[0];
+                let centerPoint;
+                if (feature.geometry.type === 'Point') centerPoint = feature.geometry.coordinates;
+                else if (feature.geometry.type === 'LineString') centerPoint = feature.geometry.coordinates[Math.floor(feature.geometry.coordinates.length / 2)];
+                else centerPoint = feature.geometry.coordinates[0][0]; // Polygon approximation
+
+                showGeometryContextPopup(centerPoint, feature.geometry, `New ${feature.geometry.type}`, '');
             });
         }
 
@@ -903,6 +900,55 @@
                     }
                 }
             });
+        }
+
+        let activeContextPopup = null;
+
+        function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText) {
+            if (activeContextPopup) activeContextPopup.remove();
+            
+            const taskWarning = activeTaskId ? `<div style="color:#27ae60; font-size:0.8em; margin-bottom:10px;">✅ Attaching to highlighted task</div>` : `<div style="color:#e74c3c; font-size:0.8em; margin-bottom:10px;">⚠️ No Task Selected (Will save unassigned)</div>`;
+
+            const popupContent = document.createElement('div');
+            popupContent.style.padding = '5px';
+            popupContent.style.width = '200px';
+            popupContent.innerHTML = `
+                <h4 style="margin: 0 0 5px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">Save to Map</h4>
+                ${taskWarning}
+                <input type="text" id="ctx-title" value="${defaultTitle}" style="width: 100%; margin-bottom: 8px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing:border-box;">
+                <div style="display: flex; gap: 5px; margin-bottom: 10px; align-items: center;">
+                    <label style="font-size: 0.8em; margin:0;">Color:</label>
+                    <input type="color" id="ctx-color" value="#3498db" style="width: 100%; height: 25px; padding: 0; cursor: pointer; border: none;">
+                </div>
+                <button id="ctx-save" style="width: 100%; padding: 8px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight:bold;">Save Shape</button>
+            `;
+
+            activeContextPopup = new mapboxgl.Popup({ closeOnClick: false, anchor: 'bottom', offset: 15 })
+                .setLngLat(lngLat)
+                .setDOMContent(popupContent)
+                .addTo(map);
+
+            document.getElementById('ctx-save').onclick = async () => {
+                const title = document.getElementById('ctx-title').value;
+                const color = document.getElementById('ctx-color').value;
+                document.getElementById('ctx-save').innerText = 'Saving...';
+                
+                try {
+                    const headers = { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY };
+                    if (geometry.type === 'Point') {
+                        await fetch(`${API_URL}/waypoints`, {
+                            method: 'POST', headers, body: JSON.stringify({ title, color, existing_task_id: activeTaskId, lat: geometry.coordinates[1], lng: geometry.coordinates[0], description: statsText })
+                        });
+                    } else {
+                        await fetch(`${API_URL}/tracks`, {
+                            method: 'POST', headers, body: JSON.stringify({ title, color, existing_task_id: activeTaskId, geojson_data: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry }] } })
+                        });
+                    }
+                    activeContextPopup.remove();
+                    draw.deleteAll();
+                    refreshData();
+                } catch (err) { alert('Error saving shape.'); document.getElementById('ctx-save').innerText = 'Save Shape'; }
+            };
         }
 
         async function refreshData() {
