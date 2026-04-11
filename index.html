@@ -576,6 +576,7 @@
         let activeTaskId = null, activeAnchorId = null, activeWaypointId = null, activeTrackId = null;
         let isEditingGeometry = false, isRouting = false, isAnalyzingSegment = false;
         let routePoints = [], segmentPoints = [], activeAnalysisTrack = null;
+        let lastCalculatedRoute = null; // Stores multi-stop route until Enter is pressed
         let ADMIN_KEY = null, elevationChart = null;
 
         const groupColors = { 'Hikers': '#2ecc71', 'Runners': '#e67e22', 'Staff': '#9b59b6', 'Transport': '#f1c40f' };
@@ -634,43 +635,36 @@
                     routePoints.push([e.lngLat.lng, e.lngLat.lat]);
                     
                     if (routePoints.length === 1) {
-                        // Visual feedback for Point A
+                        draw.deleteAll();
                         draw.add({ id: 'temp-start-point', type: 'Feature', geometry: { type: 'Point', coordinates: routePoints[0] } });
-                    }
-                    
-                    if (routePoints.length === 2) {
+                    } else if (routePoints.length >= 2 && routePoints.length <= 25) {
                         const profile = document.getElementById('route-profile').value;
-                        const coords = `${routePoints[0][0]},${routePoints[0][1]};${routePoints[1][0]},${routePoints[1][1]}`;
+                        const coords = routePoints.map(p => `${p[0]},${p[1]}`).join(';');
                         try {
                             const res = await fetch(`https://api.mapbox.com/directions/v5/mapbox/${profile}/${coords}?geometries=geojson&access_token=${mapboxgl.accessToken}`);
                             const data = await res.json();
                             if (data.routes && data.routes.length > 0) {
-                                const route = data.routes[0];
-                                draw.deleteAll(); // This also clears our temp-start-point
-                                draw.add(route.geometry);
-
-                                // Calculate Route Stats
-                                const distKm = (route.distance / 1000).toFixed(2);
-                                const durationMins = Math.round(route.duration / 60);
-
-                                resetForm();
-                                document.getElementById('color-picker-group').style.display = 'block';
-                                document.getElementById('wp-title').value = `New ${profile} route`;
-
-                                // Inject stats into the description box
-                                document.getElementById('task-comments').value = `🚗 Smart Route Stats:\n- Distance: ${distKm} km\n- Est. Time: ${durationMins} mins\n\n`;
-                                openModal();
-                            } else {
-                                alert("No valid route found between these two points.");
+                                lastCalculatedRoute = data.routes[0];
                                 draw.deleteAll();
+                                draw.add(lastCalculatedRoute.geometry);
+                                
+                                // Keep markers for intermediate stops
+                                routePoints.forEach((pt, idx) => {
+                                    draw.add({ id: `stop-${idx}`, type: 'Feature', geometry: { type: 'Point', coordinates: pt } });
+                                });
+                            } else {
+                                alert("No valid route found connecting these points.");
+                                routePoints.pop(); // Remove the bad point
                             }
                         } catch (err) { 
-                            alert("Routing error. Please try again."); 
-                            draw.deleteAll();
+                            console.error(err);
+                            routePoints.pop();
                         }
-                        isRouting = false;
-                        map.getCanvas().style.cursor = '';
+                    } else if (routePoints.length > 25) {
+                        alert("Mapbox API limit: Maximum 25 stops per route.");
+                        routePoints.pop();
                     }
+                    return; // Keep routing active until Enter is pressed
                 }
             });
 
@@ -682,6 +676,36 @@
                 document.getElementById('color-picker-group').style.display = 'block';
                 document.getElementById('wp-title').value = e.result.text;
                 openModal();
+            });
+
+            // Listen for ENTER to finish Multi-stop Route
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && isRouting && lastCalculatedRoute) {
+                    isRouting = false;
+                    map.getCanvas().style.cursor = '';
+                    
+                    const profile = document.getElementById('route-profile').value;
+                    const distKm = (lastCalculatedRoute.distance / 1000).toFixed(2);
+                    const durationMins = Math.round(lastCalculatedRoute.duration / 60);
+                    
+                    // Clean up intermediate stop markers, leave only the final line
+                    draw.deleteAll();
+                    draw.add(lastCalculatedRoute.geometry);
+                    
+                    resetForm();
+                    document.getElementById('color-picker-group').style.display = 'block';
+                    document.getElementById('wp-title').value = `Multi-stop ${profile} route`;
+                    document.getElementById('task-comments').value = `🚗 Smart Route Stats:\n- Stops: ${routePoints.length}\n- Distance: ${distKm} km\n- Est. Time: ${durationMins} mins\n\n`;
+                    
+                    openModal();
+                    lastCalculatedRoute = null;
+                } else if (e.key === 'Escape' && isRouting) {
+                    isRouting = false;
+                    map.getCanvas().style.cursor = '';
+                    draw.deleteAll();
+                    routePoints = [];
+                    lastCalculatedRoute = null;
+                }
             });
 
             map.on('load', () => {
@@ -893,8 +917,9 @@
         function startSmartRoute() {
             isRouting = true;
             routePoints = [];
+            lastCalculatedRoute = null;
             map.getCanvas().style.cursor = 'crosshair';
-            alert("Smart Route: Click two points on the map.");
+            alert("Multi-stop Route: Click points on the map sequentially. Press ENTER to save, or ESC to cancel.");
         }
 
         function changeMapStyle(style) { 
