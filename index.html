@@ -30,10 +30,24 @@
 
         #left-panel {
             width: 450px;
+            min-width: 250px;
+            max-width: 50vw;
+            resize: horizontal;
+            overflow-x: hidden;
             display: flex;
             flex-direction: column;
             border-right: 2px solid #ccc;
             background: #f8f9fa;
+            transition: min-width 0.3s ease;
+            position: relative;
+        }
+        #left-panel.collapsed {
+            width: 0 !important;
+            min-width: 0 !important;
+            border: none !important;
+        }
+        #left-panel.collapsed > * {
+            display: none;
         }
 
         #panel-header {
@@ -435,6 +449,7 @@
         <div id="loading-overlay" style="position:absolute; inset:0; background:rgba(255,255,255,0.8); z-index:9999; display:flex; justify-content:center; align-items:center; font-size:20px; font-weight:bold; color:#333;">Waking up server (This takes ~50 seconds)...</div>
         <div id="map" style="position: absolute; top: 0; bottom: 0; width: 100%;"></div>
         <div class="floating-tools">
+            <button onclick="document.getElementById('left-panel').classList.toggle('collapsed')" title="Toggle Sidebar" style="font-weight: bold; font-size: 1.2em; padding: 5px 12px;">☰</button>
             <button onclick="draw.changeMode('draw_point')">📍 Add Waypoint</button>
             <button onclick="draw.changeMode('draw_line_string')">📈 Add Track</button>
             <button onclick="draw.changeMode('draw_polygon')">🛑 Add Zone</button>
@@ -596,7 +611,6 @@
                         const coords = sliced.geometry.coordinates;
                         const gain = (coords[coords.length - 1][2] || 0) - (coords[0][2] || 0);
                         
-                        alert(`Segment Info:\nDistance: ${dist} km\nElevation Change: ${gain.toFixed(1)}m`);
                         showElevationProfile({ type: 'FeatureCollection', features: [sliced] }, "Selected Segment");
                         
                         draw.deleteAll();
@@ -606,6 +620,7 @@
                         document.getElementById('color-picker-group').style.display = 'block';
                         document.getElementById('wp-title').value = `Segment (${dist}km)`;
                         document.getElementById('existing-task').value = activeTaskId;
+                        document.getElementById('task-comments').value = `📈 Segment Stats:\n- Distance: ${dist} km\n- Elevation Change: ${gain.toFixed(1)}m\n\n`;
                         
                         openModal();
                         
