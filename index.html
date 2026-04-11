@@ -1430,13 +1430,13 @@
 
         async function updateSection(oldDay, newDay) {
             if (oldDay === newDay) return;
-            await fetch(`${API_URL}/tasks/section/${oldDay}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY }, body: JSON.stringify({ new_label: newDay }) });
+            await fetch(`${API_URL}/tasks/section/${encodeURIComponent(oldDay)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY }, body: JSON.stringify({ new_label: newDay }) });
             refreshData();
         }
 
         async function deleteSection(day) {
             if (!confirm(`Delete all tasks in ${day}?`)) return;
-            await fetch(`${API_URL}/tasks/section/${day}`, { method: 'DELETE', headers: { 'x-api-key': ADMIN_KEY } });
+            await fetch(`${API_URL}/tasks/section/${encodeURIComponent(day)}`, { method: 'DELETE', headers: { 'x-api-key': ADMIN_KEY } });
             refreshData();
         }
 
