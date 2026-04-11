@@ -930,7 +930,8 @@
             popupContent.innerHTML = `
                 <h4 style="margin: 0 0 5px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">Save to Map</h4>
                 ${taskWarning}
-                <input type="text" id="ctx-title" value="${defaultTitle}" style="width: 100%; margin-bottom: 8px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing:border-box;">
+                <input type="text" id="ctx-title" value="${defaultTitle}" placeholder="Shape Title" style="width: 100%; margin-bottom: 5px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing:border-box;">
+                <input type="url" id="ctx-link" placeholder="https:// link (optional)" style="width: 100%; margin-bottom: 8px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing:border-box; font-size:0.85em;">
                 <div style="display: flex; gap: 5px; margin-bottom: 10px; align-items: center;">
                     <label style="font-size: 0.8em; margin:0;">Color:</label>
                     <input type="color" id="ctx-color" value="#3498db" style="width: 40px; height: 25px; padding: 0; cursor: pointer; border: none;">
@@ -951,19 +952,23 @@
 
             document.getElementById('ctx-save').onclick = async () => {
                 const title = document.getElementById('ctx-title').value;
+                const link = document.getElementById('ctx-link').value;
                 const color = document.getElementById('ctx-color').value;
                 const icon = document.getElementById('ctx-icon') ? document.getElementById('ctx-icon').value : '📍';
                 document.getElementById('ctx-save').innerText = 'Saving...';
+                
+                // Append the link to the description text if it exists
+                const finalDesc = link ? `${statsText}\nLink: ${link}` : statsText;
                 
                 try {
                     const headers = { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY };
                     if (geometry.type === 'Point') {
                         await fetch(`${API_URL}/waypoints`, {
-                            method: 'POST', headers, body: JSON.stringify({ title, color, icon, existing_task_id: activeTaskId, lat: geometry.coordinates[1], lng: geometry.coordinates[0], description: statsText })
+                            method: 'POST', headers, body: JSON.stringify({ title, color, icon, existing_task_id: activeTaskId, lat: geometry.coordinates[1], lng: geometry.coordinates[0], description: finalDesc })
                         });
                     } else {
                         await fetch(`${API_URL}/tracks`, {
-                            method: 'POST', headers, body: JSON.stringify({ title, color, existing_task_id: activeTaskId, geojson_data: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry }] } })
+                            method: 'POST', headers, body: JSON.stringify({ title, color, existing_task_id: activeTaskId, geojson_data: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry }] }, description: finalDesc })
                         });
                     }
                     activeContextPopup.remove();
@@ -1218,15 +1223,16 @@
                 const section = document.createElement('div');
                 section.className = 'asana-section';
                 
-                // Auto-detect if day is a YYYY-MM-DD string to format as Date Input
+                // Force a date picker for all sections, even if they have custom text names
                 const isDate = !isNaN(Date.parse(day)) && day.includes('-');
-                const dayHtml = isDate 
-                    ? `<input type="date" value="${day}" class="inline-edit-input" style="font-weight:bold; font-size:1em;" onchange="updateSection('${day}', this.value)" onclick="event.stopPropagation()">` 
-                    : `<span class="inline-edit" contenteditable="true" onblur="updateSection('${day}', this.innerText)" onclick="event.stopPropagation()">${day}</span>`;
+                const dateVal = isDate ? day : '';
+                const textVal = isDate ? 'Select Date' : day;
 
                 section.innerHTML = `
-                    <div class="asana-header" style="cursor:pointer;" onclick="flyToSection('${day}')">
-                        <span>▼ ${dayHtml}</span>
+                    <div class="asana-header" style="cursor:pointer; display: flex; align-items: center; gap: 10px;" onclick="flyToSection('${day}')">
+                        <span>▼</span>
+                        <input type="date" value="${dateVal}" class="inline-edit-input" style="padding:2px; font-size:0.8em; color:#7f8c8d; border:1px solid #ddd; border-radius:4px;" onchange="updateSection('${day}', this.value)" onclick="event.stopPropagation()">
+                        <span class="inline-edit" contenteditable="true" style="font-weight:bold;" onblur="updateSection('${day}', this.innerText)" onclick="event.stopPropagation()">${textVal}</span>
                         <button class="delete-btn" onclick="event.stopPropagation(); deleteSection('${day}')">🗑️</button>
                     </div>
                     <div class="task-table-header" style="grid-template-columns: ${gridCols};">
@@ -1390,23 +1396,25 @@
             const geom = task?.geometries.find(g => g.anchor_id === anchorId);
             if (!geom) return;
 
-            isEditingGeometry = true;
-            activeTaskId = taskId;
-            activeAnchorId = anchorId;
-            activeWaypointId = geom.waypoint_id;
-            activeTrackId = geom.track_id;
+            // Delete the old geometry first so we can save the edited one as a replacement
+            deleteGeometry(geom.kind, geom.waypoint_id || geom.track_id);
 
-            openModal();
-            document.getElementById('wp-title').value = geom.title;
-            document.getElementById('geom-color').value = geom.color || '#3498db';
-            document.getElementById('existing-task').value = taskId;
+            activeTaskId = taskId; // Ensure it stays attached to the same task
             
             draw.deleteAll();
+            let centerPoint;
             if (geom.kind === 'point') {
-                draw.add({ type: 'Feature', geometry: { type: 'Point', coordinates: [geom.lng, geom.lat] }, properties: {} });
+                const feature = { type: 'Feature', geometry: { type: 'Point', coordinates: [geom.lng, geom.lat] }, properties: {} };
+                draw.add(feature);
+                centerPoint = [geom.lng, geom.lat];
+                showGeometryContextPopup(centerPoint, feature.geometry, geom.title, '');
             } else if (geom.geojson) {
                 draw.add(geom.geojson);
+                const feature = geom.geojson.features[0];
+                centerPoint = feature.geometry.type === 'Polygon' ? feature.geometry.coordinates[0][0] : feature.geometry.coordinates[Math.floor(feature.geometry.coordinates.length / 2)];
+                showGeometryContextPopup(centerPoint, feature.geometry, geom.title, '');
             }
+            alert("Drag the white vertices to edit the shape. Click 'Save Shape' on the popup when finished.");
         }
 
         // GPX Upload Handler
