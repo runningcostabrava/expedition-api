@@ -9,8 +9,11 @@
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.0/mapbox-gl-draw.css"
         type="text/css">
-    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
-    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css" type="text/css">
+    <script
+        src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
+    <link rel="stylesheet"
+        href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css"
+        type="text/css">
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.0/mapbox-gl-draw.js"></script>
     <script src="https://unpkg.com/togeojson@0.16.0/togeojson.js"></script>
@@ -29,7 +32,8 @@
         }
 
         #left-panel {
-            width: 30vw; /* Default stage */
+            width: 30vw;
+            /* Default stage */
             min-width: 0;
             overflow-x: hidden;
             display: flex;
@@ -39,15 +43,27 @@
             transition: width 0.3s ease;
             position: relative;
         }
-        #left-panel.hidden { width: 0; border: none; }
-        #left-panel.wide { width: 60vw; }
-        #left-panel.hidden > * { display: none; }
+
+        #left-panel.hidden {
+            width: 0;
+            border: none;
+        }
+
+        #left-panel.wide {
+            width: 60vw;
+        }
+
+        #left-panel.hidden>* {
+            display: none;
+        }
+
         #left-panel.collapsed {
             width: 0 !important;
             min-width: 0 !important;
             border: none !important;
         }
-        #left-panel.collapsed > * {
+
+        #left-panel.collapsed>* {
             display: none;
         }
 
@@ -56,8 +72,9 @@
             background: white;
             border-bottom: 1px solid #eee;
             z-index: 2;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
         }
+
         .filter-drawer {
             max-height: 0;
             overflow: hidden;
@@ -66,10 +83,12 @@
             border-bottom: 1px solid #eee;
             padding: 0 20px;
         }
+
         .filter-drawer.open {
             max-height: 300px;
             padding: 15px 20px;
         }
+
         .search-container {
             display: flex;
             background: #f1f3f5;
@@ -78,6 +97,7 @@
             align-items: center;
             margin-top: 15px;
         }
+
         .search-container input {
             border: none;
             background: transparent;
@@ -103,7 +123,7 @@
             background: white;
             padding: 10px;
             border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
         }
 
         .floating-tools button {
@@ -137,8 +157,10 @@
             text-overflow: ellipsis;
             gap: 10px;
         }
+
         .section-title-text {
-            max-width: 150px; /* Truncate if space is tight */
+            max-width: 150px;
+            /* Truncate if space is tight */
             min-width: 80px;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -164,14 +186,14 @@
             background: #fff;
             border: 1px solid #eee;
             border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
             gap: 10px;
             cursor: pointer;
             transition: all 0.2s ease;
         }
 
         .task-row:hover {
-            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
             transform: translateY(-1px);
         }
 
@@ -225,9 +247,24 @@
             cursor: pointer;
         }
 
-        .geom-info { display: flex; align-items: center; gap: 8px; }
-        .visibility-btn { background: none; border: none; cursor: pointer; padding: 2px; font-size: 1.1em; color: #bdc3c7; }
-        .visibility-btn.hidden { color: #e74c3c; }
+        .geom-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .visibility-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 2px;
+            font-size: 1.1em;
+            color: #bdc3c7;
+        }
+
+        .visibility-btn.hidden {
+            color: #e74c3c;
+        }
 
         .color-dot {
             width: 12px;
@@ -387,8 +424,10 @@
             bottom: 0;
             padding: 20px;
             z-index: 1000;
-            pointer-events: none; /* Allows the user to click/pan the map behind the form */
-            align-items: flex-start; /* Aligns to the top */
+            pointer-events: none;
+            /* Allows the user to click/pan the map behind the form */
+            align-items: flex-start;
+            /* Aligns to the top */
             justify-content: flex-end;
         }
 
@@ -400,7 +439,8 @@
             border-radius: 12px;
             padding: 25px;
             box-shadow: -5px 5px 30px rgba(0, 0, 0, 0.15);
-            pointer-events: auto; /* Re-enables clicking on the form inputs */
+            pointer-events: auto;
+            /* Re-enables clicking on the form inputs */
         }
 
         .form-group {
@@ -415,7 +455,9 @@
             color: #34495e;
         }
 
-        input, select, textarea {
+        input,
+        select,
+        textarea {
             width: 100%;
             padding: 10px;
             box-sizing: border-box;
@@ -434,8 +476,14 @@
             font-weight: 600;
         }
 
-        .save-btn { background: #27ae60; }
-        .cancel-btn { background: #95a5a6; margin-top: 10px; }
+        .save-btn {
+            background: #27ae60;
+        }
+
+        .cancel-btn {
+            background: #95a5a6;
+            margin-top: 10px;
+        }
 
         .draw-controls {
             display: flex;
@@ -466,18 +514,23 @@
     <div id="left-panel">
         <div id="panel-header">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <button class="add-task-btn" onclick="openModal()" style="width: auto; margin: 0; padding: 10px 20px;">+ New Task</button>
-                <button onclick="document.getElementById('filter-drawer').classList.toggle('open')" style="width: auto; background: none; color: #7f8c8d; border: 1px solid #ddd; padding: 8px 12px; border-radius: 6px; cursor: pointer;">⚙️ Filters</button>
+                <button class="add-task-btn" onclick="openModal()" style="width: auto; margin: 0; padding: 10px 20px;">+
+                    New Task</button>
+                <button onclick="document.getElementById('filter-drawer').classList.toggle('open')"
+                    style="width: auto; background: none; color: #7f8c8d; border: 1px solid #ddd; padding: 8px 12px; border-radius: 6px; cursor: pointer;">⚙️
+                    Filters</button>
             </div>
             <div class="search-container">
                 <span>🔍</span>
-                <input type="text" id="search-filter" placeholder="Search tasks, descriptions, assignee..." oninput="renderProjectView()">
+                <input type="text" id="search-filter" placeholder="Search tasks, descriptions, assignee..."
+                    oninput="renderProjectView()">
             </div>
         </div>
         <div id="filter-drawer" class="filter-drawer">
             <div style="display: flex; gap: 10px; margin-bottom: 10px;">
                 <div style="flex:1;">
-                    <label style="font-weight: bold; font-size: 0.85em; display:block; margin-bottom: 5px;">Group Filter</label>
+                    <label style="font-weight: bold; font-size: 0.85em; display:block; margin-bottom: 5px;">Group
+                        Filter</label>
                     <select id="group-filter" onchange="renderProjectView()" style="padding: 6px;">
                         <option value="">All Groups</option>
                         <option value="Hikers">Hikers</option>
@@ -487,7 +540,8 @@
                     </select>
                 </div>
                 <div style="flex:1;">
-                    <label style="font-weight: bold; font-size: 0.85em; display:block; margin-bottom: 5px;">Type Filter</label>
+                    <label style="font-weight: bold; font-size: 0.85em; display:block; margin-bottom: 5px;">Type
+                        Filter</label>
                     <select id="type-filter" onchange="renderProjectView()" style="padding: 6px;">
                         <option value="">All Types</option>
                         <option value="Transport">🚗 Transport</option>
@@ -499,15 +553,20 @@
             </div>
             <div style="font-size: 0.85em; margin-bottom: 10px;">
                 <strong>Show Columns:</strong><br>
-                <label style="margin-right:10px;"><input type="checkbox" id="col-assignee" checked onchange="renderProjectView()"> Assignee</label>
-                <label style="margin-right:10px;"><input type="checkbox" id="col-time" checked onchange="renderProjectView()"> Time</label>
+                <label style="margin-right:10px;"><input type="checkbox" id="col-assignee" checked
+                        onchange="renderProjectView()"> Assignee</label>
+                <label style="margin-right:10px;"><input type="checkbox" id="col-time" checked
+                        onchange="renderProjectView()"> Time</label>
                 <label><input type="checkbox" id="col-group" onchange="renderProjectView()"> Group</label>
             </div>
             <div style="font-size: 0.85em;">
                 <strong>Show on Map:</strong><br>
-                <label style="margin-right:10px;"><input type="checkbox" id="filter-points" checked onchange="updateFilters()"> 📍 Points</label>
-                <label style="margin-right:10px;"><input type="checkbox" id="filter-lines" checked onchange="updateFilters()"> 📈 Tracks</label>
-                <label style="margin-right:10px;"><input type="checkbox" id="filter-smart" checked onchange="updateFilters()"> 🚗 Smart Routes</label>
+                <label style="margin-right:10px;"><input type="checkbox" id="filter-points" checked
+                        onchange="updateFilters()"> 📍 Points</label>
+                <label style="margin-right:10px;"><input type="checkbox" id="filter-lines" checked
+                        onchange="updateFilters()"> 📈 Tracks</label>
+                <label style="margin-right:10px;"><input type="checkbox" id="filter-smart" checked
+                        onchange="updateFilters()"> 🚗 Smart Routes</label>
                 <label><input type="checkbox" id="filter-polygons" checked onchange="updateFilters()"> 🛑 Zones</label>
             </div>
         </div>
@@ -515,10 +574,13 @@
     </div>
 
     <div id="map-wrapper" style="flex: 1; position: relative;">
-        <div id="loading-overlay" style="position:absolute; inset:0; background:rgba(255,255,255,0.8); z-index:9999; display:flex; justify-content:center; align-items:center; font-size:20px; font-weight:bold; color:#333;">Waking up server (This takes ~50 seconds)...</div>
+        <div id="loading-overlay"
+            style="position:absolute; inset:0; background:rgba(255,255,255,0.8); z-index:9999; display:flex; justify-content:center; align-items:center; font-size:20px; font-weight:bold; color:#333;">
+            Waking up server (This takes ~50 seconds)...</div>
         <div id="map" style="position: absolute; top: 0; bottom: 0; width: 100%;"></div>
         <div class="floating-tools">
-            <button onclick="cycleSidebar()" title="Toggle Sidebar" style="font-weight: bold; font-size: 1.2em; padding: 5px 12px;">☰</button>
+            <button onclick="cycleSidebar()" title="Toggle Sidebar"
+                style="font-weight: bold; font-size: 1.2em; padding: 5px 12px;">☰</button>
             <button onclick="draw.changeMode('draw_point')">📍 Add Waypoint</button>
             <button onclick="draw.changeMode('draw_line_string')">📈 Add Track</button>
             <button onclick="draw.changeMode('draw_polygon')">🛑 Add Zone</button>
@@ -527,7 +589,9 @@
                 📁 Upload GPX
                 <input type="file" id="gpx-file" accept=".gpx" style="display: none;">
             </label>
-            <label class="tool-btn" style="cursor: pointer; padding: 8px 15px; background: #fff; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;">📄 Import CSV
+            <label class="tool-btn"
+                style="cursor: pointer; padding: 8px 15px; background: #fff; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;">📄
+                Import CSV
                 <input type="file" id="csv-file" accept=".csv" style="display:none;">
             </label>
             <select id="route-profile" style="width: auto; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
@@ -548,8 +612,11 @@
         </div>
 
         <div id="elevation-panel">
-            <span id="close-elevation" onclick="document.getElementById('elevation-panel').style.display='none'">❌</span>
-            <div id="elevation-stats-header" style="display:flex; gap:20px; padding:8px 15px; background:#f8f9fa; border-bottom:1px solid #ddd; font-size:0.9em; font-weight:bold; color:#2c3e50;"></div>
+            <span id="close-elevation"
+                onclick="document.getElementById('elevation-panel').style.display='none'">❌</span>
+            <div id="elevation-stats-header"
+                style="display:flex; gap:20px; padding:8px 15px; background:#f8f9fa; border-bottom:1px solid #ddd; font-size:0.9em; font-weight:bold; color:#2c3e50;">
+            </div>
             <canvas id="elevation-chart"></canvas>
         </div>
     </div>
@@ -611,20 +678,22 @@
                 </div>
             </div>
 
-            <div class="form-group" id="color-picker-group" style="border-top: 1px solid #eee; padding-top: 15px; margin-top: 15px; display: none;">
+            <div class="form-group" id="color-picker-group"
+                style="border-top: 1px solid #eee; padding-top: 15px; margin-top: 15px; display: none;">
                 <label>Location Color</label>
                 <input type="color" id="geom-color" value="#3498db" style="padding: 0; height: 40px; cursor: pointer;">
             </div>
 
             <div class="form-group">
                 <label>Attached Locations</label>
-                <div id="attached-locations-list" style="font-size: 0.85em; background: #f8f9fa; padding: 10px; border-radius: 6px;">
+                <div id="attached-locations-list"
+                    style="font-size: 0.85em; background: #f8f9fa; padding: 10px; border-radius: 6px;">
                 </div>
             </div>
 
             <button id="unified-save-btn" class="save-btn">Save changes</button>
             <button class="cancel-btn" onclick="closeModal()">Cancel</button>
-            
+
             <button onclick="syncDbSchema()" style="margin-top:20px; background:#34495e;">Sync DB Schema</button>
         </div>
     </div>
@@ -635,7 +704,7 @@
         let activeMarkers = [];
         let allTracks = [], allItinerary = [];
         let mapFilters = { point: true, line: true, smart: true, polygon: true };
-        
+
         function updateFilters() {
             mapFilters.point = document.getElementById('filter-points').checked;
             mapFilters.line = document.getElementById('filter-lines').checked;
@@ -682,16 +751,16 @@
                         const dist = turf.length(sliced, { units: 'kilometers' }).toFixed(2);
                         const coords = sliced.geometry.coordinates;
                         const gain = (coords[coords.length - 1][2] || 0) - (coords[0][2] || 0);
-                        
+
                         showElevationProfile({ type: 'FeatureCollection', features: [sliced] }, "Selected Segment");
-                        
+
                         draw.deleteAll();
                         draw.add(sliced);
-                        
+
                         const centerIndex = Math.floor(sliced.geometry.coordinates.length / 2);
                         const centerPoint = sliced.geometry.coordinates[centerIndex];
                         showGeometryContextPopup(centerPoint, sliced.geometry, `Segment (${dist}km)`, `📈 Segment Stats: Distance ${dist}km, Elev Change ${gain.toFixed(1)}m`);
-                        
+
                         isAnalyzingSegment = false;
                         map.getCanvas().style.cursor = '';
                     }
@@ -700,7 +769,7 @@
 
                 if (isRouting) {
                     routePoints.push([e.lngLat.lng, e.lngLat.lat]);
-                    
+
                     if (routePoints.length === 1) {
                         draw.deleteAll();
                         draw.add({ id: 'temp-start-point', type: 'Feature', geometry: { type: 'Point', coordinates: routePoints[0] } });
@@ -714,7 +783,7 @@
                                 lastCalculatedRoute = data.routes[0];
                                 draw.deleteAll();
                                 draw.add(lastCalculatedRoute.geometry);
-                                
+
                                 // Keep markers for intermediate stops
                                 routePoints.forEach((pt, idx) => {
                                     draw.add({ id: `stop-${idx}`, type: 'Feature', geometry: { type: 'Point', coordinates: pt } });
@@ -723,7 +792,7 @@
                                 alert("No valid route found connecting these points.");
                                 routePoints.pop(); // Remove the bad point
                             }
-                        } catch (err) { 
+                        } catch (err) {
                             console.error(err);
                             routePoints.pop();
                         }
@@ -748,28 +817,28 @@
                 if (e.key === 'Enter' && isRouting && lastCalculatedRoute) {
                     isRouting = false;
                     map.getCanvas().style.cursor = '';
-                    
+
                     const profile = document.getElementById('route-profile').value;
                     const distKm = (lastCalculatedRoute.distance / 1000).toFixed(2);
                     const durationMins = Math.round(lastCalculatedRoute.duration / 60);
-                    
+
                     // Clean up intermediate stop markers, leave only the final line
                     draw.deleteAll();
                     draw.add(lastCalculatedRoute.geometry);
-                    
+
                     const feature = lastCalculatedRoute.geometry;
                     // Persist the original stops so they can be re-edited later
-                    feature.properties = { 
-                        route_type: 'smart', 
+                    feature.properties = {
+                        route_type: 'smart',
                         profile: profile,
-                        stops: routePoints, 
+                        stops: routePoints,
                         distance: distKm,
                         duration: durationMins,
                         title: `Smart ${profile} Route`
                     };
                     const centerIndex = Math.floor(feature.coordinates.length / 2);
                     const centerPoint = feature.coordinates[centerIndex];
-                    
+
                     showGeometryContextPopup(centerPoint, feature, `Multi-stop ${profile} route`, `🚗 Smart Route Stats: Distance ${distKm}km, Time: ${durationMins}m`);
                     lastCalculatedRoute = null;
                 } else if (e.key === 'Escape' && isRouting) {
@@ -829,7 +898,7 @@
                         el.innerText = geom.icon || '📍';
                         el.style.filter = `drop-shadow(0px 0px 4px ${renderColor})`;
                         el.style.cursor = 'pointer';
-                        
+
                         const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
                             .setLngLat([geom.lng, geom.lat])
                             .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
@@ -846,20 +915,20 @@
                             id: layerId,
                             type: geom.kind === 'polygon' ? 'fill' : 'line',
                             source: `track-${geom.track_id}`,
-                            paint: geom.kind === 'polygon' ? { 'fill-color': renderColor, 'fill-opacity': 0.4 } : 
-                                   isSmart ? { 'line-color': renderColor, 'line-width': 4, 'line-dasharray': [2, 2] } : 
-                                   { 'line-color': renderColor, 'line-width': 4 }
+                            paint: geom.kind === 'polygon' ? { 'fill-color': renderColor, 'fill-opacity': 0.4 } :
+                                isSmart ? { 'line-color': renderColor, 'line-width': 4, 'line-dasharray': [2, 2] } :
+                                    { 'line-color': renderColor, 'line-width': 4 }
                         });
 
                         map.on('click', layerId, (e) => {
                             focusTaskInSidebar(task.task_id);
                             const dist = turf.length(geom.geojson, { units: 'kilometers' }).toFixed(2);
-                            
+
                             // Calculate Elevation Gain/Loss
                             let gain = 0, loss = 0;
                             const coords = geom.geojson.features[0].geometry.type === 'Polygon' ? geom.geojson.features[0].geometry.coordinates[0] : geom.geojson.features[0].geometry.coordinates;
                             for (let i = 1; i < coords.length; i++) {
-                                const diff = (coords[i][2] || 0) - (coords[i-1][2] || 0);
+                                const diff = (coords[i][2] || 0) - (coords[i - 1][2] || 0);
                                 if (diff > 0) gain += diff;
                                 else loss -= diff;
                             }
@@ -877,7 +946,7 @@
                                     </div>
                                 `)
                                 .addTo(map);
-                            
+
                             const props = geom.geojson.features[0].properties || {};
                             showElevationProfile(geom.geojson, geom.title, {
                                 distance: dist,
@@ -910,13 +979,13 @@
 
         function toggleLayerVisibility(layerId, btn) {
             if (!map.getLayer(layerId)) return;
-            
+
             // Cycle: 1.0 (👁️) -> 0.6 (◑) -> 0.3 (◔) -> 0.0 (🙈)
             const opacityField = map.getLayer(layerId).type === 'fill' ? 'fill-opacity' : 'line-opacity';
             const currentOpacity = map.getPaintProperty(layerId, opacityField) ?? 1.0;
-            
+
             let nextOpacity, nextIcon, isHidden = false;
-            
+
             if (currentOpacity > 0.6) { nextOpacity = 0.6; nextIcon = '◑'; }
             else if (currentOpacity > 0.3) { nextOpacity = 0.3; nextIcon = '◔'; }
             else if (currentOpacity > 0) { nextOpacity = 0; nextIcon = '🙈'; isHidden = true; }
@@ -925,14 +994,14 @@
             map.setPaintProperty(layerId, opacityField, nextOpacity);
             // Also toggle visibility 'none' if 0 to prevent clicks
             map.setLayoutProperty(layerId, 'visibility', nextOpacity === 0 ? 'none' : 'visible');
-            
+
             btn.innerText = nextIcon;
             btn.classList.toggle('hidden', isHidden);
         }
 
         function flyToGeometry(lng, lat, kind, layerId) {
-            if (kind === 'point') { 
-                map.flyTo({ center: [lng, lat], zoom: 16 }); 
+            if (kind === 'point') {
+                map.flyTo({ center: [lng, lat], zoom: 16 });
             } else {
                 const source = map.getSource(layerId.replace('layer-', 'track-'));
                 if (source && source._data) {
@@ -988,18 +1057,18 @@
         function showElevationProfile(geojson, title, metadata = null) {
             document.getElementById('elevation-panel').style.display = 'block';
             const statsHeader = document.getElementById('elevation-stats-header');
-            
+
             // If no metadata passed, try to extract from geojson properties (Mapbox data)
             const props = metadata || geojson.features?.[0]?.properties || {};
-            
+
             statsHeader.innerHTML = `
-                <span style="color:#000;">🏁 <strong>${title}</strong></span> 
-                <span style="color:#000;">📏 <strong>${props.distance || 0} km</strong></span> 
-                <span style="color:#27ae60;">▲ <strong>${props.gain || 0}m</strong></span> 
+                <span style="color:#000;">🏁 <strong>${title}</strong></span>
+                <span style="color:#000;">📏 <strong>${props.distance || 0} km</strong></span>
+                <span style="color:#27ae60;">▲ <strong>${props.gain || 0}m</strong></span>
                 <span style="color:#e74c3c;">▼ <strong>${props.loss || 0}m</strong></span>
                 ${props.duration ? `<span style="color:#000;">🕒 <strong>${props.duration} min</strong></span>` : ''}
             `;
-        }
+
             let distances = [0], elevations = [], cumulative = 0;
             const coords = geojson.features[0].geometry.type === 'Polygon' ? geojson.features[0].geometry.coordinates[0] : geojson.features[0].geometry.coordinates;
             coords.forEach((c, i) => {
@@ -1016,9 +1085,9 @@
                     maintainAspectRatio: false,
                     interaction: { mode: 'index', intersect: false },
                     plugins: { legend: { display: true } },
-                    scales: { 
-                        y: { beginAtZero: false, ticks: { color: '#000', font: { weight: 'bold' } }, title: { display: true, text: 'Elevation (m)', color: '#000' } }, 
-                        x: { ticks: { color: '#000', font: { weight: 'bold' } }, title: { display: true, text: 'Distance (km)', color: '#000' } } 
+                    scales: {
+                        y: { beginAtZero: false, ticks: { color: '#000', font: { weight: 'bold' } }, title: { display: true, text: 'Elevation (m)', color: '#000' } },
+                        x: { ticks: { color: '#000', font: { weight: 'bold' } }, title: { display: true, text: 'Distance (km)', color: '#000' } }
                     },
                     onHover: (e, activeElements) => {
                         if (activeElements.length > 0) {
@@ -1044,7 +1113,7 @@
 
         function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, editConfig = null) {
             if (activeContextPopup) activeContextPopup.remove();
-            
+
             const taskWarning = activeTaskId ? `<div style="color:#27ae60; font-size:0.8em; margin-bottom:10px;">✅ Attaching to highlighted task</div>` : `<div style="color:#e74c3c; font-size:0.8em; margin-bottom:10px;">⚠️ No Task Selected (Will save unassigned)</div>`;
 
             const popupContent = document.createElement('div');
@@ -1082,13 +1151,13 @@
                 const color = document.getElementById('ctx-color').value;
                 const icon = document.getElementById('ctx-icon') ? document.getElementById('ctx-icon').value : '📍';
                 document.getElementById('ctx-save').innerText = 'Saving...';
-                
+
                 // Append the link to the description text if it exists
                 const finalDesc = link ? `${statsText}\nLink: ${link}` : statsText;
-                
+
                 try {
                     const headers = { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY };
-                    
+
                     if (editConfig) {
                         // UPDATE Existing Shape (PUT)
                         if (editConfig.kind === 'point') {
@@ -1112,7 +1181,7 @@
                             });
                         }
                     }
-                    
+
                     activeContextPopup.remove();
                     draw.deleteAll();
                     isEditingGeometry = false;
@@ -1122,13 +1191,13 @@
         }
 
         async function refreshData() {
-            const previousActiveId = activeTaskId; 
+            const previousActiveId = activeTaskId;
             try {
                 const res = await fetch(`${API_URL}/itinerary`);
                 const data = await res.json();
                 allItinerary = Array.isArray(data) ? data : [];
                 if (previousActiveId) activeTaskId = previousActiveId;
-                
+
                 const dropdown = document.getElementById('existing-task');
                 dropdown.innerHTML = '<option value="">-- Create New Task --</option>';
                 allItinerary.forEach(t => {
@@ -1170,9 +1239,9 @@
 
         async function deleteTask(id) {
             if (!confirm("Delete this task?")) return;
-            await fetch(`${API_URL}/tasks/${id}`, { 
-                method: 'DELETE', 
-                headers: { 'x-api-key': ADMIN_KEY } 
+            await fetch(`${API_URL}/tasks/${id}`, {
+                method: 'DELETE',
+                headers: { 'x-api-key': ADMIN_KEY }
             });
             refreshData();
         }
@@ -1180,9 +1249,9 @@
         async function deleteGeometry(type, id) {
             if (!confirm(`Delete this ${type}?`)) return;
             const endpoint = type === 'point' ? `waypoints/${id}` : `tracks/${id}`;
-            await fetch(`${API_URL}/${endpoint}`, { 
-                method: 'DELETE', 
-                headers: { 'x-api-key': ADMIN_KEY } 
+            await fetch(`${API_URL}/${endpoint}`, {
+                method: 'DELETE',
+                headers: { 'x-api-key': ADMIN_KEY }
             });
             refreshData();
         }
@@ -1197,8 +1266,8 @@
 
         async function syncDbSchema() {
             try {
-                const res = await fetch(`${API_URL}/setup-db`, { 
-                    headers: { 'x-api-key': ADMIN_KEY } 
+                const res = await fetch(`${API_URL}/setup-db`, {
+                    headers: { 'x-api-key': ADMIN_KEY }
                 });
                 const msg = await res.text();
                 alert(msg);
@@ -1208,8 +1277,8 @@
             }
         }
 
-        function changeMapStyle(style) { 
-            map.setStyle(style); 
+        function changeMapStyle(style) {
+            map.setStyle(style);
             map.once('style.load', () => {
                 map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
                 map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
@@ -1258,7 +1327,7 @@
                     // Flow B: Creating a NEW shape
                     const feat = features[0];
                     const tasksArr = existingTaskId ? undefined : [{ name: taskData.task_name, ...taskData }];
-                    
+
                     if (feat.geometry.type === 'Point') {
                         await fetch(`${API_URL}/waypoints`, {
                             method: 'POST', headers,
@@ -1306,7 +1375,7 @@
         function editSmartRoute(trackId) {
             const track = allItinerary.flatMap(t => t.geometries).find(g => g.track_id === trackId);
             if (!track || !track.properties.stops) return alert("No stops found for this route.");
-            
+
             isRouting = true;
             routePoints = [...track.properties.stops];
             draw.deleteAll();
@@ -1320,7 +1389,7 @@
         async function updateTaskInline(taskId, field, value) {
             const task = allItinerary.find(t => t.task_id === taskId);
             if (!task || task[field] == value) return;
-            
+
             let payload = { ...task };
             if (field === 'starts_at') {
                 if (!value) { payload.starts_at = null; }
@@ -1328,19 +1397,19 @@
                     // Robust Date Detection:
                     // 1. Is day_label a YYYY-MM-DD? 2. Is there an existing date in starts_at? 3. Use Today.
                     const isIsoDate = (str) => str && /^\d{4}-\d{2}-\d{2}$/.test(str);
-                    let datePart = isIsoDate(task.day_label) ? task.day_label : 
-                                   (task.starts_at ? task.starts_at.split('T')[0] : new Date().toISOString().split('T')[0]);
+                    let datePart = isIsoDate(task.day_label) ? task.day_label :
+                        (task.starts_at ? task.starts_at.split('T')[0] : new Date().toISOString().split('T')[0]);
                     payload.starts_at = `${datePart}T${value}:00.000Z`;
                 }
             } else {
                 payload[field] = value;
             }
-            
+
             try {
-                const res = await fetch(`${API_URL}/tasks/${taskId}`, { 
-                    method: 'PUT', 
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY }, 
-                    body: JSON.stringify(payload) 
+                const res = await fetch(`${API_URL}/tasks/${taskId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                    body: JSON.stringify(payload)
                 });
                 if (!res.ok) throw new Error("Server Error");
                 refreshData();
@@ -1366,7 +1435,7 @@
         }
 
         async function deleteSection(day) {
-            if(!confirm(`Delete all tasks in ${day}?`)) return;
+            if (!confirm(`Delete all tasks in ${day}?`)) return;
             await fetch(`${API_URL}/tasks/section/${day}`, { method: 'DELETE', headers: { 'x-api-key': ADMIN_KEY } });
             refreshData();
         }
@@ -1379,7 +1448,7 @@
             document.getElementById('wp-title').value = task.task;
             document.getElementById('target-group').value = task.target_group || 'Hikers';
             document.getElementById('day-label').value = task.day_label || '';
-            document.getElementById('starts-at').value = task.starts_at ? task.starts_at.substring(0,16) : '';
+            document.getElementById('starts-at').value = task.starts_at ? task.starts_at.substring(0, 16) : '';
             document.getElementById('responsible').value = task.responsible || '';
             document.getElementById('is-completed').checked = task.is_completed;
             document.getElementById('task-comments').value = task.comments || '';
@@ -1390,8 +1459,8 @@
 
         function exportTaskToGPX(taskId) {
             const task = allItinerary.find(t => t.task_id === taskId);
-            if(!task || !task.geometries || task.geometries.length === 0) return alert('No locations to export for this task.');
-            
+            if (!task || !task.geometries || task.geometries.length === 0) return alert('No locations to export for this task.');
+
             let gpx = '<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="ExpeditionDashboard">';
             task.geometries.forEach(g => {
                 if (g.kind === 'point') {
@@ -1405,11 +1474,11 @@
                 }
             });
             gpx += '</gpx>';
-            
-            const blob = new Blob([gpx], {type: 'application/gpx+xml'});
+
+            const blob = new Blob([gpx], { type: 'application/gpx+xml' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url; 
+            a.href = url;
             a.download = `${task.task.replace(/\s+/g, '_')}_export.gpx`;
             a.click();
             URL.revokeObjectURL(url);
@@ -1424,7 +1493,7 @@
             const typeFilter = document.getElementById('type-filter').value;
             const filtered = allItinerary.filter(t => {
                 // Instead of a global replace, use this safe check:
-                const name = t.task_name || t.task || ""; 
+                const name = t.task_name || t.task || "";
                 const matchSearch = name.toLowerCase().includes(searchTerm);
                 const matchGroup = !groupFilter || t.target_group === groupFilter;
                 const matchType = !typeFilter || t.task_type === typeFilter;
@@ -1441,7 +1510,7 @@
             const showAssignee = document.getElementById('col-assignee').checked;
             const showTime = document.getElementById('col-time').checked;
             const showGroup = document.getElementById('col-group').checked;
-            
+
             // Grid: Name (1.5fr), Desc (1fr), Assignee (100px), Time (100px), Actions (100px)
             let gridCols = '1.5fr 1fr ';
             if (showAssignee) gridCols += '90px ';
@@ -1452,7 +1521,7 @@
             for (const [day, tasks] of Object.entries(groups)) {
                 const section = document.createElement('div');
                 section.className = 'asana-section';
-                
+
                 // Force a date picker for all sections, even if they have custom text names
                 const isDate = !isNaN(Date.parse(day)) && day.includes('-');
                 const dateVal = isDate ? day : '';
@@ -1482,13 +1551,13 @@
                 taskListContainer.dataset.section = day;
 
                 tasks.forEach(task => {
-                    if (task.parent_id) return; 
+                    if (task.parent_id) return;
                     const card = renderTaskCard(taskListContainer, task, gridCols, allItinerary);
                     if (task.task_id === activeTaskId) {
                         card.querySelector('.task-row').classList.add('active-task');
                     }
                 });
-                
+
                 // Inject Inline "+ Add Task" button
                 const inlineAdd = document.createElement('div');
                 inlineAdd.style.padding = '10px 15px';
@@ -1497,7 +1566,7 @@
                 section.appendChild(inlineAdd);
                 container.appendChild(section);
             }
-            
+
             // Inject Inline "+ Add Section" button
             const newSectionDiv = document.createElement('div');
             newSectionDiv.style.marginTop = '30px';
@@ -1510,21 +1579,21 @@
                     group: 'shared',
                     animation: 150,
                     onEnd: async function (evt) {
-                        const itemEl = evt.item; 
-                        const newSectionList = evt.to; 
+                        const itemEl = evt.item;
+                        const newSectionList = evt.to;
                         const newSectionName = newSectionList.dataset.section;
-                        
+
                         const taskRow = itemEl.querySelector('.task-row');
                         if (!taskRow) return;
                         const taskId = parseInt(taskRow.id.replace('task-row-', ''));
-                        
+
                         const task = allItinerary.find(t => t.task_id === taskId);
                         if (task && task.day_label !== newSectionName) {
                             task.day_label = newSectionName === 'Unscheduled' ? null : newSectionName;
-                            await fetch(`${API_URL}/tasks/${taskId}`, { 
-                                method: 'PUT', 
-                                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY }, 
-                                body: JSON.stringify(task) 
+                            await fetch(`${API_URL}/tasks/${taskId}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                                body: JSON.stringify(task)
                             });
                         }
                         refreshData();
@@ -1536,23 +1605,23 @@
         function renderTaskCard(parentContainer, task, gridCols, allTasks) {
             const timeOnly = (task.starts_at && task.starts_at.length >= 16) ? task.starts_at.substring(11, 16) : '';
             const doneUI = task.is_completed ? '✅ ' : '';
-            
+
             const taskContainer = document.createElement('div');
             taskContainer.style.marginLeft = task.parent_id ? '20px' : '0';
             taskContainer.style.borderLeft = task.parent_id ? '2px solid #ddd' : 'none';
-            
+
             const taskEl = document.createElement('div');
             taskEl.className = 'task-row';
             taskEl.id = `task-row-${task.task_id}`;
             taskEl.style.gridTemplateColumns = gridCols;
             if (task.is_completed) taskEl.style.opacity = '0.6';
-            
+
             taskEl.onclick = () => {
                 document.querySelectorAll('.task-row').forEach(row => row.classList.remove('active-task'));
                 taskEl.classList.add('active-task');
-                activeTaskId = task.task_id; 
+                activeTaskId = task.task_id;
                 const acc = document.getElementById(`acc-${task.task_id}`);
-                if(acc) acc.classList.toggle('open');
+                if (acc) acc.classList.toggle('open');
             };
 
             const showAssignee = document.getElementById('col-assignee').checked;
@@ -1563,7 +1632,7 @@
             if (showAssignee) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'responsible', this.innerText)" onclick="event.stopPropagation()">${task.responsible || '-'}</span></div>`;
             if (showTime) cellsHtml += `<div class="task-cell time"><input type="time" class="inline-edit" style="width:100%" value="${timeOnly}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()"></div>`;
             if (showGroup) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'target_group', this.innerText)" onclick="event.stopPropagation()">${task.target_group || '-'}</span></div>`;
-            
+
             cellsHtml += `
                 <div class="task-cell" style="gap:2px;">
                     <button class="edit-btn" title="Add Subtask" onclick="event.stopPropagation(); createSubtask(${task.task_id}, '${task.day_label || ''}')">➕</button>
@@ -1575,7 +1644,7 @@
             const accordionEl = document.createElement('div');
             accordionEl.className = 'task-accordion';
             accordionEl.id = `acc-${task.task_id}`;
-            
+
             let geomHtml = '';
             (task.geometries || []).forEach(g => {
                 const emoji = g.kind === 'point' ? '📍' : (g.kind === 'polygon' ? '🛑' : '📈');
@@ -1630,26 +1699,30 @@
         async function createSubtask(parentId, dayLabel) {
             const name = prompt("Enter subtask name:");
             if (!name) return;
-            await fetch(`${API_URL}/tasks`, { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY }, 
-                body: JSON.stringify({ task_name: name, day_label: dayLabel, parent_id: parentId }) 
+            await fetch(`${API_URL}/tasks`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                body: JSON.stringify({ task_name: name, day_label: dayLabel, parent_id: parentId })
             });
             refreshData();
         }
 
         async function createInlineTask(inputElement, dayLabel) {
             const taskName = inputElement.value.trim();
-            if(!taskName) return;
+            if (!taskName) return;
             inputElement.disabled = true;
             try {
-                await fetch(`${API_URL}/tasks`, { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY }, 
-                    body: JSON.stringify({ task_name: taskName, day_label: dayLabel === 'Unscheduled' ? null : dayLabel }) 
+                await fetch(`${API_URL}/tasks`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                    body: JSON.stringify({ task_name: taskName, day_label: dayLabel === 'Unscheduled' ? null : dayLabel })
                 });
                 refreshData();
-            } catch(e) { alert("Error adding task"); inputElement.disabled = false; }
+            } catch (e) {
+                console.error(e);
+                alert("Error adding task");
+                inputElement.disabled = false;
+            }
         }
 
         function startEditGeometry(taskId, anchorId) {
@@ -1662,12 +1735,12 @@
             if (popups.length) popups[0].remove();
 
             isEditingGeometry = true;
-            activeTaskId = taskId; 
-            
+            activeTaskId = taskId;
+
             draw.deleteAll();
             let centerPoint;
             const editConfig = { kind: geom.kind, id: geom.waypoint_id || geom.track_id };
-            
+
             if (geom.kind === 'point') {
                 const feature = { type: 'Feature', geometry: { type: 'Point', coordinates: [geom.lng, geom.lat] }, properties: {} };
                 draw.add(feature);
@@ -1682,30 +1755,30 @@
         }
 
         // GPX Upload Handler
-        document.getElementById('gpx-file').addEventListener('change', function(e) {
+        document.getElementById('gpx-file').addEventListener('change', function (e) {
             const file = e.target.files[0];
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = function(event) {
+            reader.onload = function (event) {
                 try {
                     const gpxString = event.target.result;
                     const parser = new DOMParser();
                     const gpxXml = parser.parseFromString(gpxString, "text/xml");
-                    
+
                     // Convert GPX to GeoJSON using the imported toGeoJSON library
                     const geojson = toGeoJSON.gpx(gpxXml);
 
                     if (geojson && geojson.features.length > 0) {
                         draw.deleteAll();
                         draw.add(geojson);
-                        
+
                         const feature = geojson.features[0];
                         const centerPoint = feature.geometry.type === 'Polygon' ? feature.geometry.coordinates[0][0] : feature.geometry.coordinates[Math.floor(feature.geometry.coordinates.length / 2)];
-                        
+
                         // Send straight to the Context Popup
                         showGeometryContextPopup(centerPoint, feature.geometry, file.name.replace('.gpx', ''), '');
-                        
+
                         // Zoom map to the uploaded track bounds
                         const bbox = turf.bbox(geojson);
                         map.fitBounds(bbox, { padding: 50 });
@@ -1723,10 +1796,10 @@
         });
 
         // CSV Asana Importer
-        document.getElementById('csv-file').addEventListener('change', function(e) {
+        document.getElementById('csv-file').addEventListener('change', function (e) {
             const file = e.target.files[0];
             if (!file) return;
-            
+
             document.getElementById('loading-overlay').style.display = 'flex';
             document.getElementById('loading-overlay').innerHTML = '<h2>Parsing CSV...</h2>';
 
@@ -1742,7 +1815,7 @@
                         const taskName = row['Name'] || row['Task Name'];
                         const asanaId = row['Task ID'] || row['gid'];
                         const parentAsanaId = row['Parent Task'] || row['parent_gid'];
-                        
+
                         if (!taskName) continue;
 
                         const taskData = {
@@ -1766,7 +1839,7 @@
                             successCount++;
                         } catch (err) { console.error("Failed to import task:", taskName); }
                     }
-                    
+
                     document.getElementById('loading-overlay').style.display = 'none';
                     e.target.value = ''; // Reset input
                     alert(`Successfully imported ${successCount} tasks from CSV!`);
