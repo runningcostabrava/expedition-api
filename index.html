@@ -17,6 +17,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -436,6 +437,9 @@
                 📁 Upload GPX
                 <input type="file" id="gpx-file" accept=".gpx" style="display: none;">
             </label>
+            <label class="tool-btn" style="cursor: pointer; padding: 8px 15px; background: #fff; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;">📄 Import CSV
+                <input type="file" id="csv-file" accept=".csv" style="display:none;">
+            </label>
             <select id="route-profile" style="width: auto; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
                 <option value="driving">🚗 Drive</option>
                 <option value="walking">🚶 Walk</option>
@@ -695,20 +699,46 @@
                         });
 
                         map.on('click', layerId, (e) => {
+                            focusTaskInSidebar(task.task_id);
                             const dist = turf.length(geom.geojson, { units: 'kilometers' }).toFixed(2);
-                            new mapboxgl.Popup().setLngLat(e.lngLat).setHTML(`
-                                <h4>${geom.kind === 'polygon' ? '🛑' : '📈'} ${geom.title}</h4>
-                                <p>Dist: ${dist} km | Task: ${task.task}</p>
-                                <div style="display:flex; gap:5px;">
-                                    <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})">Edit</button>
-                                    <button onclick="startSegmentAnalysis(${task.task_id}, ${geom.track_id})">Analyze</button>
-                                </div>
-                            `).addTo(map);
+                            
+                            // Calculate Elevation Gain/Loss
+                            let gain = 0, loss = 0;
+                            const coords = geom.geojson.features[0].geometry.type === 'Polygon' ? geom.geojson.features[0].geometry.coordinates[0] : geom.geojson.features[0].geometry.coordinates;
+                            for (let i = 1; i < coords.length; i++) {
+                                const diff = (coords[i][2] || 0) - (coords[i-1][2] || 0);
+                                if (diff > 0) gain += diff;
+                                else loss -= diff;
+                            }
+
+                            new mapboxgl.Popup()
+                                .setLngLat(e.lngLat)
+                                .setHTML(`
+                                    <h4>${geom.kind === 'polygon' ? '🛑' : '📈'} ${geom.title}</h4>
+                                    <p style="margin: 5px 0;">Distance: ${dist} km</p>
+                                    <p style="margin: 0; font-size: 0.9em; color: #666;">Task: ${task.task}</p>
+                                    <p style="margin: 5px 0; font-size: 0.85em; color: #333;">🔺 +${gain.toFixed(0)}m | 🔻 ${loss.toFixed(0)}m</p>
+                                    <div style="margin-top: 10px; display: flex; gap: 5px;">
+                                        <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="padding: 5px 10px; flex: 1;">Edit</button>
+                                        <button onclick="startSegmentAnalysis(${task.task_id}, ${geom.track_id})" style="padding: 5px 10px; flex: 1;">Analyze</button>
+                                    </div>
+                                `)
+                                .addTo(map);
+                            
                             showElevationProfile(geom.geojson, geom.title);
                         });
                     }
                 });
             });
+        }
+
+        function focusTaskInSidebar(taskId) {
+            const row = document.getElementById(`task-row-${taskId}`);
+            if (row) {
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const acc = document.getElementById(`acc-${taskId}`);
+                if (acc && !acc.classList.contains('open')) acc.classList.add('open');
+            }
         }
 
         function startSegmentAnalysis(taskId, trackId) {
@@ -723,6 +753,8 @@
             alert("Analysis: Click two points on the track to create a subsection.");
         }
 
+        let elevationHoverMarker = null;
+
         function showElevationProfile(geojson, title) {
             document.getElementById('elevation-panel').style.display = 'block';
             let distances = [0], elevations = [], cumulative = 0;
@@ -736,7 +768,29 @@
             elevationChart = new Chart(document.getElementById('elevation-chart'), {
                 type: 'line',
                 data: { labels: distances, datasets: [{ label: title, data: elevations, fill: true, tension: 0.4 }] },
-                options: { responsive: true, maintainAspectRatio: false }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { display: true } },
+                    scales: { y: { beginAtZero: false, title: { display: true, text: 'Elevation (m)' } }, x: { title: { display: true, text: 'Distance (km)' } } },
+                    onHover: (e, activeElements) => {
+                        if (activeElements.length > 0) {
+                            const index = activeElements[0].index;
+                            const activeCoord = coords[index];
+                            if (!elevationHoverMarker) {
+                                const el = document.createElement('div');
+                                el.style.width = '14px'; el.style.height = '14px';
+                                el.style.backgroundColor = '#e74c3c'; el.style.borderRadius = '50%';
+                                el.style.border = '2px solid white';
+                                el.style.boxShadow = '0 0 4px rgba(0,0,0,0.5)';
+                                elevationHoverMarker = new mapboxgl.Marker({ element: el }).setLngLat([activeCoord[0], activeCoord[1]]).addTo(map);
+                            } else {
+                                elevationHoverMarker.setLngLat([activeCoord[0], activeCoord[1]]);
+                            }
+                        }
+                    }
+                }
             });
         }
 
@@ -1049,11 +1103,14 @@
                             const emoji = g.kind === 'point' ? '📍' : (g.kind === 'polygon' ? '🛑' : '📈');
                             const color = g.color || '#3498db';
                             geomHtml += `
-                                <div class="geom-row" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})">
-                                    <div class="geom-info">
+                                <div class="geom-row">
+                                    <div class="geom-info" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})" style="cursor:pointer; flex:1;">
                                         <span>${emoji}</span><span class="color-dot" style="background-color: ${color}"></span><span>${g.title}</span>
                                     </div>
-                                    <button class="delete-btn" onclick="event.stopPropagation(); deleteGeometry('${g.kind}', ${g.waypoint_id || g.track_id})">🗑️</button>
+                                    <div style="display: flex; gap: 5px;">
+                                        <button class="edit-btn" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})">⚙️</button>
+                                        <button class="delete-btn" onclick="event.stopPropagation(); deleteGeometry('${g.kind}', ${g.waypoint_id || g.track_id})">🗑️</button>
+                                    </div>
                                 </div>
                             `;
                         });
@@ -1163,6 +1220,50 @@
                 e.target.value = '';
             };
             reader.readAsText(file);
+        });
+
+        // CSV Asana Importer
+        document.getElementById('csv-file').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            document.getElementById('loading-overlay').style.display = 'flex';
+            document.getElementById('loading-overlay').innerHTML = '<h2>Parsing CSV...</h2>';
+
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: async function(results) {
+                    const tasks = results.data;
+                    let successCount = 0;
+
+                    for (const row of tasks) {
+                        const taskName = row['Name'] || row['Task Name'];
+                        if (!taskName) continue;
+
+                        const taskData = {
+                            task_name: taskName,
+                            responsible: row['Assignee'] || '',
+                            day_label: row['Section/Column'] || 'Unscheduled',
+                            comments: row['Description'] || row['Notes'] || ''
+                        };
+
+                        try {
+                            await fetch(`${API_URL}/tasks`, { 
+                                method: 'POST', 
+                                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY }, 
+                                body: JSON.stringify(taskData) 
+                            });
+                            successCount++;
+                        } catch (err) { console.error("Failed to import task:", taskName); }
+                    }
+                    
+                    document.getElementById('loading-overlay').style.display = 'none';
+                    e.target.value = ''; // Reset input
+                    alert(`Successfully imported ${successCount} tasks from CSV!`);
+                    refreshData();
+                }
+            });
         });
 
         initializeApp();
