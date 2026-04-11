@@ -995,18 +995,28 @@
         }
 
         async function refreshData() {
-            const res = await fetch(`${API_URL}/itinerary`);
-            allItinerary = await res.json();
-            const dropdown = document.getElementById('existing-task');
-            dropdown.innerHTML = '<option value="">-- Create New Task --</option>';
-            allItinerary.forEach(t => {
-                const option = document.createElement('option');
-                option.value = t.task_id;
-                option.textContent = t.task;
-                dropdown.appendChild(option);
-            });
-            renderProjectView();
-            renderMapGeometries();
+            try {
+                const res = await fetch(`${API_URL}/itinerary`);
+                if (!res.ok) throw new Error("Failed to fetch itinerary");
+                const data = await res.json();
+                allItinerary = Array.isArray(data) ? data : [];
+                
+                const dropdown = document.getElementById('existing-task');
+                dropdown.innerHTML = '<option value="">-- Create New Task --</option>';
+                allItinerary.forEach(t => {
+                    const option = document.createElement('option');
+                    option.value = t.task_id;
+                    option.textContent = t.task;
+                    dropdown.appendChild(option);
+                });
+                renderProjectView();
+                renderMapGeometries();
+            } catch (err) {
+                console.error("Data Load Error:", err);
+                if (allItinerary.length === 0) {
+                    document.getElementById('asana-container').innerHTML = `<div style="padding: 20px; color: #e74c3c;">⚠️ Cannot connect to database. If you recently updated the schema, please click 'Sync DB Schema' in the New Task menu.</div>`;
+                }
+            }
         }
 
         function resetForm() {
@@ -1055,6 +1065,19 @@
             lastCalculatedRoute = null;
             map.getCanvas().style.cursor = 'crosshair';
             alert("Multi-stop Route: Click points on the map sequentially. Press ENTER to save, or ESC to cancel.");
+        }
+
+        async function syncDbSchema() {
+            try {
+                const res = await fetch(`${API_URL}/setup-db`, { 
+                    headers: { 'x-api-key': ADMIN_KEY } 
+                });
+                const msg = await res.text();
+                alert(msg);
+                refreshData();
+            } catch (err) {
+                alert("Error syncing DB: " + err.message);
+            }
         }
 
         function changeMapStyle(style) { 
