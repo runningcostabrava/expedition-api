@@ -1385,7 +1385,7 @@
                 // Force a date picker for all sections, even if they have custom text names
                 const isDate = !isNaN(Date.parse(day)) && day.includes('-');
                 const dateVal = isDate ? day : '';
-                const textVal = isDate ? 'Select Date' : day;
+                const textVal = day;
 
                 section.innerHTML = `
                     <div class="asana-header">
