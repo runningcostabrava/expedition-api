@@ -87,6 +87,11 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       ALTER TABLE tracks ADD COLUMN IF NOT EXISTS gain NUMERIC;
       ALTER TABLE tracks ADD COLUMN IF NOT EXISTS loss NUMERIC;
       ALTER TABLE tracks ADD COLUMN IF NOT EXISTS parent_track_id INTEGER;
+
+      ALTER TABLE tracks ADD COLUMN IF NOT EXISTS link TEXT;
+      ALTER TABLE tracks ADD COLUMN IF NOT EXISTS comments TEXT;
+      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS link TEXT;
+      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS comments TEXT;
     `);
 
     res.send("Database tables created and updated successfully with v3.0 Task-Centric model!");
@@ -323,40 +328,44 @@ app.delete('/tracks/:id', adminAuth, async (req, res) => {
 // 4. ITINERARY: View Project Plan
 app.get('/itinerary', async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT 
-        t.id as task_id, t.task_name as task, t.responsible, t.target_group, t.task_type,
-        t.day_label, t.starts_at, t.ends_at, t.is_completed, t.comments, t.parent_id,
-        COALESCE(
-          json_agg(
-            json_build_object(
-              'anchor_id', sa.id,
-              'kind', sa.kind,
-              'waypoint_id', w.id,
-              'track_id', tr.id,
-              'title', COALESCE(w.title, tr.title),
-              'lat', w.lat, 'lng', w.lng,
-              'color', COALESCE(w.color, tr.color),
-              'geojson', tr.geojson_data,
-              'link', COALESCE(w.link, tr.link),
-              'comments', COALESCE(w.comments, tr.comments),
-              'distance', COALESCE(w.distance, tr.distance),
-              'gain', COALESCE(w.gain, tr.gain),
-              'loss', COALESCE(w.loss, tr.loss),
-              'parent_track_id', COALESCE(w.parent_track_id, tr.parent_track_id)
-            )
-          ) FILTER (WHERE sa.id IS NOT NULL), '[]'
-        ) as geometries
+    const query = `
+      SELECT t.*,
+             COALESCE(
+               json_agg(
+                 json_build_object(
+                   'anchor_id', ta.anchor_id,
+                   'waypoint_id', w.id,
+                   'track_id', tr.id,
+                   'kind', CASE WHEN w.id IS NOT NULL THEN 'point' ELSE 'line' END,
+                   'title', COALESCE(w.title, tr.title),
+                   'color', COALESCE(w.color, tr.color),
+                   'icon', w.icon,
+                   'lat', w.lat,
+                   'lng', w.lng,
+                   'geojson', tr.geojson_data,
+                   'link', COALESCE(w.link, tr.link),
+                   'comments', COALESCE(w.comments, tr.comments),
+                   'distance', tr.distance,
+                   'gain', tr.gain,
+                   'loss', tr.loss,
+                   'parent_track_id', tr.parent_track_id
+                 )
+               ) FILTER (WHERE ta.anchor_id IS NOT NULL), '[]'
+             ) as geometries
       FROM tasks t
       LEFT JOIN task_anchors ta ON t.id = ta.task_id
       LEFT JOIN spatial_anchors sa ON ta.anchor_id = sa.id
       LEFT JOIN waypoints w ON sa.waypoint_id = w.id
       LEFT JOIN tracks tr ON sa.track_id = tr.id
       GROUP BY t.id
-      ORDER BY t.starts_at ASC NULLS LAST, t.day_label ASC;
-    `);
+      ORDER BY t.day_label, t.starts_at;
+    `;
+    const result = await pool.query(query);
     res.json(result.rows);
-  } catch (err) { res.status(500).send({ error: err.message }); }
+  } catch (err) {
+    console.error("ITINERARY ERROR:", err.message);
+    res.status(500).json({ error: "Database query failed", details: err.message });
+  }
 });
 
 app.get('/api/config', (req, res) => {
