@@ -421,6 +421,12 @@
                 <label><input type="checkbox" id="col-time" checked onchange="renderProjectView()"> Time</label>
                 <label><input type="checkbox" id="col-group" onchange="renderProjectView()"> Group</label>
             </div>
+            <div style="margin: 10px 15px; font-size: 0.9em;">
+                <strong>Show on Map: </strong>
+                <label><input type="checkbox" id="filter-points" checked onchange="updateFilters()"> 📍 Waypoints</label>
+                <label><input type="checkbox" id="filter-lines" checked onchange="updateFilters()"> 📈 Tracks</label>
+                <label><input type="checkbox" id="filter-polygons" checked onchange="updateFilters()"> 🛑 Zones</label>
+            </div>
         </div>
         <div id="asana-container"></div>
     </div>
@@ -543,6 +549,15 @@
         let map, draw;
         let activeMarkers = [];
         let allTracks = [], allItinerary = [];
+        let mapFilters = { point: true, line: true, polygon: true };
+
+        function updateFilters() {
+            mapFilters.point = document.getElementById('filter-points').checked;
+            mapFilters.line = document.getElementById('filter-lines').checked;
+            mapFilters.polygon = document.getElementById('filter-polygons').checked;
+            renderMapGeometries();
+        }
+
         let activeTaskId = null, activeAnchorId = null, activeWaypointId = null, activeTrackId = null;
         let isEditingGeometry = false, isRouting = false, isAnalyzingSegment = false;
         let routePoints = [], segmentPoints = [], activeAnalysisTrack = null;
@@ -615,11 +630,21 @@
                             const res = await fetch(`https://api.mapbox.com/directions/v5/mapbox/${profile}/${coords}?geometries=geojson&access_token=${mapboxgl.accessToken}`);
                             const data = await res.json();
                             if (data.routes && data.routes.length > 0) {
+                                const route = data.routes[0];
                                 draw.deleteAll(); // This also clears our temp-start-point
-                                draw.add(data.routes[0].geometry);
+                                draw.add(route.geometry);
+
+                                // Calculate Route Stats
+                                const distKm = (route.distance / 1000).toFixed(2);
+                                const durationMins = Math.round(route.duration / 60);
+
                                 resetForm();
                                 document.getElementById('color-picker-group').style.display = 'block';
                                 document.getElementById('wp-title').value = `New ${profile} route`;
+
+                                // Inject stats into the description box
+                                document.getElementById('task-comments').value = `🚗 Smart Route Stats:\n- Distance: ${distKm} km\n- Est. Time: ${durationMins} mins\n\n`;
+
                                 openModal();
                             } else {
                                 alert("No valid route found between these two points.");
@@ -677,6 +702,9 @@
             allItinerary.forEach(task => {
                 if (!task.geometries) return;
                 task.geometries.forEach(geom => {
+                    // Skip rendering if the filter for this geometry type is unchecked
+                    if (!mapFilters[geom.kind]) return;
+
                     const renderColor = geom.color || groupColors[task.target_group] || '#3498db';
                     if (geom.kind === 'point' && geom.lat && geom.lng) {
                         const marker = new mapboxgl.Marker({ color: renderColor })
@@ -1059,7 +1087,8 @@
                 tasks.forEach(task => {
                     if (task.parent_id) return; // Skip subtasks for now, handled in next phase
 
-                    const startTime = task.starts_at ? task.starts_at.substring(0,16) : '';
+                    // Extract just the HH:MM from the ISO string
+                    const timeOnly = task.starts_at ? task.starts_at.substring(11, 16) : '';
                     const doneUI = task.is_completed ? '✅ ' : '';
                     
                     const taskContainer = document.createElement('div');
@@ -1081,7 +1110,7 @@
 
                     let cellsHtml = `<div class="task-cell name"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">${doneUI}${task.task}</span></div>`;
                     if (showAssignee) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'responsible', this.innerText)" onclick="event.stopPropagation()">${task.responsible || '-'}</span></div>`;
-                    if (showTime) cellsHtml += `<div class="task-cell time"><input type="datetime-local" class="inline-edit" style="width:100%" value="${startTime}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()"></div>`;
+                    if (showTime) cellsHtml += `<div class="task-cell time"><input type="time" class="inline-edit" style="width:100%" value="${timeOnly}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()"></div>`;
                     if (showGroup) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'target_group', this.innerText)" onclick="event.stopPropagation()">${task.target_group || '-'}</span></div>`;
                     
                     cellsHtml += `
