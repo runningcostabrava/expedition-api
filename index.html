@@ -883,11 +883,16 @@
         function startSegmentAnalysis(taskId, trackId) {
             const task = allItinerary.find(t => t.task_id === taskId);
             const geom = task?.geometries.find(g => g.track_id === trackId);
-            if (!geom) return;
+            if (!geom) { alert("Track not found!"); return; }
+            
+            // Clear mapbox popups that might trap the click
+            const popups = document.getElementsByClassName('mapboxgl-popup');
+            if (popups.length) popups[0].remove();
+
             isAnalyzingSegment = true;
             segmentPoints = [];
             activeAnalysisTrack = geom.geojson;
-            activeTaskId = taskId; // Set this so we know which task to link the subsection to
+            activeTaskId = taskId; 
             map.getCanvas().style.cursor = 'crosshair';
             alert("Analysis: Click two points on the track to create a subsection.");
         }
@@ -935,7 +940,7 @@
 
         let activeContextPopup = null;
 
-        function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText) {
+        function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, editConfig = null) {
             if (activeContextPopup) activeContextPopup.remove();
             
             const taskWarning = activeTaskId ? `<div style="color:#27ae60; font-size:0.8em; margin-bottom:10px;">✅ Attaching to highlighted task</div>` : `<div style="color:#e74c3c; font-size:0.8em; margin-bottom:10px;">⚠️ No Task Selected (Will save unassigned)</div>`;
@@ -978,17 +983,34 @@
                 
                 try {
                     const headers = { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY };
-                    if (geometry.type === 'Point') {
-                        await fetch(`${API_URL}/waypoints`, {
-                            method: 'POST', headers, body: JSON.stringify({ title, color, icon, existing_task_id: activeTaskId, lat: geometry.coordinates[1], lng: geometry.coordinates[0], description: finalDesc })
-                        });
+                    
+                    if (editConfig) {
+                        // UPDATE Existing Shape (PUT)
+                        if (editConfig.kind === 'point') {
+                            await fetch(`${API_URL}/waypoints/${editConfig.id}`, {
+                                method: 'PUT', headers, body: JSON.stringify({ title, color, icon, lat: geometry.coordinates[1], lng: geometry.coordinates[0], description: finalDesc })
+                            });
+                        } else {
+                            await fetch(`${API_URL}/tracks/${editConfig.id}`, {
+                                method: 'PUT', headers, body: JSON.stringify({ title, color, geojson_data: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry }] }, description: finalDesc })
+                            });
+                        }
                     } else {
-                        await fetch(`${API_URL}/tracks`, {
-                            method: 'POST', headers, body: JSON.stringify({ title, color, existing_task_id: activeTaskId, geojson_data: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry }] }, description: finalDesc })
-                        });
+                        // CREATE New Shape (POST)
+                        if (geometry.type === 'Point') {
+                            await fetch(`${API_URL}/waypoints`, {
+                                method: 'POST', headers, body: JSON.stringify({ title, color, icon, existing_task_id: activeTaskId, lat: geometry.coordinates[1], lng: geometry.coordinates[0], description: finalDesc })
+                            });
+                        } else {
+                            await fetch(`${API_URL}/tracks`, {
+                                method: 'POST', headers, body: JSON.stringify({ title, color, existing_task_id: activeTaskId, geojson_data: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry }] }, description: finalDesc })
+                            });
+                        }
                     }
+                    
                     activeContextPopup.remove();
                     draw.deleteAll();
+                    isEditingGeometry = false;
                     refreshData();
                 } catch (err) { alert('Error saving shape.'); document.getElementById('ctx-save').innerText = 'Save Shape'; }
             };
@@ -1452,27 +1474,30 @@
         function startEditGeometry(taskId, anchorId) {
             const task = allItinerary.find(t => t.task_id === taskId);
             const geom = task?.geometries.find(g => g.anchor_id === anchorId);
-            if (!geom) return;
+            if (!geom) { alert("Geometry not found!"); return; }
 
-            // Delete the old geometry first so we can save the edited one as a replacement
-            deleteGeometry(geom.kind, geom.waypoint_id || geom.track_id);
+            // Clear mapbox popups that might trap the click
+            const popups = document.getElementsByClassName('mapboxgl-popup');
+            if (popups.length) popups[0].remove();
 
-            activeTaskId = taskId; // Ensure it stays attached to the same task
+            isEditingGeometry = true;
+            activeTaskId = taskId; 
             
             draw.deleteAll();
             let centerPoint;
+            const editConfig = { kind: geom.kind, id: geom.waypoint_id || geom.track_id };
+            
             if (geom.kind === 'point') {
                 const feature = { type: 'Feature', geometry: { type: 'Point', coordinates: [geom.lng, geom.lat] }, properties: {} };
                 draw.add(feature);
                 centerPoint = [geom.lng, geom.lat];
-                showGeometryContextPopup(centerPoint, feature.geometry, geom.title, '');
+                showGeometryContextPopup(centerPoint, feature.geometry, geom.title, '', editConfig);
             } else if (geom.geojson) {
                 draw.add(geom.geojson);
                 const feature = geom.geojson.features[0];
                 centerPoint = feature.geometry.type === 'Polygon' ? feature.geometry.coordinates[0][0] : feature.geometry.coordinates[Math.floor(feature.geometry.coordinates.length / 2)];
-                showGeometryContextPopup(centerPoint, feature.geometry, geom.title, '');
+                showGeometryContextPopup(centerPoint, feature.geometry, geom.title, '', editConfig);
             }
-            alert("Drag the white vertices to edit the shape. Click 'Save Shape' on the popup when finished.");
         }
 
         // GPX Upload Handler
@@ -1494,12 +1519,11 @@
                         draw.deleteAll();
                         draw.add(geojson);
                         
-                        // Prepare the modal to save the new track
-                        resetForm();
-                        document.getElementById('color-picker-group').style.display = 'block';
-                        // Auto-fill the title with the filename (removing the .gpx extension)
-                        document.getElementById('wp-title').value = file.name.replace('.gpx', '');
-                        openModal();
+                        const feature = geojson.features[0];
+                        const centerPoint = feature.geometry.type === 'Polygon' ? feature.geometry.coordinates[0][0] : feature.geometry.coordinates[Math.floor(feature.geometry.coordinates.length / 2)];
+                        
+                        // Send straight to the Context Popup
+                        showGeometryContextPopup(centerPoint, feature.geometry, file.name.replace('.gpx', ''), '');
                         
                         // Zoom map to the uploaded track bounds
                         const bbox = turf.bbox(geojson);
