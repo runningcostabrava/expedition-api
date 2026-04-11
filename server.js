@@ -38,6 +38,7 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       ALTER TABLE tasks ADD COLUMN IF NOT EXISTS responsible TEXT;
       ALTER TABLE tasks ADD COLUMN IF NOT EXISTS characteristics TEXT;
       ALTER TABLE tasks ADD COLUMN IF NOT EXISTS target_group TEXT;
+      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS task_type TEXT;
       ALTER TABLE tasks ADD COLUMN IF NOT EXISTS day_label TEXT;
       ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_completed BOOLEAN DEFAULT false;
       
@@ -82,11 +83,11 @@ app.get('/setup-db', adminAuth, async (req, res) => {
 
 // 2. TRACKS: GPX Upload & Management
 app.post('/tasks', adminAuth, async (req, res) => {
-    const { task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed, comments, parent_id } = req.body;
+    const { task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id } = req.body;
     try {
         const result = await pool.query(
-            'INSERT INTO tasks (task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed, comments, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-            [task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed || false, comments, parent_id]
+            'INSERT INTO tasks (task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+            [task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed || false, comments, parent_id]
         );
         res.json(result.rows[0]);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -94,11 +95,11 @@ app.post('/tasks', adminAuth, async (req, res) => {
 
 app.put('/tasks/:id', adminAuth, async (req, res) => {
     const { id } = req.params;
-    const { task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed, comments, parent_id } = req.body;
+    const { task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id } = req.body;
     try {
         const result = await pool.query(
-            'UPDATE tasks SET task_name=$1, responsible=$2, target_group=$3, day_label=$4, starts_at=$5, ends_at=$6, is_completed=$7, comments=$8, parent_id=$9 WHERE id=$10 RETURNING *',
-            [task_name, responsible, target_group, day_label, starts_at, ends_at, is_completed, comments, parent_id, id]
+            'UPDATE tasks SET task_name=$1, responsible=$2, target_group=$3, task_type=$4, day_label=$5, starts_at=$6, ends_at=$7, is_completed=$8, comments=$9, parent_id=$10 WHERE id=$11 RETURNING *',
+            [task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id, id]
         );
         res.json(result.rows[0]);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -310,7 +311,7 @@ app.get('/itinerary', async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT 
-        t.id as task_id, t.task_name as task, t.responsible, t.target_group, 
+        t.id as task_id, t.task_name as task, t.responsible, t.target_group, t.task_type,
         t.day_label, t.starts_at, t.ends_at, t.is_completed, t.comments, t.parent_id,
         COALESCE(
           json_agg(

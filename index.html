@@ -855,6 +855,22 @@
             });
         }
 
+        function flyToSection(dayLabel) {
+            const sectionTasks = allItinerary.filter(t => (t.day_label || 'Unscheduled') === dayLabel);
+            const features = [];
+            sectionTasks.forEach(task => {
+                if (!task.geometries) return;
+                task.geometries.forEach(g => {
+                    if (g.kind === 'point' && g.lat) features.push(turf.point([g.lng, g.lat]));
+                    else if (g.geojson) features.push(...g.geojson.features);
+                });
+            });
+            if (features.length > 0) {
+                const bbox = turf.bbox(turf.featureCollection(features));
+                map.fitBounds(bbox, { padding: 50, maxZoom: 15, duration: 1500 });
+            }
+        }
+
         function focusTaskInSidebar(taskId) {
             const row = document.getElementById(`task-row-${taskId}`);
             if (row) {
@@ -1129,7 +1145,15 @@
         async function updateTaskInline(taskId, field, value) {
             const task = allItinerary.find(t => t.task_id === taskId);
             if (!task || task[field] == value) return;
-            task[field] = value;
+            
+            if (field === 'starts_at' && value) {
+                const isDate = !isNaN(Date.parse(task.day_label)) && task.day_label.includes('-');
+                const datePart = isDate ? task.day_label : new Date().toISOString().split('T')[0];
+                task[field] = `${datePart}T${value}:00Z`; 
+            } else {
+                task[field] = value;
+            }
+            
             await fetch(`${API_URL}/tasks/${taskId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY }, body: JSON.stringify(task) });
             refreshData();
         }
@@ -1229,11 +1253,12 @@
                 const textVal = isDate ? 'Select Date' : day;
 
                 section.innerHTML = `
-                    <div class="asana-header" style="cursor:pointer; display: flex; align-items: center; gap: 10px;" onclick="flyToSection('${day}')">
-                        <span>▼</span>
-                        <input type="date" value="${dateVal}" class="inline-edit-input" style="padding:2px; font-size:0.8em; color:#7f8c8d; border:1px solid #ddd; border-radius:4px;" onchange="updateSection('${day}', this.value)" onclick="event.stopPropagation()">
-                        <span class="inline-edit" contenteditable="true" style="font-weight:bold;" onblur="updateSection('${day}', this.innerText)" onclick="event.stopPropagation()">${textVal}</span>
-                        <button class="delete-btn" onclick="event.stopPropagation(); deleteSection('${day}')">🗑️</button>
+                    <div class="asana-header" style="display: flex; align-items: center; gap: 10px;">
+                        <span style="cursor:pointer;" onclick="flyToSection('${day}')">▼</span>
+                        <input type="date" value="${dateVal}" class="inline-edit-input" style="padding:2px; font-size:0.8em; color:#7f8c8d; border:1px solid #ddd; border-radius:4px;" onchange="updateSection('${day}', this.value)">
+                        <span class="inline-edit" contenteditable="true" style="font-weight:bold; flex:1;" onblur="updateSection('${day}', this.innerText)">${textVal}</span>
+                        <button class="edit-btn" title="Center Map on Section" onclick="flyToSection('${day}')">🎯</button>
+                        <button class="delete-btn" title="Delete Section" onclick="deleteSection('${day}')">🗑️</button>
                     </div>
                     <div class="task-table-header" style="grid-template-columns: ${gridCols};">
                         <div>Task Name</div>
@@ -1292,7 +1317,17 @@
                     let cellsHtml = `<div class="task-cell name"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">${doneUI}${task.task}</span></div>`;
                     if (showAssignee) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'responsible', this.innerText)" onclick="event.stopPropagation()">${task.responsible || '-'}</span></div>`;
                     if (showTime) cellsHtml += `<div class="task-cell time"><input type="time" class="inline-edit" style="width:100%" value="${timeOnly}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()"></div>`;
-                    if (showGroup) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'target_group', this.innerText)" onclick="event.stopPropagation()">${task.target_group || '-'}</span></div>`;
+                    if (showGroup) cellsHtml += `
+                        <div class="task-cell" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                            <select class="inline-edit-input" style="font-size: 0.85em; padding: 0; margin: 0; border: none; background: transparent; color: #7f8c8d;" onchange="updateTaskInline(${task.task_id}, 'task_type', this.value)" onclick="event.stopPropagation()">
+                                <option value="" ${!task.task_type ? 'selected' : ''}>Type...</option>
+                                <option value="Transport" ${task.task_type === 'Transport' ? 'selected' : ''}>🚗 Transport</option>
+                                <option value="Route" ${task.task_type === 'Route' ? 'selected' : ''}>🗺️ Route</option>
+                                <option value="Accommodation" ${task.task_type === 'Accommodation' ? 'selected' : ''}>🏨 Accommodation</option>
+                                <option value="Activity" ${task.task_type === 'Activity' ? 'selected' : ''}>🧗 Activity</option>
+                            </select>
+                            <span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'target_group', this.innerText)" onclick="event.stopPropagation()">${task.target_group || '-'}</span>
+                        </div>`;
                     
                     cellsHtml += `
                         <div class="task-cell" style="gap:2px;">
