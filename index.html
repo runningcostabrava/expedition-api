@@ -415,18 +415,18 @@
                     <option value="Transport">Transport</option>
                 </select>
             </div>
-            <div id="column-toggles">
-                <strong>Show Columns:</strong>
-                <label><input type="checkbox" id="col-assignee" checked onchange="renderProjectView()"> Assignee</label>
-                <label><input type="checkbox" id="col-time" checked onchange="renderProjectView()"> Time</label>
-                <label><input type="checkbox" id="col-group" onchange="renderProjectView()"> Group</label>
-            </div>
-            <div style="margin: 10px 15px; font-size: 0.9em;">
-                <strong>Show on Map: </strong>
-                <label><input type="checkbox" id="filter-points" checked onchange="updateFilters()"> 📍 Waypoints</label>
-                <label><input type="checkbox" id="filter-lines" checked onchange="updateFilters()"> 📈 Tracks</label>
-                <label><input type="checkbox" id="filter-polygons" checked onchange="updateFilters()"> 🛑 Zones</label>
-            </div>
+                <div style="font-size: 0.85em; margin-top: 10px;">
+                    <strong>Show Columns:</strong>
+                    <label style="margin-left:5px;"><input type="checkbox" id="col-assignee" checked onchange="renderProjectView()"> Assignee</label>
+                    <label style="margin-left:5px;"><input type="checkbox" id="col-time" checked onchange="renderProjectView()"> Time</label>
+                    <label style="margin-left:5px;"><input type="checkbox" id="col-group" onchange="renderProjectView()"> Group</label>
+                </div>
+                <div style="font-size: 0.85em; margin-top: 10px;">
+                    <strong>Show on Map:</strong>
+                    <label style="margin-left:5px;"><input type="checkbox" id="filter-points" checked onchange="updateFilters()"> 📍 Points</label>
+                    <label style="margin-left:5px;"><input type="checkbox" id="filter-lines" checked onchange="updateFilters()"> 📈 Tracks</label>
+                    <label style="margin-left:5px;"><input type="checkbox" id="filter-polygons" checked onchange="updateFilters()"> 🛑 Zones</label>
+                </div>
         </div>
         <div id="asana-container"></div>
     </div>
@@ -550,7 +550,7 @@
         let activeMarkers = [];
         let allTracks = [], allItinerary = [];
         let mapFilters = { point: true, line: true, polygon: true };
-
+        
         function updateFilters() {
             mapFilters.point = document.getElementById('filter-points').checked;
             mapFilters.line = document.getElementById('filter-lines').checked;
@@ -644,7 +644,6 @@
 
                                 // Inject stats into the description box
                                 document.getElementById('task-comments').value = `🚗 Smart Route Stats:\n- Distance: ${distKm} km\n- Est. Time: ${durationMins} mins\n\n`;
-
                                 openModal();
                             } else {
                                 alert("No valid route found between these two points.");
@@ -702,8 +701,7 @@
             allItinerary.forEach(task => {
                 if (!task.geometries) return;
                 task.geometries.forEach(geom => {
-                    // Skip rendering if the filter for this geometry type is unchecked
-                    if (!mapFilters[geom.kind]) return;
+                    if (!mapFilters[geom.kind]) return; // Apply Map Filters
 
                     const renderColor = geom.color || groupColors[task.target_group] || '#3498db';
                     if (geom.kind === 'point' && geom.lat && geom.lng) {
@@ -1087,8 +1085,7 @@
                 tasks.forEach(task => {
                     if (task.parent_id) return; // Skip subtasks for now, handled in next phase
 
-                    // Extract just the HH:MM from the ISO string
-                    const timeOnly = task.starts_at ? task.starts_at.substring(11, 16) : '';
+                    const timeOnly = task.starts_at && task.starts_at.length >= 16 ? task.starts_at.substring(11, 16) : '';
                     const doneUI = task.is_completed ? '✅ ' : '';
                     
                     const taskContainer = document.createElement('div');
