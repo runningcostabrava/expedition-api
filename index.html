@@ -1238,6 +1238,10 @@
         function closeModal() { document.getElementById('command-modal').style.display = 'none'; resetForm(); draw.deleteAll(); }
 
         async function deleteTask(id) {
+            if (!id || id === 'undefined') {
+                console.error("Attempted to delete task with undefined ID");
+                return;
+            }
             if (!confirm("Delete this task?")) return;
             await fetch(`${API_URL}/tasks/${id}`, {
                 method: 'DELETE',
