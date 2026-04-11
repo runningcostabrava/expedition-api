@@ -549,6 +549,7 @@
 
         <div id="elevation-panel">
             <span id="close-elevation" onclick="document.getElementById('elevation-panel').style.display='none'">❌</span>
+            <div id="elevation-stats-header" style="display:flex; gap:20px; padding:8px 15px; background:#f8f9fa; border-bottom:1px solid #ddd; font-size:0.9em; font-weight:bold; color:#2c3e50;"></div>
             <canvas id="elevation-chart"></canvas>
         </div>
     </div>
@@ -757,8 +758,15 @@
                     draw.add(lastCalculatedRoute.geometry);
                     
                     const feature = lastCalculatedRoute.geometry;
-                    feature.properties = { route_type: 'smart', profile: profile };
-                    // Find middle coordinate for the popup
+                    // Persist the original stops so they can be re-edited later
+                    feature.properties = { 
+                        route_type: 'smart', 
+                        profile: profile,
+                        stops: routePoints, 
+                        distance: distKm,
+                        duration: durationMins,
+                        title: `Smart ${profile} Route`
+                    };
                     const centerIndex = Math.floor(feature.coordinates.length / 2);
                     const centerPoint = feature.coordinates[centerIndex];
                     
@@ -870,7 +878,14 @@
                                 `)
                                 .addTo(map);
                             
-                            showElevationProfile(geom.geojson, geom.title);
+                            const props = geom.geojson.features[0].properties || {};
+                            showElevationProfile(geom.geojson, geom.title, {
+                                distance: dist,
+                                duration: props.duration,
+                                profile: props.profile,
+                                gain: gain.toFixed(0),
+                                loss: loss.toFixed(0)
+                            });
                         });
                     }
                 });
@@ -949,11 +964,12 @@
             }
         }
 
+        let activeParentTrackId = null;
         function startSegmentAnalysis(taskId, trackId) {
             const task = allItinerary.find(t => t.task_id === taskId);
             const geom = task?.geometries.find(g => g.track_id === trackId);
             if (!geom) { alert("Track not found!"); return; }
-            
+
             // Clear mapbox popups that might trap the click
             const popups = document.getElementsByClassName('mapboxgl-popup');
             if (popups.length) popups[0].remove();
@@ -961,15 +977,22 @@
             isAnalyzingSegment = true;
             segmentPoints = [];
             activeAnalysisTrack = geom.geojson;
-            activeTaskId = taskId; 
+            activeParentTrackId = trackId;
+            activeTaskId = taskId;
             map.getCanvas().style.cursor = 'crosshair';
             alert("Analysis: Click two points on the track to create a subsection.");
         }
 
         let elevationHoverMarker = null;
 
-        function showElevationProfile(geojson, title) {
+        function showElevationProfile(geojson, title, metadata = null) {
             document.getElementById('elevation-panel').style.display = 'block';
+            const statsHeader = document.getElementById('elevation-stats-header');
+            if (metadata) {
+                statsHeader.innerHTML = `<span>🏁 ${title}</span> <span>📏 ${metadata.distance || 0} km</span> <span style="color:#27ae60;">▲ ${metadata.gain || 0}m</span> <span style="color:#e74c3c;">▼ ${metadata.loss || 0}m</span>`;
+            } else {
+                statsHeader.innerHTML = `<span>🏁 ${title}</span>`;
+            }
             let distances = [0], elevations = [], cumulative = 0;
             const coords = geojson.features[0].geometry.type === 'Polygon' ? geojson.features[0].geometry.coordinates[0] : geojson.features[0].geometry.coordinates;
             coords.forEach((c, i) => {
@@ -1043,6 +1066,9 @@
                 .setDOMContent(popupContent)
                 .addTo(map);
 
+            const segmentTrackId = activeParentTrackId;
+            activeParentTrackId = null;
+
             document.getElementById('ctx-save').onclick = async () => {
                 const title = document.getElementById('ctx-title').value;
                 const link = document.getElementById('ctx-link').value;
@@ -1075,7 +1101,7 @@
                             });
                         } else {
                             await fetch(`${API_URL}/tracks`, {
-                                method: 'POST', headers, body: JSON.stringify({ title, color, existing_task_id: activeTaskId, geojson_data: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry }] }, description: finalDesc })
+                                method: 'POST', headers, body: JSON.stringify({ title, color, existing_task_id: activeTaskId, parent_track_id: segmentTrackId, geojson_data: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry }] }, description: finalDesc })
                             });
                         }
                     }
@@ -1089,11 +1115,12 @@
         }
 
         async function refreshData() {
+            const previousActiveId = activeTaskId; 
             try {
                 const res = await fetch(`${API_URL}/itinerary`);
-                if (!res.ok) throw new Error("Failed to fetch itinerary");
                 const data = await res.json();
                 allItinerary = Array.isArray(data) ? data : [];
+                if (previousActiveId) activeTaskId = previousActiveId;
                 
                 const dropdown = document.getElementById('existing-task');
                 dropdown.innerHTML = '<option value="">-- Create New Task --</option>';
@@ -1259,6 +1286,16 @@
         };
 
         // UI Helpers
+        async function updateGeomMeta(kind, id, field, value) {
+            const route = kind === 'point' ? 'waypoints' : 'tracks';
+            await fetch(`${API_URL}/${route}/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                body: JSON.stringify({ [field]: value })
+            });
+            refreshData();
+        }
+
         async function updateTaskInline(taskId, field, value) {
             const task = allItinerary.find(t => t.task_id === taskId);
             if (!task || task[field] == value) return;
@@ -1287,6 +1324,18 @@
                 if (!res.ok) throw new Error("Server Error");
                 refreshData();
             } catch (e) { console.error("Inline Update Failed:", e); }
+        }
+
+        async function updateGeomMeta(type, id, field, value) {
+            const endpoint = type === 'point' ? `waypoints/${id}` : `tracks/${id}`;
+            try {
+                await fetch(`${API_URL}/${endpoint}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                    body: JSON.stringify({ [field]: value })
+                });
+                refreshData();
+            } catch (e) { console.error("Geom Meta Update Failed:", e); }
         }
 
         async function updateSection(oldDay, newDay) {
@@ -1412,7 +1461,10 @@
 
                 tasks.forEach(task => {
                     if (task.parent_id) return; 
-                    renderTaskCard(taskListContainer, task, gridCols, allItinerary);
+                    const card = renderTaskCard(taskListContainer, task, gridCols, allItinerary);
+                    if (task.task_id === activeTaskId) {
+                        card.querySelector('.task-row').classList.add('active-task');
+                    }
                 });
                 
                 // Inject Inline "+ Add Task" button
@@ -1507,13 +1559,38 @@
                 const emoji = g.kind === 'point' ? '📍' : (g.kind === 'polygon' ? '🛑' : '📈');
                 const layerId = `layer-${g.track_id}`;
                 const isVisible = map.getLayer(layerId) ? map.getLayoutProperty(layerId, 'visibility') !== 'none' : true;
+                const color = g.color || '#3498db';
+                const stats = g.properties || {};
+                const isSegment = g.parent_track_id !== null;
+
                 geomHtml += `
-                    <div class="geom-row">
-                        <div class="geom-info" onclick="event.stopPropagation(); flyToGeometry(${g.lng}, ${g.lat}, '${g.kind}', '${layerId}')" style="cursor:pointer; flex:1;">
-                            <button class="visibility-btn ${!isVisible ? 'hidden' : ''}" onclick="event.stopPropagation(); toggleLayerVisibility('${layerId}', this)">${isVisible ? '👁️' : '🙈'}</button>
-                            <span>${emoji}</span><span class="color-dot" style="background-color: ${g.color || '#3498db'}"></span><span>${g.title}</span>
+                    <div class="geom-row" style="display:flex; flex-direction:column; padding:10px; border-left:4px solid ${color}; margin-bottom:8px; background:#fff; border-radius:4px; box-shadow:0 1px 3px rgba(0,0,0,0.05); ${isSegment ? 'margin-left:20px; border-left-style:dashed;' : ''}">
+                        ${isSegment ? `<div style="font-size:0.7em; color:#95a5a6; margin-bottom:2px;">↳ Segment of ${g.parent_track_name || 'Original'}</div>` : ''}
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div class="geom-info" onclick="event.stopPropagation(); flyToGeometry(${g.lng}, ${g.lat}, '${g.kind}', '${layerId}')" style="cursor:pointer; display:flex; align-items:center; gap:8px;">
+                                <button class="visibility-btn ${!isVisible ? 'hidden' : ''}" onclick="event.stopPropagation(); toggleLayerVisibility('${layerId}', this)">${isVisible ? '👁️' : '🙈'}</button>
+                                <span>${emoji}</span><strong>${g.title}</strong>
+                            </div>
+                            <div style="display: flex; gap: 5px;">
+                                <button class="edit-btn" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})">⚙️</button>
+                                <button class="delete-btn" onclick="event.stopPropagation(); deleteGeometry('${g.kind}', ${g.waypoint_id || g.track_id})">🗑️</button>
+                            </div>
                         </div>
-                        <button class="delete-btn" onclick="event.stopPropagation(); deleteGeometry('${g.kind}', ${g.waypoint_id || g.track_id})">🗑️</button>
+                        ${g.kind === 'line' ? `
+                        <div style="display:flex; gap:12px; margin-top:5px; font-size:0.8em; font-weight:bold; color:#7f8c8d;">
+                            <span>📏 ${stats.distance || '0'}km</span>
+                            <span style="color:#27ae60;">▲ ${stats.gain || '0'}m</span>
+                            <span style="color:#e74c3c;">▼ ${stats.loss || '0'}m</span>
+                        </div>` : ''}
+                        <div style="margin-top:8px; padding-top:8px; border-top:1px solid #eee; display:flex; flex-direction:column; gap:4px; font-size:0.85em;">
+                            <div style="display:flex; align-items:center; gap:5px;">
+                                🔗 <span class="inline-edit" contenteditable="true" style="color:#3498db; text-decoration:underline;" onblur="updateGeomMeta('${g.kind}', ${g.waypoint_id || g.track_id}, 'link', this.innerText)" onclick="event.stopPropagation()">${g.link || 'Add link...'}</span>
+                                ${g.link ? `<a href="${g.link.startsWith('http') ? g.link : 'https://' + g.link}" target="_blank" onclick="event.stopPropagation()">↗️</a>` : ''}
+                            </div>
+                            <div style="display:flex; align-items:center; gap:5px;">
+                                📝 <span class="inline-edit" contenteditable="true" style="font-style:italic; color:#7f8c8d;" onblur="updateGeomMeta('${g.kind}', ${g.waypoint_id || g.track_id}, 'comments', this.innerText)" onclick="event.stopPropagation()">${g.comments || 'Add comment...'}</span>
+                            </div>
+                        </div>
                     </div>`;
             });
             accordionEl.innerHTML = geomHtml || `<div style="color: #95a5a6; font-size: 0.85em; font-style: italic;">No locations attached.</div>`;
@@ -1633,27 +1710,36 @@
             Papa.parse(file, {
                 header: true,
                 skipEmptyLines: true,
-                complete: async function(results) {
+                complete: async function (results) {
                     const tasks = results.data;
+                    const idMapping = {}; // Asana GID -> DB Task ID
                     let successCount = 0;
 
                     for (const row of tasks) {
                         const taskName = row['Name'] || row['Task Name'];
+                        const asanaId = row['Task ID'] || row['gid'];
+                        const parentAsanaId = row['Parent Task'] || row['parent_gid'];
+                        
                         if (!taskName) continue;
 
                         const taskData = {
                             task_name: taskName,
                             responsible: row['Assignee'] || '',
                             day_label: row['Section/Column'] || 'Unscheduled',
-                            comments: row['Description'] || row['Notes'] || ''
+                            comments: row['Description'] || row['Notes'] || '',
+                            parent_id: idMapping[parentAsanaId] || null
                         };
 
                         try {
-                            await fetch(`${API_URL}/tasks`, { 
-                                method: 'POST', 
-                                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY }, 
-                                body: JSON.stringify(taskData) 
+                            const res = await fetch(`${API_URL}/tasks`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                                body: JSON.stringify(taskData)
                             });
+                            const saved = await res.json();
+                            if (asanaId && saved.task_id) {
+                                idMapping[asanaId] = saved.task_id;
+                            }
                             successCount++;
                         } catch (err) { console.error("Failed to import task:", taskName); }
                     }

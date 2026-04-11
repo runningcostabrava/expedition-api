@@ -73,6 +73,20 @@ app.get('/setup-db', adminAuth, async (req, res) => {
 
       ALTER TABLE tasks ADD COLUMN IF NOT EXISTS comments TEXT;
       ALTER TABLE tasks ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE;
+
+      -- Sub-Task 3.3 additions
+      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS link TEXT;
+      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS comments TEXT;
+      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS distance NUMERIC;
+      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS gain NUMERIC;
+      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS loss NUMERIC;
+
+      ALTER TABLE tracks ADD COLUMN IF NOT EXISTS link TEXT;
+      ALTER TABLE tracks ADD COLUMN IF NOT EXISTS comments TEXT;
+      ALTER TABLE tracks ADD COLUMN IF NOT EXISTS distance NUMERIC;
+      ALTER TABLE tracks ADD COLUMN IF NOT EXISTS gain NUMERIC;
+      ALTER TABLE tracks ADD COLUMN IF NOT EXISTS loss NUMERIC;
+      ALTER TABLE tracks ADD COLUMN IF NOT EXISTS parent_track_id INTEGER;
     `);
 
     res.send("Database tables created and updated successfully with v3.0 Task-Centric model!");
@@ -141,11 +155,11 @@ app.post('/tracks', adminAuth, async (req, res) => {
 
 app.put('/tracks/:id', adminAuth, async (req, res) => {
   const { id } = req.params;
-  const { geojson_data, title, color, target_group, tasks, existing_task_id } = req.body;
+  const { geojson_data, title, color, target_group, tasks, existing_task_id, link, comments, distance, gain, loss, parent_track_id } = req.body;
   try {
     await pool.query(
-      'UPDATE tracks SET geojson_data = COALESCE($1, geojson_data), title = COALESCE($2, title), color = COALESCE($3, color), target_group = COALESCE($4, target_group) WHERE id = $5',
-      [geojson_data, title, color, target_group, id]
+      'UPDATE tracks SET geojson_data = COALESCE($1, geojson_data), title = COALESCE($2, title), color = COALESCE($3, color), target_group = COALESCE($4, target_group), link = COALESCE($6, link), comments = COALESCE($7, comments), distance = COALESCE($8, distance), gain = COALESCE($9, gain), loss = COALESCE($10, loss), parent_track_id = COALESCE($11, parent_track_id) WHERE id = $5',
+      [geojson_data, title, color, target_group, id, link, comments, distance, gain, loss, parent_track_id]
     );
 
     let anchorId;
@@ -218,11 +232,11 @@ app.post('/waypoints', adminAuth, async (req, res) => {
 
 app.put('/waypoints/:id', adminAuth, async (req, res) => {
     const { id } = req.params;
-    const { title, lat, lng, description, category, tasks, color, icon, existing_task_id } = req.body;
+    const { title, lat, lng, description, category, tasks, color, icon, existing_task_id, link, comments, distance, gain, loss, parent_track_id } = req.body;
     try {
       await pool.query(
-        'UPDATE waypoints SET title = COALESCE($1, title), lat = COALESCE($2, lat), lng = COALESCE($3, lng), description = COALESCE($4, description), category = COALESCE($5, category), color = COALESCE($6, color), icon = COALESCE($7, icon) WHERE id = $8',
-        [title, lat, lng, description, category, color, icon, id]
+        'UPDATE waypoints SET title = COALESCE($1, title), lat = COALESCE($2, lat), lng = COALESCE($3, lng), description = COALESCE($4, description), category = COALESCE($5, category), color = COALESCE($6, color), icon = COALESCE($7, icon), link = COALESCE($9, link), comments = COALESCE($10, comments), distance = COALESCE($11, distance), gain = COALESCE($12, gain), loss = COALESCE($13, loss), parent_track_id = COALESCE($14, parent_track_id) WHERE id = $8',
+        [title, lat, lng, description, category, color, icon, id, link, comments, distance, gain, loss, parent_track_id]
       );
 
       let anchorId;
@@ -323,7 +337,13 @@ app.get('/itinerary', async (req, res) => {
               'title', COALESCE(w.title, tr.title),
               'lat', w.lat, 'lng', w.lng,
               'color', COALESCE(w.color, tr.color),
-              'geojson', tr.geojson_data
+              'geojson', tr.geojson_data,
+              'link', COALESCE(w.link, tr.link),
+              'comments', COALESCE(w.comments, tr.comments),
+              'distance', COALESCE(w.distance, tr.distance),
+              'gain', COALESCE(w.gain, tr.gain),
+              'loss', COALESCE(w.loss, tr.loss),
+              'parent_track_id', COALESCE(w.parent_track_id, tr.parent_track_id)
             )
           ) FILTER (WHERE sa.id IS NOT NULL), '[]'
         ) as geometries
