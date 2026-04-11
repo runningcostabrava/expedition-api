@@ -988,11 +988,18 @@
         function showElevationProfile(geojson, title, metadata = null) {
             document.getElementById('elevation-panel').style.display = 'block';
             const statsHeader = document.getElementById('elevation-stats-header');
-            if (metadata) {
-                statsHeader.innerHTML = `<span>🏁 ${title}</span> <span>📏 ${metadata.distance || 0} km</span> <span style="color:#27ae60;">▲ ${metadata.gain || 0}m</span> <span style="color:#e74c3c;">▼ ${metadata.loss || 0}m</span>`;
-            } else {
-                statsHeader.innerHTML = `<span>🏁 ${title}</span>`;
-            }
+            
+            // If no metadata passed, try to extract from geojson properties (Mapbox data)
+            const props = metadata || geojson.features?.[0]?.properties || {};
+            
+            statsHeader.innerHTML = `
+                <span style="color:#000;">🏁 <strong>${title}</strong></span> 
+                <span style="color:#000;">📏 <strong>${props.distance || 0} km</strong></span> 
+                <span style="color:#27ae60;">▲ <strong>${props.gain || 0}m</strong></span> 
+                <span style="color:#e74c3c;">▼ <strong>${props.loss || 0}m</strong></span>
+                ${props.duration ? `<span style="color:#000;">🕒 <strong>${props.duration} min</strong></span>` : ''}
+            `;
+        }
             let distances = [0], elevations = [], cumulative = 0;
             const coords = geojson.features[0].geometry.type === 'Polygon' ? geojson.features[0].geometry.coordinates[0] : geojson.features[0].geometry.coordinates;
             coords.forEach((c, i) => {
@@ -1296,6 +1303,20 @@
             refreshData();
         }
 
+        function editSmartRoute(trackId) {
+            const track = allItinerary.flatMap(t => t.geometries).find(g => g.track_id === trackId);
+            if (!track || !track.properties.stops) return alert("No stops found for this route.");
+            
+            isRouting = true;
+            routePoints = [...track.properties.stops];
+            draw.deleteAll();
+            // Re-draw the stops as points so user can see them
+            routePoints.forEach((pt, idx) => {
+                draw.add({ id: `stop-${idx}`, type: 'Feature', geometry: { type: 'Point', coordinates: pt } });
+            });
+            alert("Routing mode re-activated. Add new points or click Enter to re-calculate.");
+        }
+
         async function updateTaskInline(taskId, field, value) {
             const task = allItinerary.find(t => t.task_id === taskId);
             if (!task || task[field] == value) return;
@@ -1400,10 +1421,11 @@
             const groupFilter = document.getElementById('group-filter').value;
             container.innerHTML = '';
 
-            const typeFilterEl = document.getElementById('type-filter');
-            const typeFilter = typeFilterEl ? typeFilterEl.value : '';
+            const typeFilter = document.getElementById('type-filter').value;
             const filtered = allItinerary.filter(t => {
-                const matchSearch = t.task.toLowerCase().includes(searchTerm);
+                // Instead of a global replace, use this safe check:
+                const name = t.task_name || t.task || ""; 
+                const matchSearch = name.toLowerCase().includes(searchTerm);
                 const matchGroup = !groupFilter || t.target_group === groupFilter;
                 const matchType = !typeFilter || t.task_type === typeFilter;
                 return matchSearch && matchGroup && matchType;
@@ -1572,6 +1594,7 @@
                                 <span>${emoji}</span><strong>${g.title}</strong>
                             </div>
                             <div style="display: flex; gap: 5px;">
+                                ${stats.route_type === 'smart' ? `<button class="edit-btn" title="Edit Route Stops" onclick="event.stopPropagation(); editSmartRoute(${g.track_id})">🔄</button>` : ''}
                                 <button class="edit-btn" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})">⚙️</button>
                                 <button class="delete-btn" onclick="event.stopPropagation(); deleteGeometry('${g.kind}', ${g.waypoint_id || g.track_id})">🗑️</button>
                             </div>
