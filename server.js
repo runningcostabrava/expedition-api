@@ -329,7 +329,7 @@ app.delete('/tracks/:id', adminAuth, async (req, res) => {
 app.get('/itinerary', async (req, res) => {
   try {
     const query = `
-      SELECT t.*,
+      SELECT t.*, t.id AS task_id,
              COALESCE(
                json_agg(
                  json_build_object(
