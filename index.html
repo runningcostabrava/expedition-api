@@ -1105,9 +1105,9 @@
                 section.className = 'asana-section';
                 
                 section.innerHTML = `
-                    <div class="asana-header">
+                    <div class="asana-header" style="cursor:pointer;" onclick="flyToSection('${day}')">
                         <span>▼ <span class="inline-edit" contenteditable="true" onblur="updateSection('${day}', this.innerText)" onclick="event.stopPropagation()">${day}</span></span>
-                        <button class="delete-btn" onclick="deleteSection('${day}')">🗑️</button>
+                        <button class="delete-btn" onclick="event.stopPropagation(); deleteSection('${day}')">🗑️</button>
                     </div>
                     <div class="task-table-header" style="grid-template-columns: ${gridCols};">
                         <div>Task Name</div>
