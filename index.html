@@ -485,6 +485,7 @@
                 <strong>Show on Map:</strong><br>
                 <label style="margin-right:10px;"><input type="checkbox" id="filter-points" checked onchange="updateFilters()"> 📍 Points</label>
                 <label style="margin-right:10px;"><input type="checkbox" id="filter-lines" checked onchange="updateFilters()"> 📈 Tracks</label>
+                <label style="margin-right:10px;"><input type="checkbox" id="filter-smart" checked onchange="updateFilters()"> 🚗 Smart Routes</label>
                 <label><input type="checkbox" id="filter-polygons" checked onchange="updateFilters()"> 🛑 Zones</label>
             </div>
         </div>
@@ -610,11 +611,12 @@
         let map, draw;
         let activeMarkers = [];
         let allTracks = [], allItinerary = [];
-        let mapFilters = { point: true, line: true, polygon: true };
+        let mapFilters = { point: true, line: true, smart: true, polygon: true };
         
         function updateFilters() {
             mapFilters.point = document.getElementById('filter-points').checked;
             mapFilters.line = document.getElementById('filter-lines').checked;
+            mapFilters.smart = document.getElementById('filter-smart').checked;
             mapFilters.polygon = document.getElementById('filter-polygons').checked;
             renderMapGeometries();
         }
@@ -733,6 +735,7 @@
                     draw.add(lastCalculatedRoute.geometry);
                     
                     const feature = lastCalculatedRoute.geometry;
+                    feature.properties = { route_type: 'smart', profile: profile };
                     // Find middle coordinate for the popup
                     const centerIndex = Math.floor(feature.coordinates.length / 2);
                     const centerPoint = feature.coordinates[centerIndex];
@@ -783,11 +786,21 @@
             allItinerary.forEach(task => {
                 if (!task.geometries) return;
                 task.geometries.forEach(geom => {
-                    if (!mapFilters[geom.kind]) return; // Apply Map Filters
+                    const isSmart = geom.geojson && geom.geojson.features[0].properties && geom.geojson.features[0].properties.route_type === 'smart';
+                    if (geom.kind === 'point' && !mapFilters.point) return;
+                    if (geom.kind === 'polygon' && !mapFilters.polygon) return;
+                    if (geom.kind === 'line' && isSmart && !mapFilters.smart) return;
+                    if (geom.kind === 'line' && !isSmart && !mapFilters.line) return;
 
                     const renderColor = geom.color || groupColors[task.target_group] || '#3498db';
                     if (geom.kind === 'point' && geom.lat && geom.lng) {
-                        const marker = new mapboxgl.Marker({ color: renderColor })
+                        const el = document.createElement('div');
+                        el.style.fontSize = '22px';
+                        el.innerText = geom.icon || '📍';
+                        el.style.filter = `drop-shadow(0px 0px 4px ${renderColor})`;
+                        el.style.cursor = 'pointer';
+                        
+                        const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
                             .setLngLat([geom.lng, geom.lat])
                             .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
                                 <h4>📍 ${geom.title}</h4>
@@ -803,7 +816,9 @@
                             id: layerId,
                             type: geom.kind === 'polygon' ? 'fill' : 'line',
                             source: `track-${geom.track_id}`,
-                            paint: geom.kind === 'polygon' ? { 'fill-color': renderColor, 'fill-opacity': 0.4 } : { 'line-color': renderColor, 'line-width': 4 }
+                            paint: geom.kind === 'polygon' ? { 'fill-color': renderColor, 'fill-opacity': 0.4 } : 
+                                   isSmart ? { 'line-color': renderColor, 'line-width': 4, 'line-dasharray': [2, 2] } : 
+                                   { 'line-color': renderColor, 'line-width': 4 }
                         });
 
                         map.on('click', layerId, (e) => {
@@ -918,7 +933,13 @@
                 <input type="text" id="ctx-title" value="${defaultTitle}" style="width: 100%; margin-bottom: 8px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing:border-box;">
                 <div style="display: flex; gap: 5px; margin-bottom: 10px; align-items: center;">
                     <label style="font-size: 0.8em; margin:0;">Color:</label>
-                    <input type="color" id="ctx-color" value="#3498db" style="width: 100%; height: 25px; padding: 0; cursor: pointer; border: none;">
+                    <input type="color" id="ctx-color" value="#3498db" style="width: 40px; height: 25px; padding: 0; cursor: pointer; border: none;">
+                    ${geometry.type === 'Point' ? `
+                    <select id="ctx-icon" style="flex:1; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
+                        <option value="📍">📍 Pin</option><option value="🏕️">🏕️ Camp</option>
+                        <option value="🍔">🍔 Food</option><option value="📷">📷 Photo</option>
+                        <option value="🚗">🚗 Car</option><option value="⚠️">⚠️ Alert</option>
+                    </select>` : ''}
                 </div>
                 <button id="ctx-save" style="width: 100%; padding: 8px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight:bold;">Save Shape</button>
             `;
@@ -931,13 +952,14 @@
             document.getElementById('ctx-save').onclick = async () => {
                 const title = document.getElementById('ctx-title').value;
                 const color = document.getElementById('ctx-color').value;
+                const icon = document.getElementById('ctx-icon') ? document.getElementById('ctx-icon').value : '📍';
                 document.getElementById('ctx-save').innerText = 'Saving...';
                 
                 try {
                     const headers = { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY };
                     if (geometry.type === 'Point') {
                         await fetch(`${API_URL}/waypoints`, {
-                            method: 'POST', headers, body: JSON.stringify({ title, color, existing_task_id: activeTaskId, lat: geometry.coordinates[1], lng: geometry.coordinates[0], description: statsText })
+                            method: 'POST', headers, body: JSON.stringify({ title, color, icon, existing_task_id: activeTaskId, lat: geometry.coordinates[1], lng: geometry.coordinates[0], description: statsText })
                         });
                     } else {
                         await fetch(`${API_URL}/tracks`, {
@@ -1196,9 +1218,15 @@
                 const section = document.createElement('div');
                 section.className = 'asana-section';
                 
+                // Auto-detect if day is a YYYY-MM-DD string to format as Date Input
+                const isDate = !isNaN(Date.parse(day)) && day.includes('-');
+                const dayHtml = isDate 
+                    ? `<input type="date" value="${day}" class="inline-edit-input" style="font-weight:bold; font-size:1em;" onchange="updateSection('${day}', this.value)" onclick="event.stopPropagation()">` 
+                    : `<span class="inline-edit" contenteditable="true" onblur="updateSection('${day}', this.innerText)" onclick="event.stopPropagation()">${day}</span>`;
+
                 section.innerHTML = `
                     <div class="asana-header" style="cursor:pointer;" onclick="flyToSection('${day}')">
-                        <span>▼ <span class="inline-edit" contenteditable="true" onblur="updateSection('${day}', this.innerText)" onclick="event.stopPropagation()">${day}</span></span>
+                        <span>▼ ${dayHtml}</span>
                         <button class="delete-btn" onclick="event.stopPropagation(); deleteSection('${day}')">🗑️</button>
                     </div>
                     <div class="task-table-header" style="grid-template-columns: ${gridCols};">
@@ -1300,9 +1328,20 @@
                     taskListContainer.appendChild(taskContainer);
                 });
                 
+                // Inject Inline "+ Add Task" button
+                const inlineAdd = document.createElement('div');
+                inlineAdd.style.padding = '10px 15px';
+                inlineAdd.innerHTML = `<input type="text" placeholder="+ Add task to this section..." style="border:none; border-bottom:1px dashed #ccc; padding:5px; outline:none; background:transparent; width:100%; font-size:0.9em; transition:0.2s;" onfocus="this.style.borderBottom='1px solid #3498db'" onblur="this.style.borderBottom='1px dashed #ccc'" onkeydown="if(event.key==='Enter') createInlineTask(this, '${day}')">`;
                 section.appendChild(taskListContainer);
+                section.appendChild(inlineAdd);
                 container.appendChild(section);
             }
+            
+            // Inject Inline "+ Add Section" button
+            const newSectionDiv = document.createElement('div');
+            newSectionDiv.style.marginTop = '30px';
+            newSectionDiv.innerHTML = `<input type="date" title="Add New Day" style="padding:10px; border:1px solid #ddd; border-radius:6px; cursor:pointer; background:#fff; color:#333; font-weight:bold; outline:none;" onchange="if(this.value) { updateSection('new_temp_section', this.value); this.value=''; }"> <span style="font-size:0.85em; color:#7f8c8d; margin-left:10px;">+ Add Date Section</span>`;
+            container.appendChild(newSectionDiv);
 
             // Initialize Sortable JS
             document.querySelectorAll('.sortable-task-list').forEach(list => {
@@ -1325,8 +1364,22 @@
                                 method: 'PUT', 
                                 headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY }, 
                                 body: JSON.stringify(task) 
-                            });
-                        }
+            });
+        }
+
+        async function createInlineTask(inputElement, dayLabel) {
+            const taskName = inputElement.value.trim();
+            if(!taskName) return;
+            inputElement.disabled = true;
+            try {
+                await fetch(`${API_URL}/tasks`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY }, 
+                    body: JSON.stringify({ task_name: taskName, day_label: dayLabel === 'Unscheduled' ? null : dayLabel }) 
+                });
+                refreshData();
+            } catch(e) { alert("Error adding task"); inputElement.disabled = false; }
+        }
                     }
                 });
             });
