@@ -2049,13 +2049,22 @@
         async function createInlineTask(inputElement, sectionId, sectionTitle) {
             const taskName = inputElement.value.trim();
             if (!taskName) return;
+
+            // Find the associated Fite checkbox
+            const checkbox = inputElement.parentElement.querySelector('.inline-fite-checkbox');
+            const isMilestone = checkbox ? checkbox.checked : false;
+
             inputElement.disabled = true;
+            if (checkbox) checkbox.disabled = true;
+
             try {
                 const payload = {
                     task_name: taskName,
                     section_id: sectionId,
-                    day_label: sectionTitle === 'Unscheduled' ? null : sectionTitle
+                    day_label: sectionTitle === 'Unscheduled' ? null : sectionTitle,
+                    is_milestone: isMilestone
                 };
+
                 console.log("DEBUG: Inline Task Payload ->", payload); // <-- Debugging
                 const res = await fetch(`${API_URL}/tasks`, {
                     method: 'POST',
@@ -2150,7 +2159,16 @@
             inlineAdd.style.padding = '10px 15px';
             // Pass both section.id and safe sectionTitle
             const safeTitle = sectionTitle.replace(/'/g, "\\'");
-            inlineAdd.innerHTML = `<input type="text" placeholder="+ Add task to this section..." style="border:none; border-bottom:1px dashed #ccc; padding:5px; outline:none; background:transparent; width:100%; font-size:0.9em;" onkeydown="if(event.key==='Enter') createInlineTask(this, ${section.id || null}, '${safeTitle}')">`;
+
+            // Wrap the input and a new Fite checkbox in a flex container
+            inlineAdd.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px; border-bottom: 1px dashed #ccc; padding-right: 5px;">
+                    <input type="text" placeholder="+ Add task to this section..." style="flex: 1; border:none; padding:5px; outline:none; background:transparent; font-size:0.9em;" onkeydown="if(event.key==='Enter') createInlineTask(this, ${section.id || null}, '${safeTitle}')">
+                    <label style="font-size: 0.85em; color: #7f8c8d; cursor: pointer; display: flex; align-items: center; gap: 4px; margin: 0;" title="Mark as Milestone (Fite)">
+                        <input type="checkbox" class="inline-fite-checkbox"> 📍 Fite
+                    </label>
+                </div>
+            `;
 
             sectionDiv.appendChild(taskListContainer);
             sectionDiv.appendChild(inlineAdd);
