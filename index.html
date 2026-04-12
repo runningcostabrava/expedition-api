@@ -854,7 +854,13 @@
             draw = new MapboxDraw({ displayControlsDefault: false, controls: { trash: true } });
             map.addControl(draw);
 
-            const geocoder = new MapboxGeocoder({ accessToken: mapboxgl.accessToken, mapboxgl: mapboxgl, marker: false });
+            const geocoder = new MapboxGeocoder({ 
+                accessToken: mapboxgl.accessToken, 
+                mapboxgl: mapboxgl, 
+                marker: false,
+                types: 'poi,place,address,locality', // Forces POIs (like airports) into the results
+                proximity: 'ip' // Biases results closer to the user's current location/map view
+            });
             map.addControl(geocoder, 'top-right');
 
             // 1. Unified Click Handler for Routing and Analysis
