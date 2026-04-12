@@ -197,9 +197,9 @@
         }
 
         .task-row.active-task {
-            background: #ebf5fb;
-            border-left: 4px solid #3498db;
-            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+            filter: brightness(0.9) saturate(1.1); /* Darkens and enhances the category color */
+            border-left: 6px solid rgba(0,0,0,0.3) !important;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.15);
         }
 
         .task-cell {
@@ -564,6 +564,8 @@
             </div>
             <div style="font-size: 0.85em; margin-bottom: 10px;">
                 <strong>Show Columns:</strong><br>
+                <label style="margin-right:10px;"><input type="checkbox" id="col-category" checked
+                        onchange="renderProjectView()"> Category</label>
                 <label style="margin-right:10px;"><input type="checkbox" id="col-assignee" checked
                         onchange="renderProjectView()"> Assignee</label>
                 <label style="margin-right:10px;"><input type="checkbox" id="col-time" checked
@@ -731,6 +733,7 @@
     </div>
 
     <script>
+        let activeCategoryIdForEdit = null;
         const API_URL = 'https://mapbox-api-uz9a.onrender.com';
         let map, draw;
         let activeMarkers = [];
@@ -1294,9 +1297,27 @@
             list.innerHTML = allCategories.map(cat => `
         <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #eee;">
             <span>${cat.icon} <strong style="color:${cat.color}">${cat.name}</strong></span>
-            <button onclick="deleteCategory(${cat.id})" style="width:auto; padding:4px 8px; background:#e74c3c; font-size:12px;">Delete</button>
+            <div style="display:flex; gap:5px;">
+                <button onclick="startEditCategory(${cat.id})" style="width:auto; padding:4px 8px; background:#3498db; font-size:12px;">Edit</button>
+                <button onclick="deleteCategory(${cat.id})" style="width:auto; padding:4px 8px; background:#e74c3c; font-size:12px;">Delete</button>
+            </div>
         </div>
     `).join('') || '<p style="font-size:12px; color:#95a5a6;">No categories created yet.</p>';
+        }
+
+        function startEditCategory(id) {
+            const cat = allCategories.find(c => c.id === id);
+            if (!cat) return;
+
+            activeCategoryIdForEdit = id;
+            document.getElementById('new-cat-name').value = cat.name;
+            document.getElementById('new-cat-color').value = cat.color || '#3498db';
+            document.getElementById('new-cat-icon').value = cat.icon || '';
+
+            // Change the "Create" button to "Update"
+            const btn = document.querySelector('#category-modal button[onclick="saveCategory()"]');
+            btn.innerText = "Update Category";
+            btn.style.background = "#f39c12"; // Change to orange to signal edit mode
         }
 
         async function deleteCategory(id) {
@@ -1311,13 +1332,26 @@
             const icon = document.getElementById('new-cat-icon').value;
             if (!name) return alert("Name is required");
 
-            await fetch(`${API_URL}/categories`, {
-                method: 'POST',
+            // Determine if we are updating or creating
+            const method = activeCategoryIdForEdit ? 'PUT' : 'POST';
+            const url = activeCategoryIdForEdit ? `${API_URL}/categories/${activeCategoryIdForEdit}` : `${API_URL}/categories`;
+
+            await fetch(url, {
+                method: method,
                 headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
                 body: JSON.stringify({ name, color, icon })
             });
 
+            // Reset the UI and variable
+            activeCategoryIdForEdit = null;
             document.getElementById('new-cat-name').value = '';
+            document.getElementById('new-cat-color').value = '#3498db';
+            document.getElementById('new-cat-icon').value = '';
+
+            const btn = document.querySelector('#category-modal button[onclick="saveCategory()"]');
+            btn.innerText = "Create Category";
+            btn.style.background = "#27ae60";
+
             refreshData();
         }
 
@@ -1614,11 +1648,14 @@
             container.innerHTML = '';
 
             // 1. Calculate grid columns first so renderSectionUI can use them
+            const showCategory = document.getElementById('col-category').checked;
             const showAssignee = document.getElementById('col-assignee').checked;
             const showTime = document.getElementById('col-time').checked;
             const showGroup = document.getElementById('col-group').checked;
 
-            let gridCols = '1.5fr 1fr ';
+            let gridCols = '1.5fr ';
+            if (showCategory) gridCols += '120px '; // Add space for category dropdown
+            gridCols += '1fr ';
             if (showAssignee) gridCols += '90px ';
             if (showTime) gridCols += '90px ';
             if (showGroup) gridCols += '90px ';
@@ -1733,6 +1770,7 @@
         function renderTaskCard(parentContainer, task, gridCols, allTasks) {
             const timeOnly = (task.starts_at && task.starts_at.length >= 16) ? task.starts_at.substring(11, 16) : '';
             const doneUI = task.is_completed ? '✅ ' : '';
+            const catColor = task.category_color || '#ffffff'; //
 
             const taskContainer = document.createElement('div');
             // Margin is now handled by the nested list container, but we keep the visual line indicator
@@ -1742,6 +1780,7 @@
             taskEl.className = 'task-row';
             taskEl.id = `task-row-${task.task_id}`;
             taskEl.style.gridTemplateColumns = gridCols;
+            taskEl.style.backgroundColor = catColor; // Apply category color
             if (task.is_completed) taskEl.style.opacity = '0.6';
 
             taskEl.onclick = () => {
@@ -1752,11 +1791,23 @@
                 if (acc) acc.classList.toggle('open');
             };
 
+            const showCategory = document.getElementById('col-category').checked;
             const showAssignee = document.getElementById('col-assignee').checked;
             const showTime = document.getElementById('col-time').checked;
             const showGroup = document.getElementById('col-group').checked;
 
             let cellsHtml = `<div class="task-cell name"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">${doneUI}${task.task_name || task.task || 'Unnamed Task'}</span></div>`;
+
+            // Add Category Dropdown Cell
+            if (showCategory) {
+                let catOptions = `<option value="">-</option>`;
+                allCategories.forEach(cat => {
+                    const isSel = task.category_id === cat.id ? 'selected' : '';
+                    catOptions += `<option value="${cat.id}" ${isSel}>${cat.icon} ${cat.name}</option>`;
+                });
+                cellsHtml += `<div class="task-cell"><select class="inline-edit" style="width:100%; border:none; background:transparent;" onchange="updateTaskInline(${task.task_id}, 'category_id', this.value)" onclick="event.stopPropagation()">${catOptions}</select></div>`;
+            }
+
             if (showAssignee) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'responsible', this.innerText)" onclick="event.stopPropagation()">${task.responsible || '-'}</span></div>`;
             if (showTime) cellsHtml += `<div class="task-cell time"><input type="time" class="inline-edit" style="width:100%" value="${timeOnly}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()"></div>`;
             if (showGroup) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'target_group', this.innerText)" onclick="event.stopPropagation()">${task.target_group || '-'}</span></div>`;
@@ -1917,6 +1968,7 @@
         </div>
         <div class="task-table-header" style="grid-template-columns: ${gridCols};">
             <div>Task Name</div>
+            ${document.getElementById('col-category').checked ? '<div>Category</div>' : ''}
             ${document.getElementById('col-assignee').checked ? '<div>Assignee</div>' : ''}
             ${document.getElementById('col-time').checked ? '<div>Start Time</div>' : ''}
             ${document.getElementById('col-group').checked ? '<div>Group</div>' : ''}
