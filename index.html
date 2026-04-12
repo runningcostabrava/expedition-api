@@ -1492,13 +1492,21 @@
             container.innerHTML = '';
 
             const typeFilter = document.getElementById('type-filter').value;
-            const filtered = allItinerary.filter(t => {
+            let filtered = allItinerary.filter(t => {
                 // Instead of a global replace, use this safe check:
                 const name = t.task_name || t.task || "";
                 const matchSearch = name.toLowerCase().includes(searchTerm);
                 const matchGroup = !groupFilter || t.target_group === groupFilter;
                 const matchType = !typeFilter || t.task_type === typeFilter;
                 return matchSearch && matchGroup && matchType;
+            });
+
+            // Auto-sort tasks chronologically by time
+            filtered.sort((a, b) => {
+                if (!a.starts_at && !b.starts_at) return 0;
+                if (!a.starts_at) return 1; // Push unscheduled to the bottom
+                if (!b.starts_at) return -1;
+                return new Date(a.starts_at) - new Date(b.starts_at);
             });
 
             const groups = {};
@@ -1574,30 +1582,66 @@
             newSectionDiv.innerHTML = `<input type="date" title="Add New Day" style="padding:10px; border:1px solid #ddd; border-radius:6px; cursor:pointer; background:#fff; color:#333; font-weight:bold; outline:none;" onchange="if(this.value) { updateSection('new_temp_section', this.value); this.value=''; }"> <span style="font-size:0.85em; color:#7f8c8d; margin-left:10px;">+ Add Date Section</span>`;
             container.appendChild(newSectionDiv);
 
-            // Initialize Sortable JS
-            document.querySelectorAll('.sortable-task-list').forEach(list => {
+            // Initialize Sortable JS for BOTH sections and nested subtasks
+            document.querySelectorAll('.sortable-task-list, .subtask-list').forEach(list => {
                 new Sortable(list, {
                     group: 'shared',
                     animation: 150,
+                    fallbackOnBody: true,
+                    swapThreshold: 0.65,
                     onEnd: async function (evt) {
-                        const itemEl = evt.item;
-                        const newSectionList = evt.to;
-                        const newSectionName = newSectionList.dataset.section;
+                        const itemEl = evt.item; // The dragged card
+                        const toList = evt.to;   // The drop zone it landed in
 
                         const taskRow = itemEl.querySelector('.task-row');
                         if (!taskRow) return;
                         const taskId = parseInt(taskRow.id.replace('task-row-', ''));
-
                         const task = allItinerary.find(t => t.task_id === taskId);
-                        if (task && task.day_label !== newSectionName) {
-                            task.day_label = newSectionName === 'Unscheduled' ? null : newSectionName;
-                            await fetch(`${API_URL}/tasks/${taskId}`, {
-                                method: 'PUT',
-                                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
-                                body: JSON.stringify(task)
-                            });
+                        if (!task) return;
+
+                        let needsUpdate = false;
+                        let payload = { ...task };
+
+                        if (toList.classList.contains('subtask-list')) {
+                            // Dropped inside another task (became a subtask)
+                            const newParentId = parseInt(toList.dataset.parentId);
+                            if (payload.parent_id !== newParentId) {
+                                payload.parent_id = newParentId;
+                                needsUpdate = true;
+                            }
+
+                            // Inherit the day_label from the new parent task
+                            const parentTask = allItinerary.find(t => t.task_id === newParentId);
+                            if (parentTask && payload.day_label !== parentTask.day_label) {
+                                payload.day_label = parentTask.day_label;
+                                needsUpdate = true;
+                            }
+                        } else {
+                            // Dropped in a main section (became a top-level task)
+                            const newSectionName = toList.dataset.section;
+                            if (payload.parent_id !== null) {
+                                payload.parent_id = null;
+                                needsUpdate = true;
+                            }
+                            if (payload.day_label !== newSectionName) {
+                                payload.day_label = newSectionName === 'Unscheduled' ? null : newSectionName;
+                                needsUpdate = true;
+                            }
                         }
-                        refreshData();
+
+                        if (needsUpdate) {
+                            try {
+                                await fetch(`${API_URL}/tasks/${taskId}`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                                    body: JSON.stringify(payload)
+                                });
+                            } catch (e) {
+                                console.error("Drag Update Failed:", e);
+                            }
+                        }
+
+                        refreshData(); // Triggers a re-render to enforce chronological order
                     }
                 });
             });
@@ -1608,8 +1652,8 @@
             const doneUI = task.is_completed ? '✅ ' : '';
 
             const taskContainer = document.createElement('div');
-            taskContainer.style.marginLeft = task.parent_id ? '20px' : '0';
-            taskContainer.style.borderLeft = task.parent_id ? '2px solid #ddd' : 'none';
+            // Margin is now handled by the nested list container, but we keep the visual line indicator
+            taskContainer.style.borderLeft = task.parent_id ? '2px solid #3498db' : 'none';
 
             const taskEl = document.createElement('div');
             taskEl.className = 'task-row';
@@ -1690,12 +1734,21 @@
 
             taskContainer.appendChild(taskEl);
             taskContainer.appendChild(accordionEl);
+
+            // Create a specific drop-zone container for subtasks
+            const subtaskListContainer = document.createElement('div');
+            subtaskListContainer.className = 'sortable-task-list subtask-list';
+            subtaskListContainer.dataset.parentId = task.task_id;
+            subtaskListContainer.style.minHeight = '10px';
+            subtaskListContainer.style.marginLeft = '20px';
+            subtaskListContainer.style.marginTop = '5px';
+
+            taskContainer.appendChild(subtaskListContainer);
             parentContainer.appendChild(taskContainer);
 
-
-            // Recursion: Find and render children
+            // Recursion: Find and render children inside the new drop zone
             const subtasks = allTasks.filter(t => t.parent_id === task.task_id);
-            subtasks.forEach(st => renderTaskCard(parentContainer, st, gridCols, allTasks));
+            subtasks.forEach(st => renderTaskCard(subtaskListContainer, st, gridCols, allTasks));
 
             return taskContainer;
         }
