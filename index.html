@@ -1262,6 +1262,53 @@
             }
         }
 
+        function updateCategoryDropdowns() {
+            const catSelect = document.getElementById('task-category-id');
+            if (!catSelect) return;
+            const currentVal = catSelect.value;
+            catSelect.innerHTML = '<option value="">No Category</option>';
+            allCategories.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat.id;
+                opt.textContent = `${cat.icon || '🏷️'} ${cat.name}`;
+                catSelect.appendChild(opt);
+            });
+            catSelect.value = currentVal;
+        }
+
+        function renderCategoryList() {
+            const list = document.getElementById('category-list');
+            if (!list) return;
+            list.innerHTML = allCategories.map(cat => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #eee;">
+            <span>${cat.icon} <strong style="color:${cat.color}">${cat.name}</strong></span>
+            <button onclick="deleteCategory(${cat.id})" style="width:auto; padding:4px 8px; background:#e74c3c; font-size:12px;">Delete</button>
+        </div>
+    `).join('') || '<p style="font-size:12px; color:#95a5a6;">No categories created yet.</p>';
+        }
+
+        async function deleteCategory(id) {
+            if (!confirm("Delete category? Tasks will remain but lose their styling.")) return;
+            await fetch(`${API_URL}/categories/${id}`, { method: 'DELETE', headers: { 'x-api-key': ADMIN_KEY } });
+            refreshData();
+        }
+
+        async function saveCategory() {
+            const name = document.getElementById('new-cat-name').value;
+            const color = document.getElementById('new-cat-color').value;
+            const icon = document.getElementById('new-cat-icon').value;
+            if (!name) return alert("Name is required");
+
+            await fetch(`${API_URL}/categories`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                body: JSON.stringify({ name, color, icon })
+            });
+
+            document.getElementById('new-cat-name').value = '';
+            refreshData();
+        }
+
         function resetForm() {
             activeTaskId = null;
             activeAnchorId = null;
