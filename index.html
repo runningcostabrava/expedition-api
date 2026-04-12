@@ -730,8 +730,10 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Day Label</label>
-                    <input type="text" id="day-label" placeholder="Friday - Day 1">
+                    <label>Section (Day)</label>
+                    <select id="task-section-id">
+                        <option value="">Unscheduled</option>
+                    </select>
                 </div>
 
                 <div class="form-group">
@@ -897,22 +899,15 @@
                                 lastCalculatedRoute = data.routes[0];
                                 draw.deleteAll();
                                 draw.add(lastCalculatedRoute.geometry);
+                            } // <-- ADDED MISSING BRACE HERE
 
-                                // Keep markers for intermediate stops
-                                routePoints.forEach((pt, idx) => {
-                                    draw.add({ id: `stop-${idx}`, type: 'Feature', geometry: { type: 'Point', coordinates: pt } });
-                                });
-                            } else {
-                                alert("No valid route found connecting these points.");
-                                routePoints.pop(); // Remove the bad point
-                            }
+                            // Keep markers for intermediate stops
+                            routePoints.forEach((pt, idx) => {
+                                draw.add({ id: `stop-${idx}`, type: 'Feature', geometry: { type: 'Point', coordinates: pt } });
+                            });
                         } catch (err) {
-                            console.error(err);
-                            routePoints.pop();
+                            console.error("Routing error:", err);
                         }
-                    } else if (routePoints.length > 25) {
-                        alert("Mapbox API limit: Maximum 25 stops per route.");
-                        routePoints.pop();
                     }
                     return; // Keep routing active until Enter is pressed
                 }
@@ -1341,6 +1336,7 @@
 
                 // Update UI components
                 updateCategoryDropdowns();
+                updateSectionDropdowns();
                 renderCategoryList();
                 if (previousActiveId) activeTaskId = previousActiveId;
 
@@ -1374,6 +1370,21 @@
                 catSelect.appendChild(opt);
             });
             catSelect.value = currentVal;
+        }
+
+        function updateSectionDropdowns() {
+            const secSelect = document.getElementById('task-section-id');
+            if (!secSelect) return;
+            const currentVal = secSelect.value;
+            secSelect.innerHTML = '<option value="">Unscheduled</option>';
+            allSections.forEach(sec => {
+                const opt = document.createElement('option');
+                opt.value = sec.id;
+                const dateStr = sec.section_date ? new Date(sec.section_date).toISOString().split('T')[0] : '';
+                opt.textContent = `${dateStr} ${sec.title || ''}`;
+                secSelect.appendChild(opt);
+            });
+            secSelect.value = currentVal;
         }
 
         function renderCategoryList() {
@@ -1450,7 +1461,7 @@
             activeTrackId = null;
             isEditingGeometry = false;
             document.getElementById('wp-title').value = '';
-            document.getElementById('day-label').value = '';
+            document.getElementById('task-section-id').value = '';
             document.getElementById('starts-at').value = '';
             document.getElementById('wp-description').value = '';
             document.getElementById('responsible').value = '';
@@ -1535,7 +1546,7 @@
             const taskData = {
                 task_name: document.getElementById('wp-title').value,
                 category_id: document.getElementById('task-category-id').value || null,
-                day_label: document.getElementById('day-label').value,
+                section_id: document.getElementById('task-section-id').value || null,
                 starts_at: document.getElementById('starts-at').value || null,
                 responsible: document.getElementById('responsible').value,
                 is_completed: document.getElementById('is-completed').checked,
@@ -1706,7 +1717,7 @@
             resetForm();
             activeTaskId = taskId;
             document.getElementById('wp-title').value = task.task_name || task.task || '';
-            document.getElementById('day-label').value = task.day_label || '';
+            document.getElementById('task-section-id').value = task.section_id || '';
             document.getElementById('starts-at').value = task.starts_at ? task.starts_at.substring(0, 16) : '';
             document.getElementById('responsible').value = task.responsible || '';
             document.getElementById('is-completed').checked = task.is_completed;
@@ -1843,13 +1854,15 @@
                             }
                         } else {
                             // Dropped in a main section (became a top-level task)
-                            const newSectionName = toList.dataset.section;
+                            const newSectionIdStr = toList.dataset.sectionId;
+                            const newSectionId = newSectionIdStr && newSectionIdStr !== 'null' ? parseInt(newSectionIdStr) : null;
+
                             if (payload.parent_id !== null) {
                                 payload.parent_id = null;
                                 needsUpdate = true;
                             }
-                            if (payload.day_label !== newSectionName) {
-                                payload.day_label = newSectionName === 'Unscheduled' ? null : newSectionName;
+                            if (payload.section_id !== newSectionId) {
+                                payload.section_id = newSectionId;
                                 needsUpdate = true;
                             }
                         }
@@ -2030,7 +2043,7 @@
             refreshData();
         }
 
-        async function createInlineTask(inputElement, dayLabel) {
+        async function createInlineTask(inputElement, sectionId) {
             const taskName = inputElement.value.trim();
             if (!taskName) return;
             inputElement.disabled = true;
@@ -2038,7 +2051,8 @@
                 await fetch(`${API_URL}/tasks`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
-                    body: JSON.stringify({ task_name: taskName, day_label: dayLabel === 'Unscheduled' ? null : dayLabel })
+                    // Send section_id instead of day_label
+                    body: JSON.stringify({ task_name: taskName, section_id: sectionId })
                 });
                 refreshData();
             } catch (e) {
@@ -2115,6 +2129,7 @@
             const taskListContainer = document.createElement('div');
             taskListContainer.className = 'sortable-task-list';
             taskListContainer.dataset.section = sectionTitle;
+            taskListContainer.dataset.sectionId = section.id || 'null';
 
             tasks.forEach(task => {
                 if (!task.parent_id) {
@@ -2124,7 +2139,8 @@
 
             const inlineAdd = document.createElement('div');
             inlineAdd.style.padding = '10px 15px';
-            inlineAdd.innerHTML = `<input type="text" placeholder="+ Add task to this section..." style="border:none; border-bottom:1px dashed #ccc; padding:5px; outline:none; background:transparent; width:100%; font-size:0.9em;" onkeydown="if(event.key==='Enter') createInlineTask(this, '${sectionTitle}')">`;
+            // Pass section.id instead of sectionTitle
+            inlineAdd.innerHTML = `<input type="text" placeholder="+ Add task to this section..." style="border:none; border-bottom:1px dashed #ccc; padding:5px; outline:none; background:transparent; width:100%; font-size:0.9em;" onkeydown="if(event.key==='Enter') createInlineTask(this, ${section.id || null})">`;
 
             sectionDiv.appendChild(taskListContainer);
             sectionDiv.appendChild(inlineAdd);
