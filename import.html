@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV Importer (Debug Mode)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            background: #f8f9fa;
+        }
+
+        .box {
+            background: white;
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        #debug-log {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            height: 400px;
+            overflow-y: auto;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        input[type="file"] {
+            padding: 10px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>CSV Importer (Debug Mode)</h2>
+
+    <div class="box">
+        <label>1. API URL:</label>
+        <input type="text" id="api-url" value="https://mapbox-api-uz9a.onrender.com">
+
+        <label>2. Admin API Key (ADMIN_KEY):</label>
+        <input type="text" id="api-key" placeholder="Paste your API key here...">
+    </div>
+
+    <div class="box">
+        <label>3. Select CSV File:</label>
+        <input type="file" id="csv-file" accept=".csv">
+    </div>
+
+    <h3>Debug Log:</h3>
+    <div id="debug-log">Waiting for file upload...</div>
+
+    <script>
+        function logMsg(msg, isError = false) {
+            const logDiv = document.getElementById('debug-log');
+            const time = new Date().toLocaleTimeString();
+            const prefix = isError ? '<span style="color: #ff4757;">❌ ERROR:</span>' : '<span style="color: #2ed573;">✅ INFO:</span>';
+            const formattedMsg = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg;
+
+            // Append and scroll to bottom
+            logDiv.innerHTML += `\n[${time}] ${prefix} ${formattedMsg}`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+
+            if (isError) console.error(msg); else console.log(msg);
+        }
+
+        document.getElementById('csv-file').addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            document.getElementById('debug-log').innerHTML = "Starting new import...";
+
+            const apiUrl = document.getElementById('api-url').value.trim();
+            const apiKey = document.getElementById('api-key').value.trim();
+
+            if (!apiKey) {
+                logMsg("Missing Admin Key! Please paste it into the box above.", true);
+                e.target.value = ''; // Reset input
+                return;
+            }
+
+            logMsg(`File selected: ${file.name} (${file.size} bytes)`);
+            logMsg("Starting PapaParse CSV extraction...");
+
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: async function (results) {
+                    logMsg(`PapaParse finished. Found ${results.data.length} rows.`);
+
+                    if (results.errors.length > 0) {
+                        logMsg("CSV Parsing Warnings/Errors:", true);
+                        logMsg(results.errors, true);
+                    }
+
+                    if (results.data.length === 0) {
+                        logMsg("CSV is empty or could not be read.", true);
+                        return;
+                    }
+
+                    logMsg("Sample of the FIRST row extracted from CSV:");
+                    logMsg(results.data[0]);
+
+                    const tasksToCreate = [];
+
+                    results.data.forEach((row, index) => {
+                        const taskData = {
+                            task_name: row['Task Name'] || row['task'] || row['Name'],
+                            responsible: row['Assignee'] || row['responsible'] || null,
+                            day_label: row['Day'] || row['day_label'] || row['Section/Column'] || 'Unscheduled',
+                            task_type: row['Type'] || row['task_type'] || null,
+                            target_group: row['Target Group'] || row['target_group'] || null,
+                            comments: row['Description'] || row['comments'] || row['Notes'] || null,
+                            parent_name: row['Parent Task'] || row['parent_name'] || null
+                        };
+
+                        if (taskData.task_name) {
+                            tasksToCreate.push(taskData);
+                        } else {
+                            logMsg(`Row ${index + 1} skipped: Missing 'Task Name' or 'Name'`, true);
+                        }
+                    });
+
+                    logMsg(`Prepared ${tasksToCreate.length} valid tasks to send to server.`);
+
+                    if (tasksToCreate.length === 0) {
+                        logMsg("No valid tasks found. Aborting.", true);
+                        return;
+                    }
+
+                    logMsg("Sample payload of the FIRST task being sent to database:");
+                    logMsg(tasksToCreate[0]);
+
+                    logMsg(`Sending POST request to: ${apiUrl}/tasks/bulk`);
+
+                    try {
+                        const response = await fetch(`${apiUrl}/tasks/bulk`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'x-api-key': apiKey
+                            },
+                            body: JSON.stringify({ tasks: tasksToCreate })
+                        });
+
+                        logMsg(`Server responded with HTTP Status: ${response.status} ${response.statusText}`);
+
+                        const responseText = await response.text();
+                        logMsg(`Raw Server Response: ${responseText}`);
+
+                        if (!response.ok) {
+                            logMsg("Server returned an error. Check the response text above.", true);
+                        } else {
+                            logMsg("SUCCESS! All tasks imported to database successfully.");
+                        }
+
+                    } catch (err) {
+                        logMsg("Fetch Request Failed (This usually means the server crashed, is offline, or blocked the connection via CORS):", true);
+                        logMsg(err.message, true);
+                    }
+
+                    e.target.value = ''; // Reset file input so you can try again
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>
