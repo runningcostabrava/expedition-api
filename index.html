@@ -1908,8 +1908,8 @@
                 taskEl.className = 'fite-row';
                 taskEl.innerHTML = `
                     <div class="fite-dot" style="border-color: ${catColor}"></div>
-                    <div class="fite-text">
-                        <span class="time" style="color:#7f8c8d; font-size:0.8em; margin-right:8px;">${timeOnly}</span>
+                    <div class="fite-text" style="display: flex; align-items: center;">
+                        <input type="time" class="inline-edit time" style="width: 75px; padding: 0; color:#7f8c8d; font-size:0.85em; margin-right:8px; border: none; background: transparent; cursor: pointer;" value="${timeOnly}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()">
                         <span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">${task.task_name || 'Event'}</span>
                     </div>
                     <div style="margin-left:auto; display:flex; gap:5px;">
