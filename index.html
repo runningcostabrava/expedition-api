@@ -725,6 +725,12 @@
                         style="width: 50px; height: 38px; border: none; padding: 0; cursor:pointer;">
                     <input type="text" id="new-cat-icon" placeholder="Icon (e.g. bus, anchor, hiking)" style="flex: 1;">
                 </div>
+                <label>Line Style (for Tracks)</label>
+                <select id="new-cat-line-type" style="margin-bottom: 10px;">
+                    <option value="solid">➖ Solid</option>
+                    <option value="dashed">--- Dashed</option>
+                    <option value="dotted">... Dotted</option>
+                </select>
                 <button onclick="saveCategory()"
                     style="background: #27ae60; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer;">Create
                     Category</button>
@@ -926,9 +932,15 @@
                     if (geom.kind === 'line' && isSmart && !mapFilters.smart) return;
                     if (geom.kind === 'line' && !isSmart && !mapFilters.line) return;
 
-                    // Determine inherited color and icon
-                    const renderColor = task.category_color || geom.color || groupColors[task.target_group] || '#3498db';
+                    // 1. Logic for Colors
+                    const markerColor = task.category_color || geom.color || '#3498db';
+                    const trackColor = geom.color || '#3498db'; // Tracks IGNORE category color
                     const renderIcon = task.category_icon || geom.icon || '📍';
+
+                    // 2. Logic for Line Style (Inherited from Category)
+                    let dashArray = [1, 0]; // Default solid
+                    if (task.category_line_type === 'dashed') dashArray = [4, 2];
+                    else if (task.category_line_type === 'dotted') dashArray = [0.1, 2];
 
                     if (geom.kind === 'point' && geom.lat && geom.lng) {
                         const el = document.createElement('div');
@@ -937,13 +949,13 @@
                         // If using FontAwesome, you'd apply a class; 
                         // for now, we'll support the current emoji/text structure
                         el.innerText = renderIcon;
-                        el.style.filter = `drop-shadow(0px 0px 4px ${renderColor})`;
+                        el.style.filter = `drop-shadow(0px 0px 4px ${markerColor})`;
                         el.style.cursor = 'pointer';
 
                         const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
                             .setLngLat([geom.lng, geom.lat])
                             .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
-                        <h4 style="border-left: 4px solid ${renderColor}; padding-left: 8px;">${renderIcon} ${geom.title}</h4>
+                        <h4 style="border-left: 4px solid ${markerColor}; padding-left: 8px;">${renderIcon} ${geom.title}</h4>
                         <p>Task: ${task.task_name || 'Unnamed'}</p>
                         <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})">Edit</button>
                     `))
@@ -959,14 +971,14 @@
                             source: `track-${geom.track_id}`,
                             layout: geom.kind === 'polygon' ? {} : {
                                 'line-join': 'round',
-                                'line-cap': isSmart ? 'round' : 'butt'
+                                'line-cap': task.category_line_type === 'dotted' ? 'round' : 'butt'
                             },
                             paint: geom.kind === 'polygon' ?
-                                { 'fill-color': renderColor, 'fill-opacity': 0.4 } :
+                                { 'fill-color': trackColor, 'fill-opacity': 0.4 } :
                                 {
-                                    'line-color': renderColor,
+                                    'line-color': trackColor,
                                     'line-width': 4,
-                                    'line-dasharray': isSmart ? [0.1, 2] : [1, 0]
+                                    'line-dasharray': dashArray
                                 }
                         });
 
@@ -1313,6 +1325,7 @@
             document.getElementById('new-cat-name').value = cat.name;
             document.getElementById('new-cat-color').value = cat.color || '#3498db';
             document.getElementById('new-cat-icon').value = cat.icon || '';
+            document.getElementById('new-cat-line-type').value = cat.line_type || 'solid';
 
             // Change the "Create" button to "Update"
             const btn = document.querySelector('#category-modal button[onclick="saveCategory()"]');
@@ -1330,6 +1343,7 @@
             const name = document.getElementById('new-cat-name').value;
             const color = document.getElementById('new-cat-color').value;
             const icon = document.getElementById('new-cat-icon').value;
+            const line_type = document.getElementById('new-cat-line-type').value;
             if (!name) return alert("Name is required");
 
             // Determine if we are updating or creating
@@ -1339,7 +1353,7 @@
             await fetch(url, {
                 method: method,
                 headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
-                body: JSON.stringify({ name, color, icon })
+                body: JSON.stringify({ name, color, icon, line_type })
             });
 
             // Reset the UI and variable
@@ -1347,6 +1361,7 @@
             document.getElementById('new-cat-name').value = '';
             document.getElementById('new-cat-color').value = '#3498db';
             document.getElementById('new-cat-icon').value = '';
+            document.getElementById('new-cat-line-type').value = 'solid';
 
             const btn = document.querySelector('#category-modal button[onclick="saveCategory()"]');
             btn.innerText = "Create Category";

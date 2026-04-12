@@ -70,7 +70,8 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS distance NUMERIC",
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS gain NUMERIC",
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS loss NUMERIC",
-      "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS parent_track_id INTEGER"
+      "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS parent_track_id INTEGER",
+      "ALTER TABLE categories ADD COLUMN IF NOT EXISTS line_type TEXT DEFAULT 'solid'"
     ];
 
     // Execute safely one by one
@@ -345,17 +346,17 @@ app.get('/categories', async (req, res) => {
 });
 
 app.post('/categories', adminAuth, async (req, res) => {
-  const { name, color, icon } = req.body;
+  const { name, color, icon, line_type } = req.body;
   try {
-    const result = await pool.query('INSERT INTO categories (name, color, icon) VALUES ($1, $2, $3) RETURNING *', [name, color || '#3498db', icon || 'tag']);
+    const result = await pool.query('INSERT INTO categories (name, color, icon, line_type) VALUES ($1, $2, $3, $4) RETURNING *', [name, color || '#3498db', icon || 'tag', line_type || 'solid']);
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/categories/:id', adminAuth, async (req, res) => {
-  const { name, color, icon } = req.body;
+  const { name, color, icon, line_type } = req.body;
   try {
-    const result = await pool.query('UPDATE categories SET name=$1, color=$2, icon=$3 WHERE id=$4 RETURNING *', [name, color, icon, req.params.id]);
+    const result = await pool.query('UPDATE categories SET name=$1, color=$2, icon=$3, line_type=$4 WHERE id=$5 RETURNING *', [name, color, icon, line_type, req.params.id]);
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -371,10 +372,11 @@ app.delete('/categories/:id', adminAuth, async (req, res) => {
 app.get('/itinerary', async (req, res) => {
   try {
     const query = `
-      SELECT t.*, t.id AS task_id,
-             c.color AS category_color, --
-             c.icon AS category_icon,   --
-             COALESCE(
+  SELECT t.*, t.id AS task_id,
+         c.color AS category_color,
+         c.icon AS category_icon,
+         c.line_type AS category_line_type,
+         COALESCE(
                json_agg(
                  json_build_object(
                    'anchor_id', ta.anchor_id,
@@ -402,7 +404,7 @@ app.get('/itinerary', async (req, res) => {
       LEFT JOIN spatial_anchors sa ON ta.anchor_id = sa.id
       LEFT JOIN waypoints w ON sa.waypoint_id = w.id
       LEFT JOIN tracks tr ON sa.track_id = tr.id
-      GROUP BY t.id, c.color, c.icon -- Group by category fields to include them
+      GROUP BY t.id, c.color, c.icon, c.line_type -- Group by category fields to include them
       ORDER BY t.day_label, t.starts_at;
     `;
     const result = await pool.query(query);
