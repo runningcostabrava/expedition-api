@@ -71,7 +71,8 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS gain NUMERIC",
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS loss NUMERIC",
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS parent_track_id INTEGER",
-      "ALTER TABLE categories ADD COLUMN IF NOT EXISTS line_type TEXT DEFAULT 'solid'"
+      "ALTER TABLE categories ADD COLUMN IF NOT EXISTS line_type TEXT DEFAULT 'solid'",
+      "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_milestone BOOLEAN DEFAULT false"
     ];
 
     // Execute safely one by one
@@ -102,23 +103,27 @@ app.get('/setup-db', adminAuth, async (req, res) => {
 
 // 2. TRACKS: GPX Upload & Management
 app.post('/tasks', adminAuth, async (req, res) => {
-  const { task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id } = req.body;
+  console.log("DEBUG POST /tasks payload:", req.body); // <-- Debugging added
+  const { task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id, is_milestone, section_id, category_id } = req.body;
   try {
     const result = await pool.query(
-      'INSERT INTO tasks (task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
-      [task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed || false, comments, parent_id]
+      'INSERT INTO tasks (task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id, is_milestone, section_id, category_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
+      [task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed || false, comments, parent_id, is_milestone || false, section_id, category_id]
     );
     res.json(result.rows[0]);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { 
+    console.error("DEBUG POST /tasks error:", err); // <-- Debugging added
+    res.status(500).json({ error: err.message }); 
+  }
 });
 
 app.put('/tasks/:id', adminAuth, async (req, res) => {
   const { id } = req.params;
-  const { task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id, category_id } = req.body;
+  const { task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id, category_id, is_milestone, section_id } = req.body;
   try {
     const result = await pool.query(
-      'UPDATE tasks SET task_name=$1, responsible=$2, target_group=$3, task_type=$4, day_label=$5, starts_at=$6, ends_at=$7, is_completed=$8, comments=$9, parent_id=$10, category_id=$11 WHERE id=$12 RETURNING *',
-      [task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id, category_id, id]
+      'UPDATE tasks SET task_name=$1, responsible=$2, target_group=$3, task_type=$4, day_label=$5, starts_at=$6, ends_at=$7, is_completed=$8, comments=$9, parent_id=$10, category_id=$11, is_milestone=$12, section_id=$14 WHERE id=$13 RETURNING *',
+      [task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id, category_id, is_milestone, id, section_id]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -132,6 +137,7 @@ app.get('/tracks', async (req, res) => {
 });
 
 app.post('/tracks', adminAuth, async (req, res) => {
+  console.log("DEBUG POST /tracks payload:", req.body);
   const { title, geojson_data, color, target_group, tasks, existing_task_id } = req.body;
   try {
     const result = await pool.query('INSERT INTO tracks (title, geojson_data, color, target_group) VALUES ($1, $2, $3, $4) RETURNING id',
@@ -147,15 +153,18 @@ app.post('/tracks', adminAuth, async (req, res) => {
       await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [existing_task_id, anchorId]);
     } else if (tasks && tasks.length > 0) {
       for (let t of tasks) {
-        const taskRes = await pool.query('INSERT INTO tasks (task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
-          [t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at, t.is_completed || false]);
+        const taskRes = await pool.query('INSERT INTO tasks (task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed, section_id, category_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id',
+          [t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at, t.is_completed || false, t.section_id, t.category_id]);
         const newTaskId = taskRes.rows[0].id;
         await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2)', [newTaskId, anchorId]);
       }
     }
 
     res.status(200).send({ message: "Track uploaded" });
-  } catch (err) { res.status(500).send({ error: err.message }); }
+  } catch (err) { 
+    console.error("DEBUG POST /tracks error:", err);
+    res.status(500).send({ error: err.message }); 
+  }
 });
 
 app.put('/tracks/:id', adminAuth, async (req, res) => {
@@ -193,9 +202,11 @@ app.put('/tracks/:id', adminAuth, async (req, res) => {
               day_label = COALESCE($4, day_label),
               starts_at = $5,
               ends_at = $6,
-              is_completed = COALESCE($7, is_completed)
+              is_completed = COALESCE($7, is_completed),
+              section_id = COALESCE($9, section_id),
+              category_id = COALESCE($10, category_id)
           WHERE id IN (SELECT task_id FROM task_anchors WHERE anchor_id = $8)`,
-          [task.name, task.responsible, task.target_group, task.day_label, task.starts_at, task.ends_at, task.is_completed, anchorId]);
+          [task.name, task.responsible, task.target_group, task.day_label, task.starts_at, task.ends_at, task.is_completed, anchorId, task.section_id, task.category_id]);
       }
     }
 
@@ -212,6 +223,7 @@ app.get('/waypoints', async (req, res) => {
 });
 
 app.post('/waypoints', adminAuth, async (req, res) => {
+  console.log("DEBUG POST /waypoints payload:", req.body);
   const { title, lat, lng, description, category, tasks, existing_task_id, color, icon } = req.body;
   try {
     const wp = await pool.query('INSERT INTO waypoints (title, lat, lng, description, category, color, icon) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
@@ -225,14 +237,17 @@ app.post('/waypoints', adminAuth, async (req, res) => {
       await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [existing_task_id, anchorId]);
     } else if (tasks && tasks.length > 0) {
       for (let t of tasks) {
-        const taskRes = await pool.query('INSERT INTO tasks (task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
-          [t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at, t.is_completed || false]);
+        const taskRes = await pool.query('INSERT INTO tasks (task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed, section_id, category_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id',
+          [t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at, t.is_completed || false, t.section_id, t.category_id]);
         const newTaskId = taskRes.rows[0].id;
         await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2)', [newTaskId, anchorId]);
       }
     }
     res.status(200).send({ message: "Waypoint created and linked!" });
-  } catch (err) { res.status(500).send({ error: err.message }); }
+  } catch (err) { 
+    console.error("DEBUG POST /waypoints error:", err);
+    res.status(500).send({ error: err.message }); 
+  }
 });
 
 app.put('/waypoints/:id', adminAuth, async (req, res) => {
@@ -266,9 +281,11 @@ app.put('/waypoints/:id', adminAuth, async (req, res) => {
                   day_label = COALESCE($4, day_label),
                   starts_at = $5,
                   ends_at = $6,
-                  is_completed = COALESCE($7, is_completed)
+                  is_completed = COALESCE($7, is_completed),
+                  section_id = COALESCE($9, section_id),
+                  category_id = COALESCE($10, category_id)
               WHERE id IN (SELECT task_id FROM task_anchors WHERE anchor_id = $8)`,
-          [task.name, task.responsible, task.target_group, task.day_label, task.starts_at, task.ends_at, task.is_completed, anchorId]);
+          [task.name, task.responsible, task.target_group, task.day_label, task.starts_at, task.ends_at, task.is_completed, anchorId, task.section_id, task.category_id]);
       }
     }
 

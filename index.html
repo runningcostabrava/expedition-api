@@ -1559,10 +1559,11 @@
             const headers = { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY };
 
             try {
+                let res;
                 if (isEditingGeometry) {
                     // Flow A: Updating an existing shape
                     if (activeWaypointId) {
-                        await fetch(`${API_URL}/waypoints/${activeWaypointId}`, {
+                        res = await fetch(`${API_URL}/waypoints/${activeWaypointId}`, {
                             method: 'PUT', headers,
                             body: JSON.stringify({
                                 title: taskData.task_name, color: geomColor, existing_task_id: existingTaskId,
@@ -1571,7 +1572,7 @@
                             })
                         });
                     } else if (activeTrackId) {
-                        await fetch(`${API_URL}/tracks/${activeTrackId}`, {
+                        res = await fetch(`${API_URL}/tracks/${activeTrackId}`, {
                             method: 'PUT', headers,
                             body: JSON.stringify({
                                 title: taskData.task_name, color: geomColor, existing_task_id: existingTaskId,
@@ -1585,7 +1586,7 @@
                     const tasksArr = existingTaskId ? undefined : [{ name: taskData.task_name, ...taskData }];
 
                     if (feat.geometry.type === 'Point') {
-                        await fetch(`${API_URL}/waypoints`, {
+                        res = await fetch(`${API_URL}/waypoints`, {
                             method: 'POST', headers,
                             body: JSON.stringify({
                                 title: taskData.task_name, color: geomColor, existing_task_id: existingTaskId,
@@ -1593,7 +1594,7 @@
                             })
                         });
                     } else {
-                        await fetch(`${API_URL}/tracks`, {
+                        res = await fetch(`${API_URL}/tracks`, {
                             method: 'POST', headers,
                             body: JSON.stringify({
                                 title: taskData.task_name, color: geomColor, existing_task_id: existingTaskId,
@@ -1604,16 +1605,18 @@
                 } else {
                     // Flow C: Saving ONLY a Task (No map shape)
                     if (existingTaskId) {
-                        await fetch(`${API_URL}/tasks/${existingTaskId}`, { method: 'PUT', headers, body: JSON.stringify(taskData) });
+                        const res = await fetch(`${API_URL}/tasks/${existingTaskId}`, { method: 'PUT', headers, body: JSON.stringify(taskData) });
+                        if (!res.ok) throw new Error(await res.text());
                     } else {
-                        await fetch(`${API_URL}/tasks`, { method: 'POST', headers, body: JSON.stringify(taskData) });
+                        const res = await fetch(`${API_URL}/tasks`, { method: 'POST', headers, body: JSON.stringify(taskData) });
+                        if (!res.ok) throw new Error(await res.text());
                     }
                 }
                 closeModal();
                 refreshData();
             } catch (err) {
-                console.error(err);
-                alert("Error saving data. Check console.");
+                console.error("DEBUG: Modal Save Error ->", err);
+                alert("Error saving data: " + err.message);
             }
         };
 
@@ -2048,20 +2051,22 @@
             if (!taskName) return;
             inputElement.disabled = true;
             try {
-                await fetch(`${API_URL}/tasks`, {
+                const payload = {
+                    task_name: taskName,
+                    section_id: sectionId,
+                    day_label: sectionTitle === 'Unscheduled' ? null : sectionTitle
+                };
+                console.log("DEBUG: Inline Task Payload ->", payload); // <-- Debugging
+                const res = await fetch(`${API_URL}/tasks`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
-                    // Send both section_id and day_label for full compatibility
-                    body: JSON.stringify({
-                        task_name: taskName,
-                        section_id: sectionId,
-                        day_label: sectionTitle === 'Unscheduled' ? null : sectionTitle
-                    })
+                    body: JSON.stringify(payload)
                 });
+                if (!res.ok) throw new Error(await res.text()); // <-- Strict error throwing
                 refreshData();
             } catch (e) {
-                console.error(e);
-                alert("Error adding task");
+                console.error("DEBUG: Inline Task Error ->", e);
+                alert("Server Error: " + e.message);
                 inputElement.disabled = false;
             }
         }
