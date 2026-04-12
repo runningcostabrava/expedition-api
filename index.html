@@ -20,7 +20,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -589,11 +588,7 @@
                 📁 Upload GPX
                 <input type="file" id="gpx-file" accept=".gpx" style="display: none;">
             </label>
-            <label class="tool-btn"
-                style="cursor: pointer; padding: 8px 15px; background: #fff; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;">📄
-                Import CSV
-                <input type="file" id="csv-file" accept=".csv" style="display:none;">
-            </label>
+
             <select id="route-profile" style="width: auto; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
                 <option value="driving">🚗 Drive</option>
                 <option value="walking">🚶 Walk</option>
@@ -1806,51 +1801,7 @@
             reader.readAsText(file);
         });
 
-        // CSV Asana Importer
-        document.getElementById('csv-file').addEventListener('change', function (e) {
-            const file = e.target.files[0];
-            if (!file) return;
 
-            document.getElementById('loading-overlay').style.display = 'flex';
-            document.getElementById('loading-overlay').innerHTML = '<h2>Parsing CSV...</h2>';
-
-            Papa.parse(file, {
-                header: true,
-                skipEmptyLines: true,
-                complete: async function (results) {
-                    const tasksToCreate = [];
-                    results.data.forEach(row => {
-                        const taskData = {
-                            task_name: row['Task Name'] || row['task'],
-                            responsible: row['Assignee'] || row['responsible'] || null,
-                            day_label: row['Day'] || row['day_label'] || null,
-                            task_type: row['Type'] || row['task_type'] || null,
-                            target_group: row['Target Group'] || row['target_group'] || null,
-                            comments: row['Description'] || row['comments'] || null,
-                            parent_name: row['Parent Task'] || row['parent_name'] || null
-                        };
-                        if (taskData.task_name) tasksToCreate.push(taskData);
-                    });
-
-                    try {
-                        const res = await fetch(`${API_URL}/tasks/bulk`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
-                            body: JSON.stringify({ tasks: tasksToCreate })
-                        });
-                        const saved = await res.json();
-                        alert(`Successfully imported ${tasksToCreate.length} tasks!`);
-                    } catch (err) {
-                        console.error("Bulk Import Error:", err);
-                        alert("Bulk import failed. See console.");
-                    }
-
-                    document.getElementById('loading-overlay').style.display = 'none';
-                    e.target.value = ''; // Reset input
-                    refreshData();
-                }
-            });
-        });
 
         initializeApp();
     </script>

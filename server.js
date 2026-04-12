@@ -257,59 +257,7 @@ app.put('/waypoints/:id', adminAuth, async (req, res) => {
   } catch (err) { res.status(500).send({ error: err.message }); }
 });
 
-// Bulk Import Tasks (CSV)
-app.post('/tasks/bulk', adminAuth, async (req, res) => {
-  const tasks = req.body.tasks;
-  if (!Array.isArray(tasks)) return res.status(400).json({ error: "Expected an array of tasks" });
 
-  const client = await pool.connect(); // <-- Grabs a dedicated connection
-
-  try {
-    await client.query('BEGIN');
-    const nameToIdMap = {};
-
-    for (const t of tasks) {
-      let parentId = null;
-
-      if (t.parent_name) {
-        if (nameToIdMap[t.parent_name]) {
-          parentId = nameToIdMap[t.parent_name];
-        } else {
-          const parentRes = await client.query('SELECT id FROM tasks WHERE task_name = $1 LIMIT 1', [t.parent_name]);
-          if (parentRes.rows.length > 0) {
-            parentId = parentRes.rows[0].id;
-            nameToIdMap[t.parent_name] = parentId;
-          }
-        }
-      }
-
-      const insertRes = await client.query(
-        `INSERT INTO tasks (task_name, responsible, day_label, target_group, task_type, comments, parent_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-        [
-          t.task_name,
-          t.responsible || null,
-          t.day_label || null,
-          t.target_group || null,
-          t.task_type || null,
-          t.comments || null,
-          parentId
-        ]
-      );
-
-      nameToIdMap[t.task_name] = insertRes.rows[0].id;
-    }
-
-    await client.query('COMMIT');
-    res.json({ message: "Bulk import successful" });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    console.error("Bulk Import Error:", err);
-    res.status(500).json({ error: err.message });
-  } finally {
-    client.release(); // <-- MUST release connection back to the pool
-  }
-});
 
 // Delete a specific task
 app.delete('/tasks/:id', adminAuth, async (req, res) => {
