@@ -34,14 +34,14 @@ app.get('/setup-db', adminAuth, async (req, res) => {
     await pool.query(`
       ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS category TEXT;
       ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS description TEXT;
-      
+
       ALTER TABLE tasks ADD COLUMN IF NOT EXISTS responsible TEXT;
       ALTER TABLE tasks ADD COLUMN IF NOT EXISTS characteristics TEXT;
       ALTER TABLE tasks ADD COLUMN IF NOT EXISTS target_group TEXT;
       ALTER TABLE tasks ADD COLUMN IF NOT EXISTS task_type TEXT;
       ALTER TABLE tasks ADD COLUMN IF NOT EXISTS day_label TEXT;
       ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_completed BOOLEAN DEFAULT false;
-      
+
       ALTER TABLE tracks ADD COLUMN IF NOT EXISTS target_group TEXT;
     `);
 
@@ -63,7 +63,7 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       -- Add styling to waypoints
       ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS color TEXT DEFAULT '#e74c3c';
       ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT 'marker';
-      
+
       -- Create Junction Table for Many-to-Many relationship
       CREATE TABLE IF NOT EXISTS task_anchors (
         task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
@@ -95,33 +95,33 @@ app.get('/setup-db', adminAuth, async (req, res) => {
     `);
 
     res.send("Database tables created and updated successfully with v3.0 Task-Centric model!");
-  } catch (err) { 
-    res.status(500).send("Setup Error: " + err.message); 
+  } catch (err) {
+    res.status(500).send("Setup Error: " + err.message);
   }
 });
 
 // 2. TRACKS: GPX Upload & Management
 app.post('/tasks', adminAuth, async (req, res) => {
-    const { task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id } = req.body;
-    try {
-        const result = await pool.query(
-            'INSERT INTO tasks (task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
-            [task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed || false, comments, parent_id]
-        );
-        res.json(result.rows[0]);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+  const { task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id } = req.body;
+  try {
+    const result = await pool.query(
+      'INSERT INTO tasks (task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+      [task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed || false, comments, parent_id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/tasks/:id', adminAuth, async (req, res) => {
-    const { id } = req.params;
-    const { task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id } = req.body;
-    try {
-        const result = await pool.query(
-            'UPDATE tasks SET task_name=$1, responsible=$2, target_group=$3, task_type=$4, day_label=$5, starts_at=$6, ends_at=$7, is_completed=$8, comments=$9, parent_id=$10 WHERE id=$11 RETURNING *',
-            [task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id, id]
-        );
-        res.json(result.rows[0]);
-    } catch (err) { res.status(500).json({ error: err.message }); }
+  const { id } = req.params;
+  const { task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id } = req.body;
+  try {
+    const result = await pool.query(
+      'UPDATE tasks SET task_name=$1, responsible=$2, target_group=$3, task_type=$4, day_label=$5, starts_at=$6, ends_at=$7, is_completed=$8, comments=$9, parent_id=$10 WHERE id=$11 RETURNING *',
+      [task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id, id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/tracks', async (req, res) => {
@@ -134,7 +134,7 @@ app.get('/tracks', async (req, res) => {
 app.post('/tracks', adminAuth, async (req, res) => {
   const { title, geojson_data, color, target_group, tasks, existing_task_id } = req.body;
   try {
-    const result = await pool.query('INSERT INTO tracks (title, geojson_data, color, target_group) VALUES ($1, $2, $3, $4) RETURNING id', 
+    const result = await pool.query('INSERT INTO tracks (title, geojson_data, color, target_group) VALUES ($1, $2, $3, $4) RETURNING id',
       [title, geojson_data, color || '#3498db', target_group]);
     const trackId = result.rows[0].id;
 
@@ -147,7 +147,7 @@ app.post('/tracks', adminAuth, async (req, res) => {
       await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [existing_task_id, anchorId]);
     } else if (tasks && tasks.length > 0) {
       for (let t of tasks) {
-        const taskRes = await pool.query('INSERT INTO tasks (task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id', 
+        const taskRes = await pool.query('INSERT INTO tasks (task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
           [t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at, t.is_completed || false]);
         const newTaskId = taskRes.rows[0].id;
         await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2)', [newTaskId, anchorId]);
@@ -186,13 +186,13 @@ app.put('/tracks/:id', adminAuth, async (req, res) => {
         const task = t;
         // In the many-to-many world, we update the tasks linked to this anchor
         await pool.query(`
-          UPDATE tasks SET 
-              task_name = COALESCE($1, task_name), 
-              responsible = COALESCE($2, responsible), 
-              target_group = COALESCE($3, target_group), 
-              day_label = COALESCE($4, day_label), 
-              starts_at = $5, 
-              ends_at = $6, 
+          UPDATE tasks SET
+              task_name = COALESCE($1, task_name),
+              responsible = COALESCE($2, responsible),
+              target_group = COALESCE($3, target_group),
+              day_label = COALESCE($4, day_label),
+              starts_at = $5,
+              ends_at = $6,
               is_completed = COALESCE($7, is_completed)
           WHERE id IN (SELECT task_id FROM task_anchors WHERE anchor_id = $8)`,
           [task.name, task.responsible, task.target_group, task.day_label, task.starts_at, task.ends_at, task.is_completed, anchorId]);
@@ -214,7 +214,7 @@ app.get('/waypoints', async (req, res) => {
 app.post('/waypoints', adminAuth, async (req, res) => {
   const { title, lat, lng, description, category, tasks, existing_task_id, color, icon } = req.body;
   try {
-    const wp = await pool.query('INSERT INTO waypoints (title, lat, lng, description, category, color, icon) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id', 
+    const wp = await pool.query('INSERT INTO waypoints (title, lat, lng, description, category, color, icon) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
       [title, lat, lng, description, category, color || '#e74c3c', icon || 'marker']);
     const wpId = wp.rows[0].id;
 
@@ -225,8 +225,8 @@ app.post('/waypoints', adminAuth, async (req, res) => {
       await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [existing_task_id, anchorId]);
     } else if (tasks && tasks.length > 0) {
       for (let t of tasks) {
-        const taskRes = await pool.query('INSERT INTO tasks (task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id', 
-        [t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at, t.is_completed || false]);
+        const taskRes = await pool.query('INSERT INTO tasks (task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
+          [t.name, t.responsible, t.characteristics, t.target_group, t.day_label, t.starts_at, t.ends_at, t.is_completed || false]);
         const newTaskId = taskRes.rows[0].id;
         await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2)', [newTaskId, anchorId]);
       }
@@ -236,64 +236,65 @@ app.post('/waypoints', adminAuth, async (req, res) => {
 });
 
 app.put('/waypoints/:id', adminAuth, async (req, res) => {
-    const { id } = req.params;
-    const { title, lat, lng, description, category, tasks, color, icon, existing_task_id, link, comments, distance, gain, loss, parent_track_id } = req.body;
-    try {
-      await pool.query(
-        'UPDATE waypoints SET title = COALESCE($1, title), lat = COALESCE($2, lat), lng = COALESCE($3, lng), description = COALESCE($4, description), category = COALESCE($5, category), color = COALESCE($6, color), icon = COALESCE($7, icon), link = COALESCE($9, link), comments = COALESCE($10, comments), distance = COALESCE($11, distance), gain = COALESCE($12, gain), loss = COALESCE($13, loss), parent_track_id = COALESCE($14, parent_track_id) WHERE id = $8',
-        [title, lat, lng, description, category, color, icon, id, link, comments, distance, gain, loss, parent_track_id]
-      );
+  const { id } = req.params;
+  const { title, lat, lng, description, category, tasks, color, icon, existing_task_id, link, comments, distance, gain, loss, parent_track_id } = req.body;
+  try {
+    await pool.query(
+      'UPDATE waypoints SET title = COALESCE($1, title), lat = COALESCE($2, lat), lng = COALESCE($3, lng), description = COALESCE($4, description), category = COALESCE($5, category), color = COALESCE($6, color), icon = COALESCE($7, icon), link = COALESCE($9, link), comments = COALESCE($10, comments), distance = COALESCE($11, distance), gain = COALESCE($12, gain), loss = COALESCE($13, loss), parent_track_id = COALESCE($14, parent_track_id) WHERE id = $8',
+      [title, lat, lng, description, category, color, icon, id, link, comments, distance, gain, loss, parent_track_id]
+    );
 
-      let anchorId;
-      const existingAnchor = await pool.query('SELECT id FROM spatial_anchors WHERE waypoint_id = $1', [id]);
-      if (existingAnchor.rows.length > 0) {
-        anchorId = existingAnchor.rows[0].id;
-      }
-  
-      if (existing_task_id && anchorId) {
-        await pool.query('DELETE FROM task_anchors WHERE anchor_id = $1', [anchorId]);
-        await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [existing_task_id, anchorId]);
-      }
+    let anchorId;
+    const existingAnchor = await pool.query('SELECT id FROM spatial_anchors WHERE waypoint_id = $1', [id]);
+    if (existingAnchor.rows.length > 0) {
+      anchorId = existingAnchor.rows[0].id;
+    }
 
-      if (anchorId && tasks && tasks.length > 0) {
-          for (let t of tasks) {
-            const task = t;
-            await pool.query(`
-              UPDATE tasks SET 
-                  task_name = COALESCE($1, task_name), 
-                  responsible = COALESCE($2, responsible), 
-                  target_group = COALESCE($3, target_group), 
-                  day_label = COALESCE($4, day_label), 
-                  starts_at = $5, 
-                  ends_at = $6, 
+    if (existing_task_id && anchorId) {
+      await pool.query('DELETE FROM task_anchors WHERE anchor_id = $1', [anchorId]);
+      await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [existing_task_id, anchorId]);
+    }
+
+    if (anchorId && tasks && tasks.length > 0) {
+      for (let t of tasks) {
+        const task = t;
+        await pool.query(`
+              UPDATE tasks SET
+                  task_name = COALESCE($1, task_name),
+                  responsible = COALESCE($2, responsible),
+                  target_group = COALESCE($3, target_group),
+                  day_label = COALESCE($4, day_label),
+                  starts_at = $5,
+                  ends_at = $6,
                   is_completed = COALESCE($7, is_completed)
               WHERE id IN (SELECT task_id FROM task_anchors WHERE anchor_id = $8)`,
-              [task.name, task.responsible, task.target_group, task.day_label, task.starts_at, task.ends_at, task.is_completed, anchorId]);
-          }
+          [task.name, task.responsible, task.target_group, task.day_label, task.starts_at, task.ends_at, task.is_completed, anchorId]);
       }
-  
-      res.status(200).send({ message: "Waypoint updated successfully" });
-    } catch (err) { res.status(500).send({ error: err.message }); }
+    }
+
+    res.status(200).send({ message: "Waypoint updated successfully" });
+  } catch (err) { res.status(500).send({ error: err.message }); }
 });
 
 // Bulk Import Tasks (CSV)
 app.post('/tasks/bulk', adminAuth, async (req, res) => {
   const tasks = req.body.tasks;
   if (!Array.isArray(tasks)) return res.status(400).json({ error: "Expected an array of tasks" });
-  
+
+  const client = await pool.connect(); // <-- Grabs a dedicated connection
+
   try {
-    await pool.query('BEGIN');
-    const nameToIdMap = {}; // Cache to link parents and subtasks in the same CSV
+    await client.query('BEGIN');
+    const nameToIdMap = {};
 
     for (const t of tasks) {
       let parentId = null;
 
-      // Resolve parent_id from parent_name
       if (t.parent_name) {
         if (nameToIdMap[t.parent_name]) {
           parentId = nameToIdMap[t.parent_name];
         } else {
-          const parentRes = await pool.query('SELECT id FROM tasks WHERE task_name = $1 LIMIT 1', [t.parent_name]);
+          const parentRes = await client.query('SELECT id FROM tasks WHERE task_name = $1 LIMIT 1', [t.parent_name]);
           if (parentRes.rows.length > 0) {
             parentId = parentRes.rows[0].id;
             nameToIdMap[t.parent_name] = parentId;
@@ -301,80 +302,81 @@ app.post('/tasks/bulk', adminAuth, async (req, res) => {
         }
       }
 
-      const insertRes = await pool.query(
-        `INSERT INTO tasks (task_name, responsible, day_label, target_group, task_type, comments, parent_id) 
+      const insertRes = await client.query(
+        `INSERT INTO tasks (task_name, responsible, day_label, target_group, task_type, comments, parent_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
         [
-          t.task_name, 
-          t.responsible || null, 
-          t.day_label || null, 
-          t.target_group || null, 
-          t.task_type || null, 
-          t.comments || null, 
+          t.task_name,
+          t.responsible || null,
+          t.day_label || null,
+          t.target_group || null,
+          t.task_type || null,
+          t.comments || null,
           parentId
         ]
       );
 
-      // Store ID in cache in case this task is a parent to a subsequent row
       nameToIdMap[t.task_name] = insertRes.rows[0].id;
     }
 
-    await pool.query('COMMIT');
+    await client.query('COMMIT');
     res.json({ message: "Bulk import successful" });
   } catch (err) {
-    await pool.query('ROLLBACK');
+    await client.query('ROLLBACK');
     console.error("Bulk Import Error:", err);
     res.status(500).json({ error: err.message });
+  } finally {
+    client.release(); // <-- MUST release connection back to the pool
   }
 });
 
 // Delete a specific task
 app.delete('/tasks/:id', adminAuth, async (req, res) => {
-    try {
-        await pool.query('DELETE FROM tasks WHERE id = $1', [req.params.id]);
-        res.json({ message: "Task deleted" });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+  try {
+    await pool.query('DELETE FROM tasks WHERE id = $1', [req.params.id]);
+    res.json({ message: "Task deleted" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Delete an entire section (by day_label)
 app.delete('/tasks/section/:day_label', adminAuth, async (req, res) => {
-    try {
-        const label = req.params.day_label === 'Unscheduled' ? null : req.params.day_label;
-        if (label === null) {
-            await pool.query('DELETE FROM tasks WHERE day_label IS NULL');
-        } else {
-            await pool.query('DELETE FROM tasks WHERE day_label = $1', [label]);
-        }
-        res.json({ message: "Section deleted" });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+  try {
+    const label = req.params.day_label === 'Unscheduled' ? null : req.params.day_label;
+    if (label === null) {
+      await pool.query('DELETE FROM tasks WHERE day_label IS NULL');
+    } else {
+      await pool.query('DELETE FROM tasks WHERE day_label = $1', [label]);
+    }
+    res.json({ message: "Section deleted" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Rename a section (bulk update day_label)
 app.put('/tasks/section/:old_label', adminAuth, async (req, res) => {
-    try {
-        const oldLabel = req.params.old_label === 'Unscheduled' ? null : req.params.old_label;
-        const { new_label } = req.body;
-        if (oldLabel === null) {
-            await pool.query('UPDATE tasks SET day_label = $1 WHERE day_label IS NULL', [new_label]);
-        } else {
-            await pool.query('UPDATE tasks SET day_label = $1 WHERE day_label = $2', [new_label, oldLabel]);
-        }
-        res.json({ message: "Section renamed" });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+  try {
+    const oldLabel = req.params.old_label === 'Unscheduled' ? null : req.params.old_label;
+    const { new_label } = req.body;
+    if (oldLabel === null) {
+      await pool.query('UPDATE tasks SET day_label = $1 WHERE day_label IS NULL', [new_label]);
+    } else {
+      await pool.query('UPDATE tasks SET day_label = $1 WHERE day_label = $2', [new_label, oldLabel]);
+    }
+    res.json({ message: "Section renamed" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Delete geometries
 app.delete('/waypoints/:id', adminAuth, async (req, res) => {
-    try {
-        await pool.query('DELETE FROM waypoints WHERE id = $1', [req.params.id]);
-        res.json({ message: "Waypoint deleted" });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+  try {
+    await pool.query('DELETE FROM waypoints WHERE id = $1', [req.params.id]);
+    res.json({ message: "Waypoint deleted" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 app.delete('/tracks/:id', adminAuth, async (req, res) => {
-    try {
-        await pool.query('DELETE FROM tracks WHERE id = $1', [req.params.id]);
-        res.json({ message: "Track deleted" });
-    } catch (err) { res.status(500).json({ error: err.message }); }
+  try {
+    await pool.query('DELETE FROM tracks WHERE id = $1', [req.params.id]);
+    res.json({ message: "Track deleted" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // 4. ITINERARY: View Project Plan
@@ -421,7 +423,7 @@ app.get('/itinerary', async (req, res) => {
 });
 
 app.get('/api/config', (req, res) => {
-  res.json({ 
+  res.json({
     MAPBOX_TOKEN: process.env.MAPBOX_TOKEN,
     ADMIN_KEY: process.env.ADMIN_KEY
   });
