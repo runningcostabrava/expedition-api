@@ -903,7 +903,7 @@
                             .setLngLat([geom.lng, geom.lat])
                             .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
                                 <h4>📍 ${geom.title}</h4>
-                                <p>Task: ${task.task}</p>
+                    <p>Task: ${task.task_name || task.task || 'Unnamed Task'}</p>
                                 <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})">Edit</button>
                             `))
                             .addTo(map);
@@ -938,7 +938,7 @@
                                 .setHTML(`
                                     <h4>${geom.kind === 'polygon' ? '🛑' : '📈'} ${geom.title}</h4>
                                     <p style="margin: 5px 0;">Distance: ${dist} km</p>
-                                    <p style="margin: 0; font-size: 0.9em; color: #666;">Task: ${task.task}</p>
+                    <p style="margin: 0; font-size: 0.9em; color: #666;">Task: ${task.task_name || task.task || 'Unnamed Task'}</p>
                                     <p style="margin: 5px 0; font-size: 0.85em; color: #333;">🔺 +${gain.toFixed(0)}m | 🔻 ${loss.toFixed(0)}m</p>
                                     <div style="margin-top: 10px; display: flex; gap: 5px;">
                                         <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="padding: 5px 10px; flex: 1;">Edit</button>
@@ -1392,7 +1392,8 @@
 
         async function updateTaskInline(taskId, field, value) {
             const task = allItinerary.find(t => t.task_id === taskId);
-            if (!task || task[field] == value) return;
+            // Null-safe comparison to prevent crashes
+            if (!task || String(task[field] || "") === String(value || "")) return;
 
             let payload = { ...task };
             if (field === 'starts_at') {
@@ -1449,7 +1450,7 @@
             if (!task) return;
             resetForm();
             activeTaskId = taskId;
-            document.getElementById('wp-title').value = task.task;
+            document.getElementById('wp-title').value = task.task_name || task.task || '';
             document.getElementById('target-group').value = task.target_group || 'Hikers';
             document.getElementById('day-label').value = task.day_label || '';
             document.getElementById('starts-at').value = task.starts_at ? task.starts_at.substring(0, 16) : '';
@@ -1483,7 +1484,8 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${task.task.replace(/\s+/g, '_')}_export.gpx`;
+            const tName = task.task_name || task.task || 'export';
+            a.download = `${tName.replace(/\s+/g, '_')}.gpx`;
             a.click();
             URL.revokeObjectURL(url);
         }
@@ -1632,7 +1634,7 @@
             const showTime = document.getElementById('col-time').checked;
             const showGroup = document.getElementById('col-group').checked;
 
-            let cellsHtml = `<div class="task-cell name"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">${doneUI}${task.task}</span></div>`;
+            let cellsHtml = `<div class="task-cell name"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">${doneUI}${task.task_name || task.task || 'Unnamed Task'}</span></div>`;
             if (showAssignee) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'responsible', this.innerText)" onclick="event.stopPropagation()">${task.responsible || '-'}</span></div>`;
             if (showTime) cellsHtml += `<div class="task-cell time"><input type="time" class="inline-edit" style="width:100%" value="${timeOnly}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()"></div>`;
             if (showGroup) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'target_group', this.innerText)" onclick="event.stopPropagation()">${task.target_group || '-'}</span></div>`;
@@ -1811,42 +1813,35 @@
                 header: true,
                 skipEmptyLines: true,
                 complete: async function (results) {
-                    const tasks = results.data;
-                    const idMapping = {}; // Asana GID -> DB Task ID
-                    let successCount = 0;
-
-                    for (const row of tasks) {
-                        const taskName = row['Name'] || row['Task Name'];
-                        const asanaId = row['Task ID'] || row['gid'];
-                        const parentAsanaId = row['Parent Task'] || row['parent_gid'];
-
-                        if (!taskName) continue;
-
+                    const tasksToCreate = [];
+                    results.data.forEach(row => {
                         const taskData = {
-                            task_name: taskName,
-                            responsible: row['Assignee'] || '',
-                            day_label: row['Section/Column'] || 'Unscheduled',
-                            comments: row['Description'] || row['Notes'] || '',
-                            parent_id: idMapping[parentAsanaId] || null
+                            task_name: row['Task Name'] || row['task'],
+                            responsible: row['Assignee'] || row['responsible'] || null,
+                            day_label: row['Day'] || row['day_label'] || null,
+                            task_type: row['Type'] || row['task_type'] || null,
+                            target_group: row['Target Group'] || row['target_group'] || null,
+                            comments: row['Description'] || row['comments'] || null,
+                            parent_name: row['Parent Task'] || row['parent_name'] || null
                         };
+                        if (taskData.task_name) tasksToCreate.push(taskData);
+                    });
 
-                        try {
-                            const res = await fetch(`${API_URL}/tasks`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
-                                body: JSON.stringify(taskData)
-                            });
-                            const saved = await res.json();
-                            if (asanaId && saved.task_id) {
-                                idMapping[asanaId] = saved.task_id;
-                            }
-                            successCount++;
-                        } catch (err) { console.error("Failed to import task:", taskName); }
+                    try {
+                        const res = await fetch(`${API_URL}/tasks/bulk`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                            body: JSON.stringify({ tasks: tasksToCreate })
+                        });
+                        const saved = await res.json();
+                        alert(`Successfully imported ${tasksToCreate.length} tasks!`);
+                    } catch (err) { 
+                        console.error("Bulk Import Error:", err);
+                        alert("Bulk import failed. See console.");
                     }
 
                     document.getElementById('loading-overlay').style.display = 'none';
                     e.target.value = ''; // Reset input
-                    alert(`Successfully imported ${successCount} tasks from CSV!`);
                     refreshData();
                 }
             });
