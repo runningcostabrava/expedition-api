@@ -387,7 +387,7 @@ app.delete('/categories/:id', adminAuth, async (req, res) => {
 app.get('/itinerary', async (req, res) => {
   try {
     const query = `
-  SELECT t.*, t.id AS task_id,
+  SELECT t.*, t.id AS task_id, s.section_date, -- Include section_date for sorting
          c.color AS category_color,
          c.icon AS category_icon,
          c.line_type AS category_line_type,
@@ -414,13 +414,14 @@ app.get('/itinerary', async (req, res) => {
                ) FILTER (WHERE ta.anchor_id IS NOT NULL), '[]'
              ) as geometries
       FROM tasks t
+      LEFT JOIN sections s ON t.section_id = s.id -- Join with sections
       LEFT JOIN categories c ON t.category_id = c.id -- Join the categories table
       LEFT JOIN task_anchors ta ON t.id = ta.task_id
       LEFT JOIN spatial_anchors sa ON ta.anchor_id = sa.id
       LEFT JOIN waypoints w ON sa.waypoint_id = w.id
       LEFT JOIN tracks tr ON sa.track_id = tr.id
-      GROUP BY t.id, c.color, c.icon, c.line_type -- Group by category fields to include them
-      ORDER BY t.day_label, t.starts_at;
+      GROUP BY t.id, s.section_date, c.color, c.icon, c.line_type -- Group by section_date and category fields
+      ORDER BY s.section_date ASC, t.starts_at ASC; -- This handles the "Auto Arrange"
     `;
     const result = await pool.query(query);
     res.json(result.rows);

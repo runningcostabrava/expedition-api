@@ -178,17 +178,17 @@
 
         .task-row {
             display: grid;
-            grid-template-columns: 1fr 100px 120px 40px;
+            /* grid-template-columns is set dynamically in JS */
             align-items: center;
-            padding: 12px 15px;
-            margin: 5px 10px;
-            background: #fff;
+            background: #ffffff !important; /* White background */
+            color: #333 !important; /* Dark text */
             border: 1px solid #eee;
             border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
-            gap: 10px;
-            cursor: pointer;
+            padding: 10px 15px;
+            margin: 4px 10px;
             transition: all 0.2s ease;
+            cursor: pointer;
+            overflow: hidden;
         }
 
         .task-row:hover {
@@ -197,9 +197,9 @@
         }
 
         .task-row.active-task {
-            filter: brightness(0.9) saturate(1.1); /* Darkens and enhances the category color */
-            border-left: 6px solid rgba(0,0,0,0.3) !important;
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.15);
+            background: #fcfcfc !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: scale(1.01);
         }
 
         .task-cell {
@@ -211,6 +211,17 @@
 
         .task-cell.name {
             font-weight: 500;
+        }
+
+        /* 2-Line Truncation for Task Names */
+        .task-cell.name span.inline-edit {
+            display: -webkit-box;
+            -webkit-line-clamp: 2; /* Limit to 2 lines */
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.4;
+            word-break: break-word;
         }
 
         .task-cell.time {
@@ -1799,7 +1810,9 @@
         function renderTaskCard(parentContainer, task, gridCols, allTasks) {
             const timeOnly = (task.starts_at && task.starts_at.length >= 16) ? task.starts_at.substring(11, 16) : '';
             const doneUI = task.is_completed ? '✅ ' : '';
-            const catColor = task.category_color || '#ffffff'; //
+
+            // Ensure we have a valid category color or default to light gray
+            const catColor = task.category_color || '#dfe6e9';
 
             const taskContainer = document.createElement('div');
             // Margin is now handled by the nested list container, but we keep the visual line indicator
@@ -1809,7 +1822,11 @@
             taskEl.className = 'task-row';
             taskEl.id = `task-row-${task.task_id}`;
             taskEl.style.gridTemplateColumns = gridCols;
-            taskEl.style.backgroundColor = catColor; // Apply category color
+
+            // THE NEW STYLE: White background + thick inner left border
+            taskEl.style.backgroundColor = '#ffffff';
+            taskEl.style.borderLeft = `10px solid ${catColor}`; // Visual color indicator
+
             if (task.is_completed) taskEl.style.opacity = '0.6';
 
             taskEl.onclick = () => {
@@ -1983,25 +2000,23 @@ function renderSectionUI(section, tasks, gridCols) {
 
     const dateVal = section.section_date ? new Date(section.section_date).toISOString().split('T')[0] : '';
     const sectionTitle = section.title || 'Unscheduled';
-    const sectionDesc = section.description || 'Click to add a description for this day...'; //
+    const sectionDesc = section.description || 'Add description...';
 
     sectionDiv.innerHTML = `
-        <div class="asana-header" style="margin-bottom: 5px;">
-            <span style="cursor:pointer;" onclick="flyToSection('${sectionTitle}')">▼</span>
-            ${section.id ? `<input type="date" value="${dateVal}" class="inline-edit-input" style="width: 35px; overflow:hidden; padding:0; border:none;" onchange="updateSectionMetadata(${section.id}, 'section_date', this.value)">` : ''}
-            <span class="inline-edit section-title-text" contenteditable="true" style="font-weight:bold; flex:1;" onblur="updateSectionMetadata(${section.id}, 'title', this.innerText)">${sectionTitle}</span>
-            <div style="display:flex; gap:2px; margin-left:auto;">
+        <div class="asana-header" style="display: flex; align-items: center; gap: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 10px;">
+            <span style="cursor:pointer; flex-shrink: 0;" onclick="flyToSection('${sectionTitle}')">▼</span>
+            ${section.id ? `<input type="date" value="${dateVal}" class="inline-edit-input" style="width: 35px; overflow:hidden; padding:0; border:none; flex-shrink: 0;" onchange="updateSectionMetadata(${section.id}, 'section_date', this.value)">` : ''}
+            <span class="inline-edit section-title-text" contenteditable="true" style="font-weight: bold; flex-shrink: 0;" onblur="updateSectionMetadata(${section.id}, 'title', this.innerText)">${sectionTitle}</span>
+            <span class="inline-edit" contenteditable="true" 
+                  onblur="updateSectionMetadata(${section.id}, 'description', this.innerText)"
+                  style="font-size: 0.85em; color: #95a5a6; font-style: italic; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                  ${sectionDesc}
+            </span>
+            <div style="display:flex; gap:2px; margin-left:auto; flex-shrink: 0;">
                 <button class="edit-btn" title="Center Map" onclick="flyToSection('${sectionTitle}')">🎯</button>
                 ${section.id ? `<button class="delete-btn" title="Delete Section" onclick="deleteSection('${sectionTitle}')">🗑️</button>` : ''}
             </div>
         </div>
-        
-        ${section.id ? `
-        <div style="margin: 0 0 15px 40px; font-size: 0.9em; color: #7f8c8d; border-left: 2px solid #ecf0f1; padding-left: 10px;">
-            <span class="inline-edit" contenteditable="true" 
-                  onblur="updateSectionMetadata(${section.id}, 'description', this.innerText)" 
-                  style="font-style: italic; display: block; min-height: 1.2em;">${sectionDesc}</span>
-        </div>` : ''}
         
         <div class="task-table-header" style="grid-template-columns: ${gridCols};">
             <div>Task Name</div>
