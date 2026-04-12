@@ -1697,12 +1697,17 @@
             taskContainer.appendChild(accordionEl);
             parentContainer.appendChild(taskContainer);
 
+
             // Recursion: Find and render children
             const subtasks = allTasks.filter(t => t.parent_id === task.task_id);
             subtasks.forEach(st => renderTaskCard(parentContainer, st, gridCols, allTasks));
+
+            return taskContainer;
         }
 
         async function createSubtask(parentId, dayLabel) {
+
+
             const name = prompt("Enter subtask name:");
             if (!name) return;
             await fetch(`${API_URL}/tasks`, {
@@ -1835,7 +1840,7 @@
                         });
                         const saved = await res.json();
                         alert(`Successfully imported ${tasksToCreate.length} tasks!`);
-                    } catch (err) { 
+                    } catch (err) {
                         console.error("Bulk Import Error:", err);
                         alert("Bulk import failed. See console.");
                     }
