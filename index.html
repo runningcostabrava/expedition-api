@@ -634,12 +634,14 @@
 
             <div id="task-fields-container">
                 <div class="form-group">
-                    <label>Target Group</label>
-                    <select id="target-group">
-                        <option value="Hikers">Hikers</option>
-                        <option value="Runners">Runners</option>
-                        <option value="Staff">Staff</option>
-                        <option value="Transport">Transport</option>
+                    <label style="display: flex; justify-content: space-between; align-items: center;">
+                        Category
+                        <span onclick="openModal('category-modal')"
+                            style="cursor:pointer; font-size: 12px; color: #3498db; text-decoration: underline;">Manage
+                            ⚙️</span>
+                    </label>
+                    <select id="task-category-id">
+                        <option value="">No Category</option>
                     </select>
                 </div>
 
@@ -693,11 +695,34 @@
         </div>
     </div>
 
+    <div id="category-modal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <span class="close" onclick="closeModal('category-modal')">&times;</span>
+            <h3>⚙️ Manage Categories</h3>
+            <div id="category-list"
+                style="margin-bottom: 20px; max-height: 200px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 8px;">
+            </div>
+            <hr>
+            <h4 style="margin-top:15px;">Add New Category</h4>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <input type="text" id="new-cat-name" placeholder="Name (e.g. Hiking)">
+                <div style="display: flex; gap: 10px;">
+                    <input type="color" id="new-cat-color" value="#3498db"
+                        style="width: 50px; height: 38px; border: none; padding: 0; cursor:pointer;">
+                    <input type="text" id="new-cat-icon" placeholder="Icon (e.g. bus, anchor, hiking)" style="flex: 1;">
+                </div>
+                <button onclick="saveCategory()"
+                    style="background: #27ae60; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer;">Create
+                    Category</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_URL = 'https://mapbox-api-uz9a.onrender.com';
         let map, draw;
         let activeMarkers = [];
-        let allTracks = [], allItinerary = [];
+        let allTracks = [], allItinerary = [], allSections = [], allCategories = [];
         let mapFilters = { point: true, line: true, smart: true, polygon: true };
 
         function updateFilters() {
@@ -886,33 +911,48 @@
                     if (geom.kind === 'line' && isSmart && !mapFilters.smart) return;
                     if (geom.kind === 'line' && !isSmart && !mapFilters.line) return;
 
-                    const renderColor = geom.color || groupColors[task.target_group] || '#3498db';
+                    // Determine inherited color and icon
+                    const renderColor = task.category_color || geom.color || groupColors[task.target_group] || '#3498db';
+                    const renderIcon = task.category_icon || geom.icon || '📍';
+
                     if (geom.kind === 'point' && geom.lat && geom.lng) {
                         const el = document.createElement('div');
                         el.style.fontSize = '22px';
-                        el.innerText = geom.icon || '📍';
+
+                        // If using FontAwesome, you'd apply a class; 
+                        // for now, we'll support the current emoji/text structure
+                        el.innerText = renderIcon;
                         el.style.filter = `drop-shadow(0px 0px 4px ${renderColor})`;
                         el.style.cursor = 'pointer';
 
                         const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
                             .setLngLat([geom.lng, geom.lat])
                             .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
-                                <h4>📍 ${geom.title}</h4>
-                    <p>Task: ${task.task_name || task.task || 'Unnamed Task'}</p>
-                                <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})">Edit</button>
-                            `))
+                        <h4 style="border-left: 4px solid ${renderColor}; padding-left: 8px;">${renderIcon} ${geom.title}</h4>
+                        <p>Task: ${task.task_name || 'Unnamed'}</p>
+                        <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})">Edit</button>
+                    `))
                             .addTo(map);
                         activeMarkers.push(marker);
                     } else if (geom.geojson) {
+                        // Apply the inherited color to lines/polygons as well
                         const layerId = `layer-${geom.track_id}`;
                         map.addSource(`track-${geom.track_id}`, { type: 'geojson', data: geom.geojson });
                         map.addLayer({
                             id: layerId,
                             type: geom.kind === 'polygon' ? 'fill' : 'line',
                             source: `track-${geom.track_id}`,
-                            paint: geom.kind === 'polygon' ? { 'fill-color': renderColor, 'fill-opacity': 0.4 } :
-                                isSmart ? { 'line-color': renderColor, 'line-width': 4, 'line-dasharray': [2, 2] } :
-                                    { 'line-color': renderColor, 'line-width': 4 }
+                            layout: geom.kind === 'polygon' ? {} : {
+                                'line-join': 'round',
+                                'line-cap': isSmart ? 'round' : 'butt'
+                            },
+                            paint: geom.kind === 'polygon' ?
+                                { 'fill-color': renderColor, 'fill-opacity': 0.4 } :
+                                {
+                                    'line-color': renderColor,
+                                    'line-width': 4,
+                                    'line-dasharray': isSmart ? [0.1, 2] : [1, 0]
+                                }
                         });
 
                         map.on('click', layerId, (e) => {
@@ -1188,9 +1228,20 @@
         async function refreshData() {
             const previousActiveId = activeTaskId;
             try {
-                const res = await fetch(`${API_URL}/itinerary`);
-                const data = await res.json();
-                allItinerary = Array.isArray(data) ? data : [];
+                // Fetch Sections, Categories, and Itinerary simultaneously
+                const [itRes, secRes, catRes] = await Promise.all([
+                    fetch(`${API_URL}/itinerary`),
+                    fetch(`${API_URL}/sections`),
+                    fetch(`${API_URL}/categories`)
+                ]);
+
+                allItinerary = await itRes.json();
+                allSections = await secRes.json();
+                allCategories = await catRes.json();
+
+                // Update UI components
+                updateCategoryDropdowns();
+                renderCategoryList();
                 if (previousActiveId) activeTaskId = previousActiveId;
 
                 const dropdown = document.getElementById('existing-task');
@@ -1509,12 +1560,24 @@
                 return new Date(a.starts_at) - new Date(b.starts_at);
             });
 
+            // Group tasks by their actual section_id
             const groups = {};
             filtered.forEach(task => {
-                const day = task.day_label || 'Unscheduled';
-                if (!groups[day]) groups[day] = [];
-                groups[day].push(task);
+                const sectionId = task.section_id || 'unscheduled';
+                if (!groups[sectionId]) groups[sectionId] = [];
+                groups[sectionId].push(task);
             });
+
+            // Render sections in chronological order
+            allSections.forEach(section => {
+                const tasks = groups[section.id] || [];
+                renderSectionUI(section, tasks, gridCols);
+            });
+
+            // Render the 'Unscheduled' bucket at the bottom
+            if (groups['unscheduled']) {
+                renderSectionUI({ title: 'Unscheduled', id: null }, groups['unscheduled'], gridCols);
+            }
 
             const showAssignee = document.getElementById('col-assignee').checked;
             const showTime = document.getElementById('col-time').checked;

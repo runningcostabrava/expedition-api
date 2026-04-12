@@ -25,6 +25,10 @@ app.get('/setup-db', adminAuth, async (req, res) => {
     const queries = [
       // Core Tables
       "CREATE TABLE IF NOT EXISTS location_logs (id SERIAL PRIMARY KEY, guide_id TEXT, lat DOUBLE PRECISION, lng DOUBLE PRECISION, timestamp TIMESTAMPTZ DEFAULT NOW())",
+      "CREATE TABLE IF NOT EXISTS sections (id SERIAL PRIMARY KEY, section_date DATE, title TEXT, description TEXT)",
+      "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS section_id INTEGER REFERENCES sections(id) ON DELETE SET NULL",
+      "CREATE TABLE IF NOT EXISTS categories (id SERIAL PRIMARY KEY, name TEXT UNIQUE, color TEXT, icon TEXT)",
+      "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL",
       "CREATE TABLE IF NOT EXISTS waypoints (id SERIAL PRIMARY KEY, title TEXT, description TEXT, lat DOUBLE PRECISION, lng DOUBLE PRECISION)",
       "CREATE TABLE IF NOT EXISTS tasks (id SERIAL PRIMARY KEY, waypoint_id INTEGER REFERENCES waypoints(id) ON DELETE CASCADE, task_name TEXT, responsible TEXT, characteristics TEXT, scheduled_time TIMESTAMPTZ, is_completed BOOLEAN DEFAULT false)",
       "CREATE TABLE IF NOT EXISTS tracks (id SERIAL PRIMARY KEY, title TEXT, color TEXT DEFAULT '#FF0000', geojson_data JSONB NOT NULL)",
@@ -74,7 +78,21 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       await pool.query(q);
     }
 
-    res.send("Database tables created and updated successfully with v3.0 Task-Centric model!");
+    // Auto-migrate existing text labels into real Sections
+    await pool.query(`
+      INSERT INTO sections (title, section_date)
+      SELECT DISTINCT day_label, CURRENT_DATE
+      FROM tasks
+      WHERE day_label IS NOT NULL AND day_label NOT IN (SELECT title FROM sections)
+      ON CONFLICT DO NOTHING;
+    `);
+
+    // Link existing tasks to their new sections
+    await pool.query(`
+      UPDATE tasks t SET section_id = s.id FROM sections s WHERE t.day_label = s.title AND t.section_id IS NULL;
+    `);
+
+    res.send("Database tables updated successfully with real Sections!");
   } catch (err) {
     console.error("Setup Error:", err);
     res.status(500).send("Setup Error: " + err.message);
@@ -308,11 +326,44 @@ app.delete('/tracks/:id', adminAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// --- CATEGORY MANAGEMENT ---
+app.get('/categories', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM categories ORDER BY name ASC');
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/categories', adminAuth, async (req, res) => {
+  const { name, color, icon } = req.body;
+  try {
+    const result = await pool.query('INSERT INTO categories (name, color, icon) VALUES ($1, $2, $3) RETURNING *', [name, color || '#3498db', icon || 'tag']);
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/categories/:id', adminAuth, async (req, res) => {
+  const { name, color, icon } = req.body;
+  try {
+    const result = await pool.query('UPDATE categories SET name=$1, color=$2, icon=$3 WHERE id=$4 RETURNING *', [name, color, icon, req.params.id]);
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/categories/:id', adminAuth, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM categories WHERE id=$1', [req.params.id]);
+    res.json({ message: 'Category deleted' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // 4. ITINERARY: View Project Plan
 app.get('/itinerary', async (req, res) => {
   try {
     const query = `
       SELECT t.*, t.id AS task_id,
+             c.color AS category_color, --
+             c.icon AS category_icon,   --
              COALESCE(
                json_agg(
                  json_build_object(
@@ -336,11 +387,12 @@ app.get('/itinerary', async (req, res) => {
                ) FILTER (WHERE ta.anchor_id IS NOT NULL), '[]'
              ) as geometries
       FROM tasks t
+      LEFT JOIN categories c ON t.category_id = c.id -- Join the categories table
       LEFT JOIN task_anchors ta ON t.id = ta.task_id
       LEFT JOIN spatial_anchors sa ON ta.anchor_id = sa.id
       LEFT JOIN waypoints w ON sa.waypoint_id = w.id
       LEFT JOIN tracks tr ON sa.track_id = tr.id
-      GROUP BY t.id
+      GROUP BY t.id, c.color, c.icon -- Group by category fields to include them
       ORDER BY t.day_label, t.starts_at;
     `;
     const result = await pool.query(query);
