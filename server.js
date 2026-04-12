@@ -22,80 +22,61 @@ const pool = new Pool({
 // 1. SETUP: Run once at /setup-db
 app.get('/setup-db', adminAuth, async (req, res) => {
   try {
-    // First, ensure tables exist (for new deployments)
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS location_logs (id SERIAL PRIMARY KEY, guide_id TEXT, lat DOUBLE PRECISION, lng DOUBLE PRECISION, timestamp TIMESTAMPTZ DEFAULT NOW());
-      CREATE TABLE IF NOT EXISTS waypoints (id SERIAL PRIMARY KEY, title TEXT, description TEXT, lat DOUBLE PRECISION, lng DOUBLE PRECISION);
-      CREATE TABLE IF NOT EXISTS tasks (id SERIAL PRIMARY KEY, waypoint_id INTEGER REFERENCES waypoints(id) ON DELETE CASCADE, task_name TEXT, responsible TEXT, characteristics TEXT, scheduled_time TIMESTAMPTZ, is_completed BOOLEAN DEFAULT false);
-      CREATE TABLE IF NOT EXISTS tracks (id SERIAL PRIMARY KEY, title TEXT, color TEXT DEFAULT '#FF0000', geojson_data JSONB NOT NULL);
-    `);
+    const queries = [
+      // Core Tables
+      "CREATE TABLE IF NOT EXISTS location_logs (id SERIAL PRIMARY KEY, guide_id TEXT, lat DOUBLE PRECISION, lng DOUBLE PRECISION, timestamp TIMESTAMPTZ DEFAULT NOW())",
+      "CREATE TABLE IF NOT EXISTS waypoints (id SERIAL PRIMARY KEY, title TEXT, description TEXT, lat DOUBLE PRECISION, lng DOUBLE PRECISION)",
+      "CREATE TABLE IF NOT EXISTS tasks (id SERIAL PRIMARY KEY, waypoint_id INTEGER REFERENCES waypoints(id) ON DELETE CASCADE, task_name TEXT, responsible TEXT, characteristics TEXT, scheduled_time TIMESTAMPTZ, is_completed BOOLEAN DEFAULT false)",
+      "CREATE TABLE IF NOT EXISTS tracks (id SERIAL PRIMARY KEY, title TEXT, color TEXT DEFAULT '#FF0000', geojson_data JSONB NOT NULL)",
 
-    // Second, alter tables to add ALL potentially missing columns from older versions
-    await pool.query(`
-      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS category TEXT;
-      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS description TEXT;
+      // Additional Columns
+      "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS category TEXT",
+      "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS description TEXT",
+      "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS responsible TEXT",
+      "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS characteristics TEXT",
+      "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS target_group TEXT",
+      "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS task_type TEXT",
+      "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS day_label TEXT",
+      "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_completed BOOLEAN DEFAULT false",
+      "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS target_group TEXT",
 
-      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS responsible TEXT;
-      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS characteristics TEXT;
-      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS target_group TEXT;
-      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS task_type TEXT;
-      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS day_label TEXT;
-      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_completed BOOLEAN DEFAULT false;
+      // Spatial Anchors
+      "CREATE TABLE IF NOT EXISTS spatial_anchors (id SERIAL PRIMARY KEY, kind VARCHAR(20) CHECK (kind IN ('point', 'line', 'polygon')), waypoint_id INTEGER REFERENCES waypoints(id) ON DELETE CASCADE, track_id INTEGER REFERENCES tracks(id) ON DELETE CASCADE)",
+      "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS anchor_id INTEGER REFERENCES spatial_anchors(id) ON DELETE CASCADE",
+      "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS starts_at TIMESTAMPTZ",
+      "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS ends_at TIMESTAMPTZ",
 
-      ALTER TABLE tracks ADD COLUMN IF NOT EXISTS target_group TEXT;
-    `);
+      // Task-Centric Model
+      "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS color TEXT DEFAULT '#e74c3c'",
+      "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT 'marker'",
+      "CREATE TABLE IF NOT EXISTS task_anchors (task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE, anchor_id INTEGER REFERENCES spatial_anchors(id) ON DELETE CASCADE, PRIMARY KEY (task_id, anchor_id))",
 
-    // Phase 2: Spatial Anchors and Timelines
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS spatial_anchors (
-        id SERIAL PRIMARY KEY,
-        kind VARCHAR(20) CHECK (kind IN ('point', 'line', 'polygon')),
-        waypoint_id INTEGER REFERENCES waypoints(id) ON DELETE CASCADE,
-        track_id INTEGER REFERENCES tracks(id) ON DELETE CASCADE
-      );
-      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS anchor_id INTEGER REFERENCES spatial_anchors(id) ON DELETE CASCADE;
-      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS starts_at TIMESTAMPTZ;
-      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS ends_at TIMESTAMPTZ;
-    `);
+      "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS comments TEXT",
+      "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE",
 
-    // Phase 3: Task-Centric model & many-to-many
-    await pool.query(`
-      -- Add styling to waypoints
-      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS color TEXT DEFAULT '#e74c3c';
-      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT 'marker';
+      // Routing & Meta
+      "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS link TEXT",
+      "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS comments TEXT",
+      "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS distance NUMERIC",
+      "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS gain NUMERIC",
+      "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS loss NUMERIC",
 
-      -- Create Junction Table for Many-to-Many relationship
-      CREATE TABLE IF NOT EXISTS task_anchors (
-        task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
-        anchor_id INTEGER REFERENCES spatial_anchors(id) ON DELETE CASCADE,
-        PRIMARY KEY (task_id, anchor_id)
-      );
+      "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS link TEXT",
+      "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS comments TEXT",
+      "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS distance NUMERIC",
+      "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS gain NUMERIC",
+      "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS loss NUMERIC",
+      "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS parent_track_id INTEGER"
+    ];
 
-      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS comments TEXT;
-      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE;
-
-      -- Sub-Task 3.3 additions
-      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS link TEXT;
-      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS comments TEXT;
-      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS distance NUMERIC;
-      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS gain NUMERIC;
-      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS loss NUMERIC;
-
-      ALTER TABLE tracks ADD COLUMN IF NOT EXISTS link TEXT;
-      ALTER TABLE tracks ADD COLUMN IF NOT EXISTS comments TEXT;
-      ALTER TABLE tracks ADD COLUMN IF NOT EXISTS distance NUMERIC;
-      ALTER TABLE tracks ADD COLUMN IF NOT EXISTS gain NUMERIC;
-      ALTER TABLE tracks ADD COLUMN IF NOT EXISTS loss NUMERIC;
-      ALTER TABLE tracks ADD COLUMN IF NOT EXISTS parent_track_id INTEGER;
-
-      ALTER TABLE tracks ADD COLUMN IF NOT EXISTS link TEXT;
-      ALTER TABLE tracks ADD COLUMN IF NOT EXISTS comments TEXT;
-      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS link TEXT;
-      ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS comments TEXT;
-    `);
+    // Execute safely one by one
+    for (let q of queries) {
+      await pool.query(q);
+    }
 
     res.send("Database tables created and updated successfully with v3.0 Task-Centric model!");
   } catch (err) {
+    console.error("Setup Error:", err);
     res.status(500).send("Setup Error: " + err.message);
   }
 });
