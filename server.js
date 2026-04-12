@@ -326,6 +326,16 @@ app.delete('/tracks/:id', adminAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// --- SECTION MANAGEMENT ---
+app.get('/sections', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM sections ORDER BY section_date ASC, id ASC');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- CATEGORY MANAGEMENT ---
 app.get('/categories', async (req, res) => {
   try {
