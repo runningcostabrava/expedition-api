@@ -505,6 +505,18 @@
             gap: 8px;
             margin-top: 10px;
         }
+
+        .close {
+            float: right;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #aaa;
+        }
+
+        .close:hover {
+            color: #000;
+        }
     </style>
 </head>
 
@@ -1326,8 +1338,21 @@
             document.getElementById('existing-task').style.display = 'block';
         }
 
-        function openModal() { document.getElementById('command-modal').style.display = 'flex'; }
-        function closeModal() { document.getElementById('command-modal').style.display = 'none'; resetForm(); draw.deleteAll(); }
+        function openModal(id = 'command-modal') { 
+            const target = document.getElementById(id);
+            if (target) target.style.display = 'flex'; 
+        }
+
+        function closeModal(id = 'command-modal') { 
+            const target = document.getElementById(id);
+            if (target) target.style.display = 'none'; 
+            
+            // Only reset the drawing tools and task form if closing the main editor
+            if (id === 'command-modal') {
+                resetForm(); 
+                draw.deleteAll(); 
+            }
+        }
 
         async function deleteTask(id) {
             if (!id || id === 'undefined') {
