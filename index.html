@@ -1587,9 +1587,21 @@
             const container = document.getElementById('asana-container');
             const searchTerm = document.getElementById('search-filter').value.toLowerCase();
             const groupFilter = document.getElementById('group-filter').value;
+            const typeFilter = document.getElementById('type-filter').value;
             container.innerHTML = '';
 
-            const typeFilter = document.getElementById('type-filter').value;
+            // 1. Calculate grid columns first so renderSectionUI can use them
+            const showAssignee = document.getElementById('col-assignee').checked;
+            const showTime = document.getElementById('col-time').checked;
+            const showGroup = document.getElementById('col-group').checked;
+
+            let gridCols = '1.5fr 1fr ';
+            if (showAssignee) gridCols += '90px ';
+            if (showTime) gridCols += '90px ';
+            if (showGroup) gridCols += '90px ';
+            gridCols += '100px';
+
+            // 2. Filter tasks
             let filtered = allItinerary.filter(t => {
                 const name = t.task_name || t.task || "";
                 const matchSearch = name.toLowerCase().includes(searchTerm);
@@ -1606,17 +1618,7 @@
                 return new Date(a.starts_at) - new Date(b.starts_at);
             });
 
-            // Grid: Name (1.5fr), Desc (1fr), Assignee (100px), Time (100px), Actions (100px)
-            const showAssignee = document.getElementById('col-assignee').checked;
-            const showTime = document.getElementById('col-time').checked;
-            const showGroup = document.getElementById('col-group').checked;
-            let gridCols = '1.5fr 1fr ';
-            if (showAssignee) gridCols += '90px ';
-            if (showTime) gridCols += '90px ';
-            if (showGroup) gridCols += '90px ';
-            gridCols += '100px';
-
-            // Group tasks by their actual section_id
+            // 3. Group by section_id
             const groups = {};
             filtered.forEach(task => {
                 const sectionId = task.section_id || 'unscheduled';
@@ -1624,18 +1626,17 @@
                 groups[sectionId].push(task);
             });
 
-            // Render sections in chronological order
+            // 4. Render sections
             allSections.forEach(section => {
                 const tasks = groups[section.id] || [];
                 renderSectionUI(section, tasks, gridCols);
             });
 
-            // Render the 'Unscheduled' bucket at the bottom
             if (groups['unscheduled']) {
                 renderSectionUI({ title: 'Unscheduled', id: null }, groups['unscheduled'], gridCols);
             }
 
-            // Inject Inline "+ Add Section" button
+            // 5. Add "New Section" button at the bottom
             const newSectionDiv = document.createElement('div');
             newSectionDiv.style.marginTop = '30px';
             newSectionDiv.innerHTML = `<input type="date" title="Add New Day" style="padding:10px; border:1px solid #ddd; border-radius:6px; cursor:pointer; background:#fff; color:#333; font-weight:bold; outline:none;" onchange="if(this.value) { updateSection('new_temp_section', this.value); this.value=''; }"> <span style="font-size:0.85em; color:#7f8c8d; margin-left:10px;">+ Add Date Section</span>`;
