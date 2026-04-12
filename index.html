@@ -837,6 +837,31 @@
 
         const groupColors = { 'Hikers': '#2ecc71', 'Runners': '#e67e22', 'Staff': '#9b59b6', 'Transport': '#f1c40f' };
 
+        async function calculateSmartRoute() {
+            if (routePoints.length === 1) {
+                draw.deleteAll();
+                draw.add({ id: 'temp-start-point', type: 'Feature', geometry: { type: 'Point', coordinates: routePoints[0] } });
+            } else if (routePoints.length >= 2 && routePoints.length <= 25) {
+                const profile = document.getElementById('route-profile').value;
+                const coords = routePoints.map(p => `${p[0]},${p[1]}`).join(';');
+                try {
+                    const res = await fetch(`https://api.mapbox.com/directions/v5/mapbox/${profile}/${coords}?geometries=geojson&access_token=${mapboxgl.accessToken}`);
+                    const data = await res.json();
+                    if (data.routes && data.routes.length > 0) {
+                        lastCalculatedRoute = data.routes[0];
+                        draw.deleteAll();
+                        draw.add(lastCalculatedRoute.geometry);
+                    }
+                    // Keep markers for intermediate stops
+                    routePoints.forEach((pt, idx) => {
+                        draw.add({ id: `stop-${idx}`, type: 'Feature', geometry: { type: 'Point', coordinates: pt } });
+                    });
+                } catch (err) {
+                    console.error("Routing error:", err);
+                }
+            }
+        }
+
         async function initializeApp() {
             const configRes = await fetch(`${API_URL}/api/config`);
             const config = await configRes.json();
@@ -891,40 +916,27 @@
 
                 if (isRouting) {
                     routePoints.push([e.lngLat.lng, e.lngLat.lat]);
-
-                    if (routePoints.length === 1) {
-                        draw.deleteAll();
-                        draw.add({ id: 'temp-start-point', type: 'Feature', geometry: { type: 'Point', coordinates: routePoints[0] } });
-                    } else if (routePoints.length >= 2 && routePoints.length <= 25) {
-                        const profile = document.getElementById('route-profile').value;
-                        const coords = routePoints.map(p => `${p[0]},${p[1]}`).join(';');
-                        try {
-                            const res = await fetch(`https://api.mapbox.com/directions/v5/mapbox/${profile}/${coords}?geometries=geojson&access_token=${mapboxgl.accessToken}`);
-                            const data = await res.json();
-                            if (data.routes && data.routes.length > 0) {
-                                lastCalculatedRoute = data.routes[0];
-                                draw.deleteAll();
-                                draw.add(lastCalculatedRoute.geometry);
-                            } // <-- ADDED MISSING BRACE HERE
-
-                            // Keep markers for intermediate stops
-                            routePoints.forEach((pt, idx) => {
-                                draw.add({ id: `stop-${idx}`, type: 'Feature', geometry: { type: 'Point', coordinates: pt } });
-                            });
-                        } catch (err) {
-                            console.error("Routing error:", err);
-                        }
-                    }
+                    calculateSmartRoute();
                     return; // Keep routing active until Enter is pressed
                 }
             });
 
             // 2. Geocoder Result
             geocoder.on('result', (e) => {
-                draw.deleteAll();
-                const feature = { type: 'Feature', geometry: { type: 'Point', coordinates: e.result.center } };
-                draw.add(feature);
-                showGeometryContextPopup(e.result.center, feature.geometry, e.result.text, '');
+                if (isRouting) {
+                    // Add searched location to the route
+                    routePoints.push(e.result.center);
+                    calculateSmartRoute();
+                    
+                    // Clear the search box so user can quickly type the next stop
+                    setTimeout(() => geocoder.clear(), 200); 
+                } else {
+                    // Normal behavior: drop a single pin
+                    draw.deleteAll();
+                    const feature = { type: 'Feature', geometry: { type: 'Point', coordinates: e.result.center } };
+                    draw.add(feature);
+                    showGeometryContextPopup(e.result.center, feature.geometry, e.result.text, '');
+                }
             });
 
             // Listen for ENTER to finish Multi-stop Route
