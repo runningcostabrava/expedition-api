@@ -1976,17 +1976,17 @@
             }
         }
 
-        function renderSectionUI(section, tasks, gridCols) {
-            const container = document.getElementById('asana-container');
-            const sectionDiv = document.createElement('div');
-            sectionDiv.className = 'asana-section';
+function renderSectionUI(section, tasks, gridCols) {
+    const container = document.getElementById('asana-container');
+    const sectionDiv = document.createElement('div');
+    sectionDiv.className = 'asana-section';
 
-            const dateVal = section.section_date ? new Date(section.section_date).toISOString().split('T')[0] : '';
-            const sectionTitle = section.title || 'Unscheduled';
-            const sectionDesc = section.description || 'Add a description...';
+    const dateVal = section.section_date ? new Date(section.section_date).toISOString().split('T')[0] : '';
+    const sectionTitle = section.title || 'Unscheduled';
+    const sectionDesc = section.description || 'Click to add a description for this day...'; //
 
-            sectionDiv.innerHTML = `
-        <div class="asana-header">
+    sectionDiv.innerHTML = `
+        <div class="asana-header" style="margin-bottom: 5px;">
             <span style="cursor:pointer;" onclick="flyToSection('${sectionTitle}')">▼</span>
             ${section.id ? `<input type="date" value="${dateVal}" class="inline-edit-input" style="width: 35px; overflow:hidden; padding:0; border:none;" onchange="updateSectionMetadata(${section.id}, 'section_date', this.value)">` : ''}
             <span class="inline-edit section-title-text" contenteditable="true" style="font-weight:bold; flex:1;" onblur="updateSectionMetadata(${section.id}, 'title', this.innerText)">${sectionTitle}</span>
@@ -1995,9 +1995,12 @@
                 ${section.id ? `<button class="delete-btn" title="Delete Section" onclick="deleteSection('${sectionTitle}')">🗑️</button>` : ''}
             </div>
         </div>
+        
         ${section.id ? `
-        <div style="margin: -5px 0 15px 30px; font-size: 0.85em; color: #7f8c8d;">
-            <span class="inline-edit" contenteditable="true" onblur="updateSectionMetadata(${section.id}, 'description', this.innerText)" style="font-style: italic; display: block;">${sectionDesc}</span>
+        <div style="margin: 0 0 15px 40px; font-size: 0.9em; color: #7f8c8d; border-left: 2px solid #ecf0f1; padding-left: 10px;">
+            <span class="inline-edit" contenteditable="true" 
+                  onblur="updateSectionMetadata(${section.id}, 'description', this.innerText)" 
+                  style="font-style: italic; display: block; min-height: 1.2em;">${sectionDesc}</span>
         </div>` : ''}
         
         <div class="task-table-header" style="grid-template-columns: ${gridCols};">
@@ -2010,26 +2013,24 @@
         </div>
     `;
 
-            const taskListContainer = document.createElement('div');
-            taskListContainer.className = 'sortable-task-list';
-            taskListContainer.dataset.section = sectionTitle;
+    const taskListContainer = document.createElement('div');
+    taskListContainer.className = 'sortable-task-list';
+    taskListContainer.dataset.section = sectionTitle;
 
-            tasks.forEach(task => {
-                // Only render top-level tasks here; renderTaskCard handles recursion for subtasks
-                if (!task.parent_id) {
-                    renderTaskCard(taskListContainer, task, gridCols, allItinerary);
-                }
-            });
-
-            // Quick-add task input
-            const inlineAdd = document.createElement('div');
-            inlineAdd.style.padding = '10px 15px';
-            inlineAdd.innerHTML = `<input type="text" placeholder="+ Add task to this section..." style="border:none; border-bottom:1px dashed #ccc; padding:5px; outline:none; background:transparent; width:100%; font-size:0.9em;" onkeydown="if(event.key==='Enter') createInlineTask(this, '${sectionTitle}')">`;
-
-            sectionDiv.appendChild(taskListContainer);
-            sectionDiv.appendChild(inlineAdd);
-            container.appendChild(sectionDiv);
+    tasks.forEach(task => {
+        if (!task.parent_id) {
+            renderTaskCard(taskListContainer, task, gridCols, allItinerary);
         }
+    });
+
+    const inlineAdd = document.createElement('div');
+    inlineAdd.style.padding = '10px 15px';
+    inlineAdd.innerHTML = `<input type="text" placeholder="+ Add task to this section..." style="border:none; border-bottom:1px dashed #ccc; padding:5px; outline:none; background:transparent; width:100%; font-size:0.9em;" onkeydown="if(event.key==='Enter') createInlineTask(this, '${sectionTitle}')">`;
+
+    sectionDiv.appendChild(taskListContainer);
+    sectionDiv.appendChild(inlineAdd);
+    container.appendChild(sectionDiv);
+}
 
         // GPX Upload Handler
         document.getElementById('gpx-file').addEventListener('change', function (e) {
