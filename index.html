@@ -1316,7 +1316,6 @@
             activeTrackId = null;
             isEditingGeometry = false;
             document.getElementById('wp-title').value = '';
-            document.getElementById('target-group').value = 'Hikers';
             document.getElementById('day-label').value = '';
             document.getElementById('starts-at').value = '';
             document.getElementById('wp-description').value = '';
@@ -1387,7 +1386,7 @@
         document.getElementById('unified-save-btn').onclick = async () => {
             const taskData = {
                 task_name: document.getElementById('wp-title').value,
-                target_group: document.getElementById('target-group').value,
+                category_id: document.getElementById('task-category-id').value || null,
                 day_label: document.getElementById('day-label').value,
                 starts_at: document.getElementById('starts-at').value || null,
                 responsible: document.getElementById('responsible').value,
@@ -1544,7 +1543,6 @@
             resetForm();
             activeTaskId = taskId;
             document.getElementById('wp-title').value = task.task_name || task.task || '';
-            document.getElementById('target-group').value = task.target_group || 'Hikers';
             document.getElementById('day-label').value = task.day_label || '';
             document.getElementById('starts-at').value = task.starts_at ? task.starts_at.substring(0, 16) : '';
             document.getElementById('responsible').value = task.responsible || '';
