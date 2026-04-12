@@ -1672,11 +1672,16 @@
             if (field === 'starts_at') {
                 if (!value) { payload.starts_at = null; }
                 else {
-                    // Robust Date Detection:
-                    // 1. Is day_label a YYYY-MM-DD? 2. Is there an existing date in starts_at? 3. Use Today.
-                    const isIsoDate = (str) => str && /^\d{4}-\d{2}-\d{2}$/.test(str);
-                    let datePart = isIsoDate(task.day_label) ? task.day_label :
-                        (task.starts_at ? task.starts_at.split('T')[0] : new Date().toISOString().split('T')[0]);
+                    // Extract Date: Use existing starts_at, OR the parent Section's date, OR default to today
+                    let datePart;
+                    if (task.starts_at) {
+                        datePart = task.starts_at.split('T')[0];
+                    } else if (task.section_id) {
+                        const sec = allSections.find(s => s.id === task.section_id);
+                        datePart = (sec && sec.section_date) ? new Date(sec.section_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+                    } else {
+                        datePart = new Date().toISOString().split('T')[0];
+                    }
                     payload.starts_at = `${datePart}T${value}:00.000Z`;
                 }
             } else {
@@ -1807,12 +1812,16 @@
                 return matchSearch && matchGroup && matchType;
             });
 
-            // Auto-sort tasks chronologically by time
+            // Auto-sort tasks chronologically strictly by time (ignoring corrupted dates)
             filtered.sort((a, b) => {
                 if (!a.starts_at && !b.starts_at) return 0;
-                if (!a.starts_at) return 1;
+                if (!a.starts_at) return 1; // Send empty times to the bottom
                 if (!b.starts_at) return -1;
-                return new Date(a.starts_at) - new Date(b.starts_at);
+                
+                // Extract just the "HH:MM" string for bulletproof sorting within the day
+                const timeA = a.starts_at.length >= 16 ? a.starts_at.substring(11, 16) : '23:59';
+                const timeB = b.starts_at.length >= 16 ? b.starts_at.substring(11, 16) : '23:59';
+                return timeA.localeCompare(timeB);
             });
 
             // 3. Group by section_id
