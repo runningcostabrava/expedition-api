@@ -337,6 +337,21 @@ app.get('/sections', async (req, res) => {
   }
 });
 
+// Update Section Metadata
+app.put('/sections/:id', adminAuth, async (req, res) => {
+  const { id } = req.params;
+  const { title, section_date, description } = req.body;
+  try {
+    const result = await pool.query(
+      'UPDATE sections SET title = COALESCE($1, title), section_date = COALESCE($2, section_date), description = COALESCE($3, description) WHERE id = $4 RETURNING *',
+      [title, section_date, description, id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- CATEGORY MANAGEMENT ---
 app.get('/categories', async (req, res) => {
   try {

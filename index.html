@@ -1611,6 +1611,20 @@
             refreshData();
         }
 
+        async function updateSectionMetadata(sectionId, field, value) {
+            if (!sectionId) return; // Ignore for "Unscheduled" section
+            try {
+                await fetch(`${API_URL}/sections/${sectionId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                    body: JSON.stringify({ [field]: value })
+                });
+                refreshData(); // Refresh to ensure all labels stay in sync
+            } catch (err) {
+                console.error("Error updating section:", err);
+            }
+        }
+
         function openTaskEditor(taskId) {
             const task = allItinerary.find(t => t.task_id === taskId);
             if (!task) return;
@@ -1967,20 +1981,25 @@
             const sectionDiv = document.createElement('div');
             sectionDiv.className = 'asana-section';
 
-            // Formatting the date for the input
             const dateVal = section.section_date ? new Date(section.section_date).toISOString().split('T')[0] : '';
             const sectionTitle = section.title || 'Unscheduled';
+            const sectionDesc = section.description || 'Add a description...';
 
             sectionDiv.innerHTML = `
         <div class="asana-header">
             <span style="cursor:pointer;" onclick="flyToSection('${sectionTitle}')">▼</span>
-            ${section.id ? `<input type="date" value="${dateVal}" class="inline-edit-input" style="width: 35px; overflow:hidden; padding:0; border:none;" onchange="updateSection('${sectionTitle}', this.value)">` : ''}
-            <span class="inline-edit section-title-text" contenteditable="true" style="font-weight:bold; flex:1;" onblur="updateSection('${sectionTitle}', this.innerText)">${sectionTitle}</span>
+            ${section.id ? `<input type="date" value="${dateVal}" class="inline-edit-input" style="width: 35px; overflow:hidden; padding:0; border:none;" onchange="updateSectionMetadata(${section.id}, 'section_date', this.value)">` : ''}
+            <span class="inline-edit section-title-text" contenteditable="true" style="font-weight:bold; flex:1;" onblur="updateSectionMetadata(${section.id}, 'title', this.innerText)">${sectionTitle}</span>
             <div style="display:flex; gap:2px; margin-left:auto;">
                 <button class="edit-btn" title="Center Map" onclick="flyToSection('${sectionTitle}')">🎯</button>
                 ${section.id ? `<button class="delete-btn" title="Delete Section" onclick="deleteSection('${sectionTitle}')">🗑️</button>` : ''}
             </div>
         </div>
+        ${section.id ? `
+        <div style="margin: -5px 0 15px 30px; font-size: 0.85em; color: #7f8c8d;">
+            <span class="inline-edit" contenteditable="true" onblur="updateSectionMetadata(${section.id}, 'description', this.innerText)" style="font-style: italic; display: block;">${sectionDesc}</span>
+        </div>` : ''}
+        
         <div class="task-table-header" style="grid-template-columns: ${gridCols};">
             <div>Task Name</div>
             ${document.getElementById('col-category').checked ? '<div>Category</div>' : ''}
