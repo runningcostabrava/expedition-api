@@ -1591,7 +1591,6 @@
 
             const typeFilter = document.getElementById('type-filter').value;
             let filtered = allItinerary.filter(t => {
-                // Instead of a global replace, use this safe check:
                 const name = t.task_name || t.task || "";
                 const matchSearch = name.toLowerCase().includes(searchTerm);
                 const matchGroup = !groupFilter || t.target_group === groupFilter;
@@ -1602,10 +1601,20 @@
             // Auto-sort tasks chronologically by time
             filtered.sort((a, b) => {
                 if (!a.starts_at && !b.starts_at) return 0;
-                if (!a.starts_at) return 1; // Push unscheduled to the bottom
+                if (!a.starts_at) return 1;
                 if (!b.starts_at) return -1;
                 return new Date(a.starts_at) - new Date(b.starts_at);
             });
+
+            // Grid: Name (1.5fr), Desc (1fr), Assignee (100px), Time (100px), Actions (100px)
+            const showAssignee = document.getElementById('col-assignee').checked;
+            const showTime = document.getElementById('col-time').checked;
+            const showGroup = document.getElementById('col-group').checked;
+            let gridCols = '1.5fr 1fr ';
+            if (showAssignee) gridCols += '90px ';
+            if (showTime) gridCols += '90px ';
+            if (showGroup) gridCols += '90px ';
+            gridCols += '100px';
 
             // Group tasks by their actual section_id
             const groups = {};
@@ -1624,66 +1633,6 @@
             // Render the 'Unscheduled' bucket at the bottom
             if (groups['unscheduled']) {
                 renderSectionUI({ title: 'Unscheduled', id: null }, groups['unscheduled'], gridCols);
-            }
-
-            const showAssignee = document.getElementById('col-assignee').checked;
-            const showTime = document.getElementById('col-time').checked;
-            const showGroup = document.getElementById('col-group').checked;
-
-            // Grid: Name (1.5fr), Desc (1fr), Assignee (100px), Time (100px), Actions (100px)
-            let gridCols = '1.5fr 1fr ';
-            if (showAssignee) gridCols += '90px ';
-            if (showTime) gridCols += '90px ';
-            if (showGroup) gridCols += '90px ';
-            gridCols += '100px';
-
-            for (const [day, tasks] of Object.entries(groups)) {
-                const section = document.createElement('div');
-                section.className = 'asana-section';
-
-                // Force a date picker for all sections, even if they have custom text names
-                const isDate = !isNaN(Date.parse(day)) && day.includes('-');
-                const dateVal = isDate ? day : '';
-                const textVal = day;
-
-                section.innerHTML = `
-                    <div class="asana-header">
-                        <span style="cursor:pointer;" onclick="flyToSection('${day}')">▼</span>
-                        <input type="date" value="${dateVal}" class="inline-edit-input" style="width: 35px; overflow:hidden; padding:0; border:none;" onchange="updateSection('${day}', this.value)">
-                        <span class="inline-edit section-title-text" contenteditable="true" style="font-weight:bold; flex:1;" onblur="updateSection('${day}', this.innerText)">${textVal}</span>
-                        <div style="display:flex; gap:2px; margin-left:auto;">
-                            <button class="edit-btn" title="Center Map" onclick="flyToSection('${day}')">🎯</button>
-                            <button class="delete-btn" title="Delete Section" onclick="deleteSection('${day}')">🗑️</button>
-                        </div>
-                    </div>
-                    <div class="task-table-header" style="grid-template-columns: ${gridCols};">
-                        <div>Task Name</div>
-                        ${showAssignee ? '<div>Assignee</div>' : ''}
-                        ${showTime ? '<div>Start Time</div>' : ''}
-                        ${showGroup ? '<div>Group</div>' : ''}
-                        <div>Actions</div>
-                    </div>
-                `;
-
-                const taskListContainer = document.createElement('div');
-                taskListContainer.className = 'sortable-task-list';
-                taskListContainer.dataset.section = day;
-
-                tasks.forEach(task => {
-                    if (task.parent_id) return;
-                    const card = renderTaskCard(taskListContainer, task, gridCols, allItinerary);
-                    if (task.task_id === activeTaskId) {
-                        card.querySelector('.task-row').classList.add('active-task');
-                    }
-                });
-
-                // Inject Inline "+ Add Task" button
-                const inlineAdd = document.createElement('div');
-                inlineAdd.style.padding = '10px 15px';
-                inlineAdd.innerHTML = `<input type="text" placeholder="+ Add task to this section..." style="border:none; border-bottom:1px dashed #ccc; padding:5px; outline:none; background:transparent; width:100%; font-size:0.9em; transition:0.2s;" onfocus="this.style.borderBottom='1px solid #3498db'" onblur="this.style.borderBottom='1px dashed #ccc'" onkeydown="if(event.key==='Enter') createInlineTask(this, '${day}')">`;
-                section.appendChild(taskListContainer);
-                section.appendChild(inlineAdd);
-                container.appendChild(section);
             }
 
             // Inject Inline "+ Add Section" button
@@ -1921,6 +1870,55 @@
                 centerPoint = feature.geometry.type === 'Polygon' ? feature.geometry.coordinates[0][0] : feature.geometry.coordinates[Math.floor(feature.geometry.coordinates.length / 2)];
                 showGeometryContextPopup(centerPoint, feature.geometry, geom.title, '', editConfig);
             }
+        }
+
+        function renderSectionUI(section, tasks, gridCols) {
+            const container = document.getElementById('asana-container');
+            const sectionDiv = document.createElement('div');
+            sectionDiv.className = 'asana-section';
+
+            // Formatting the date for the input
+            const dateVal = section.section_date ? new Date(section.section_date).toISOString().split('T')[0] : '';
+            const sectionTitle = section.title || 'Unscheduled';
+
+            sectionDiv.innerHTML = `
+        <div class="asana-header">
+            <span style="cursor:pointer;" onclick="flyToSection('${sectionTitle}')">▼</span>
+            ${section.id ? `<input type="date" value="${dateVal}" class="inline-edit-input" style="width: 35px; overflow:hidden; padding:0; border:none;" onchange="updateSection('${sectionTitle}', this.value)">` : ''}
+            <span class="inline-edit section-title-text" contenteditable="true" style="font-weight:bold; flex:1;" onblur="updateSection('${sectionTitle}', this.innerText)">${sectionTitle}</span>
+            <div style="display:flex; gap:2px; margin-left:auto;">
+                <button class="edit-btn" title="Center Map" onclick="flyToSection('${sectionTitle}')">🎯</button>
+                ${section.id ? `<button class="delete-btn" title="Delete Section" onclick="deleteSection('${sectionTitle}')">🗑️</button>` : ''}
+            </div>
+        </div>
+        <div class="task-table-header" style="grid-template-columns: ${gridCols};">
+            <div>Task Name</div>
+            ${document.getElementById('col-assignee').checked ? '<div>Assignee</div>' : ''}
+            ${document.getElementById('col-time').checked ? '<div>Start Time</div>' : ''}
+            ${document.getElementById('col-group').checked ? '<div>Group</div>' : ''}
+            <div>Actions</div>
+        </div>
+    `;
+
+            const taskListContainer = document.createElement('div');
+            taskListContainer.className = 'sortable-task-list';
+            taskListContainer.dataset.section = sectionTitle;
+
+            tasks.forEach(task => {
+                // Only render top-level tasks here; renderTaskCard handles recursion for subtasks
+                if (!task.parent_id) {
+                    renderTaskCard(taskListContainer, task, gridCols, allItinerary);
+                }
+            });
+
+            // Quick-add task input
+            const inlineAdd = document.createElement('div');
+            inlineAdd.style.padding = '10px 15px';
+            inlineAdd.innerHTML = `<input type="text" placeholder="+ Add task to this section..." style="border:none; border-bottom:1px dashed #ccc; padding:5px; outline:none; background:transparent; width:100%; font-size:0.9em;" onkeydown="if(event.key==='Enter') createInlineTask(this, '${sectionTitle}')">`;
+
+            sectionDiv.appendChild(taskListContainer);
+            sectionDiv.appendChild(inlineAdd);
+            container.appendChild(sectionDiv);
         }
 
         // GPX Upload Handler
