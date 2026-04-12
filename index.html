@@ -2052,10 +2052,10 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
                     // Send both section_id and day_label for full compatibility
-                    body: JSON.stringify({ 
-                        task_name: taskName, 
-                        section_id: sectionId, 
-                        day_label: sectionTitle === 'Unscheduled' ? null : sectionTitle 
+                    body: JSON.stringify({
+                        task_name: taskName,
+                        section_id: sectionId,
+                        day_label: sectionTitle === 'Unscheduled' ? null : sectionTitle
                     })
                 });
                 refreshData();
