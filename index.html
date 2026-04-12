@@ -2043,7 +2043,7 @@
             refreshData();
         }
 
-        async function createInlineTask(inputElement, sectionId) {
+        async function createInlineTask(inputElement, sectionId, sectionTitle) {
             const taskName = inputElement.value.trim();
             if (!taskName) return;
             inputElement.disabled = true;
@@ -2051,8 +2051,12 @@
                 await fetch(`${API_URL}/tasks`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
-                    // Send section_id instead of day_label
-                    body: JSON.stringify({ task_name: taskName, section_id: sectionId })
+                    // Send both section_id and day_label for full compatibility
+                    body: JSON.stringify({ 
+                        task_name: taskName, 
+                        section_id: sectionId, 
+                        day_label: sectionTitle === 'Unscheduled' ? null : sectionTitle 
+                    })
                 });
                 refreshData();
             } catch (e) {
@@ -2139,8 +2143,9 @@
 
             const inlineAdd = document.createElement('div');
             inlineAdd.style.padding = '10px 15px';
-            // Pass section.id instead of sectionTitle
-            inlineAdd.innerHTML = `<input type="text" placeholder="+ Add task to this section..." style="border:none; border-bottom:1px dashed #ccc; padding:5px; outline:none; background:transparent; width:100%; font-size:0.9em;" onkeydown="if(event.key==='Enter') createInlineTask(this, ${section.id || null})">`;
+            // Pass both section.id and safe sectionTitle
+            const safeTitle = sectionTitle.replace(/'/g, "\\'");
+            inlineAdd.innerHTML = `<input type="text" placeholder="+ Add task to this section..." style="border:none; border-bottom:1px dashed #ccc; padding:5px; outline:none; background:transparent; width:100%; font-size:0.9em;" onkeydown="if(event.key==='Enter') createInlineTask(this, ${section.id || null}, '${safeTitle}')">`;
 
             sectionDiv.appendChild(taskListContainer);
             sectionDiv.appendChild(inlineAdd);
