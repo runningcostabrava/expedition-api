@@ -180,8 +180,10 @@
             display: grid;
             /* grid-template-columns is set dynamically in JS */
             align-items: center;
-            background: #ffffff !important; /* White background */
-            color: #333 !important; /* Dark text */
+            background: #ffffff !important;
+            /* White background */
+            color: #333 !important;
+            /* Dark text */
             border: 1px solid #eee;
             border-radius: 8px;
             padding: 10px 15px;
@@ -216,7 +218,8 @@
         /* 2-Line Truncation for Task Names */
         .task-cell.name span.inline-edit {
             display: -webkit-box;
-            -webkit-line-clamp: 2; /* Limit to 2 lines */
+            -webkit-line-clamp: 2;
+            /* Limit to 2 lines */
             -webkit-box-orient: vertical;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -528,6 +531,62 @@
         .close:hover {
             color: #000;
         }
+
+        /* index.html - Timeline Styling */
+        .sortable-task-list {
+            position: relative;
+            padding-left: 25px;
+            /* Space for the vertical line */
+            margin-top: 10px;
+        }
+
+        /* The vertical thread line */
+        .sortable-task-list::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 14px;
+            /* Centered in the padding area */
+            width: 2px;
+            background: #dfe6e9;
+            z-index: 1;
+        }
+
+        /* Fite (Milestone) Row Styling */
+        .fite-row {
+            position: relative;
+            display: flex;
+            align-items: center;
+            padding: 10px 0;
+            margin: 10px 0;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            z-index: 2;
+        }
+
+        /* The Dot on the timeline */
+        .fite-dot {
+            width: 10px;
+            height: 10px;
+            background: #fff;
+            border: 3px solid #3498db;
+            /* Default color */
+            border-radius: 50%;
+            position: absolute;
+            left: -15px;
+            /* Positioned exactly on the thread */
+            box-shadow: 0 0 0 3px #fff;
+            /* Creates a clean gap around the dot */
+        }
+
+        .fite-text {
+            font-weight: bold;
+            font-size: 0.9em;
+            color: #2c3e50;
+            margin-left: 10px;
+        }
     </style>
 </head>
 
@@ -692,6 +751,9 @@
 
                 <div class="form-group">
                     <label><input type="checkbox" id="is-completed"> Mark Task as Completed</label>
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" id="is-milestone"> 📍 Mark as Milestone (Fite)</label>
                 </div>
 
                 <div class="form-group">
@@ -957,7 +1019,7 @@
                         const el = document.createElement('div');
                         el.style.fontSize = '22px';
 
-                        // If using FontAwesome, you'd apply a class; 
+                        // If using FontAwesome, you'd apply a class;
                         // for now, we'll support the current emoji/text structure
                         el.innerText = renderIcon;
                         el.style.filter = `drop-shadow(0px 0px 4px ${markerColor})`;
@@ -1393,24 +1455,25 @@
             document.getElementById('wp-description').value = '';
             document.getElementById('responsible').value = '';
             document.getElementById('is-completed').checked = false;
+            if (document.getElementById('is-milestone')) document.getElementById('is-milestone').checked = false;
             document.getElementById('task-comments').value = '';
             document.getElementById('existing-task').value = '';
             document.getElementById('existing-task').style.display = 'block';
         }
 
-        function openModal(id = 'command-modal') { 
+        function openModal(id = 'command-modal') {
             const target = document.getElementById(id);
-            if (target) target.style.display = 'flex'; 
+            if (target) target.style.display = 'flex';
         }
 
-        function closeModal(id = 'command-modal') { 
+        function closeModal(id = 'command-modal') {
             const target = document.getElementById(id);
-            if (target) target.style.display = 'none'; 
-            
+            if (target) target.style.display = 'none';
+
             // Only reset the drawing tools and task form if closing the main editor
             if (id === 'command-modal') {
-                resetForm(); 
-                draw.deleteAll(); 
+                resetForm();
+                draw.deleteAll();
             }
         }
 
@@ -1476,6 +1539,7 @@
                 starts_at: document.getElementById('starts-at').value || null,
                 responsible: document.getElementById('responsible').value,
                 is_completed: document.getElementById('is-completed').checked,
+                is_milestone: document.getElementById('is-milestone') ? document.getElementById('is-milestone').checked : false,
                 comments: document.getElementById('task-comments').value
             };
             const existingTaskId = document.getElementById('existing-task').value || null;
@@ -1646,6 +1710,7 @@
             document.getElementById('starts-at').value = task.starts_at ? task.starts_at.substring(0, 16) : '';
             document.getElementById('responsible').value = task.responsible || '';
             document.getElementById('is-completed').checked = task.is_completed;
+            if (document.getElementById('is-milestone')) document.getElementById('is-milestone').checked = !!task.is_milestone;
             document.getElementById('task-comments').value = task.comments || '';
             document.getElementById('existing-task').value = taskId;
             document.getElementById('color-picker-group').style.display = 'none';
@@ -1813,58 +1878,77 @@
 
             // Ensure we have a valid category color or default to light gray
             const catColor = task.category_color || '#dfe6e9';
+            const isFite = task.is_milestone;
 
             const taskContainer = document.createElement('div');
             // Margin is now handled by the nested list container, but we keep the visual line indicator
-            taskContainer.style.borderLeft = task.parent_id ? '2px solid #3498db' : 'none';
+            taskContainer.style.borderLeft = (task.parent_id && !isFite) ? '2px solid #3498db' : 'none';
 
             const taskEl = document.createElement('div');
-            taskEl.className = 'task-row';
             taskEl.id = `task-row-${task.task_id}`;
-            taskEl.style.gridTemplateColumns = gridCols;
 
-            // THE NEW STYLE: White background + thick inner left border
-            taskEl.style.backgroundColor = '#ffffff';
-            taskEl.style.borderLeft = `10px solid ${catColor}`; // Visual color indicator
+            if (isFite) {
+                // RENDER AS A FITE (NODE ON LINE)
+                taskEl.className = 'fite-row';
+                taskEl.innerHTML = `
+                    <div class="fite-dot" style="border-color: ${catColor}"></div>
+                    <div class="fite-text">
+                        <span class="time" style="color:#7f8c8d; font-size:0.8em; margin-right:8px;">${timeOnly}</span>
+                        <span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">${task.task_name || 'Event'}</span>
+                    </div>
+                    <div style="margin-left:auto; display:flex; gap:5px;">
+                        <button class="edit-btn" style="font-size:0.8em;" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
+                        <button class="delete-btn" style="font-size:0.8em;" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
+                    </div>
+                `;
+            } else {
+                // RENDER AS A TASK (WHITE CARD)
+                taskEl.className = 'task-row';
+                taskEl.style.gridTemplateColumns = gridCols;
 
-            if (task.is_completed) taskEl.style.opacity = '0.6';
+                // THE NEW STYLE: White background + thick inner left border
+                taskEl.style.backgroundColor = '#ffffff';
+                taskEl.style.borderLeft = `10px solid ${catColor}`; // Visual color indicator
+
+                if (task.is_completed) taskEl.style.opacity = '0.6';
+
+                const showCategory = document.getElementById('col-category').checked;
+                const showAssignee = document.getElementById('col-assignee').checked;
+                const showTime = document.getElementById('col-time').checked;
+                const showGroup = document.getElementById('col-group').checked;
+
+                let cellsHtml = `<div class="task-cell name"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">${doneUI}${task.task_name || task.task || 'Unnamed Task'}</span></div>`;
+
+                // Add Category Dropdown Cell
+                if (showCategory) {
+                    let catOptions = `<option value="">-</option>`;
+                    allCategories.forEach(cat => {
+                        const isSel = task.category_id === cat.id ? 'selected' : '';
+                        catOptions += `<option value="${cat.id}" ${isSel}>${cat.icon} ${cat.name}</option>`;
+                    });
+                    cellsHtml += `<div class="task-cell"><select class="inline-edit" style="width:100%; border:none; background:transparent;" onchange="updateTaskInline(${task.task_id}, 'category_id', this.value)" onclick="event.stopPropagation()">${catOptions}</select></div>`;
+                }
+
+                if (showAssignee) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'responsible', this.innerText)" onclick="event.stopPropagation()">${task.responsible || '-'}</span></div>`;
+                if (showTime) cellsHtml += `<div class="task-cell time"><input type="time" class="inline-edit" style="width:100%" value="${timeOnly}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()"></div>`;
+                if (showGroup) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'target_group', this.innerText)" onclick="event.stopPropagation()">${task.target_group || '-'}</span></div>`;
+
+                cellsHtml += `
+                    <div class="task-cell" style="gap:2px;">
+                        <button class="edit-btn" title="Add Subtask" onclick="event.stopPropagation(); createSubtask(${task.task_id}, '${task.day_label || ''}')">➕</button>
+                        <button class="edit-btn" title="Edit Task" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
+                        <button class="delete-btn" title="Delete Task" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
+                    </div>`;
+                taskEl.innerHTML = cellsHtml;
+            }
 
             taskEl.onclick = () => {
-                document.querySelectorAll('.task-row').forEach(row => row.classList.remove('active-task'));
+                document.querySelectorAll('.task-row, .fite-row').forEach(row => row.classList.remove('active-task'));
                 taskEl.classList.add('active-task');
                 activeTaskId = task.task_id;
                 const acc = document.getElementById(`acc-${task.task_id}`);
                 if (acc) acc.classList.toggle('open');
             };
-
-            const showCategory = document.getElementById('col-category').checked;
-            const showAssignee = document.getElementById('col-assignee').checked;
-            const showTime = document.getElementById('col-time').checked;
-            const showGroup = document.getElementById('col-group').checked;
-
-            let cellsHtml = `<div class="task-cell name"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">${doneUI}${task.task_name || task.task || 'Unnamed Task'}</span></div>`;
-
-            // Add Category Dropdown Cell
-            if (showCategory) {
-                let catOptions = `<option value="">-</option>`;
-                allCategories.forEach(cat => {
-                    const isSel = task.category_id === cat.id ? 'selected' : '';
-                    catOptions += `<option value="${cat.id}" ${isSel}>${cat.icon} ${cat.name}</option>`;
-                });
-                cellsHtml += `<div class="task-cell"><select class="inline-edit" style="width:100%; border:none; background:transparent;" onchange="updateTaskInline(${task.task_id}, 'category_id', this.value)" onclick="event.stopPropagation()">${catOptions}</select></div>`;
-            }
-
-            if (showAssignee) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'responsible', this.innerText)" onclick="event.stopPropagation()">${task.responsible || '-'}</span></div>`;
-            if (showTime) cellsHtml += `<div class="task-cell time"><input type="time" class="inline-edit" style="width:100%" value="${timeOnly}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()"></div>`;
-            if (showGroup) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'target_group', this.innerText)" onclick="event.stopPropagation()">${task.target_group || '-'}</span></div>`;
-
-            cellsHtml += `
-                <div class="task-cell" style="gap:2px;">
-                    <button class="edit-btn" title="Add Subtask" onclick="event.stopPropagation(); createSubtask(${task.task_id}, '${task.day_label || ''}')">➕</button>
-                    <button class="edit-btn" title="Edit Task" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
-                    <button class="delete-btn" title="Delete Task" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
-                </div>`;
-            taskEl.innerHTML = cellsHtml;
 
             const accordionEl = document.createElement('div');
             accordionEl.className = 'task-accordion';
@@ -1993,21 +2077,21 @@
             }
         }
 
-function renderSectionUI(section, tasks, gridCols) {
-    const container = document.getElementById('asana-container');
-    const sectionDiv = document.createElement('div');
-    sectionDiv.className = 'asana-section';
+        function renderSectionUI(section, tasks, gridCols) {
+            const container = document.getElementById('asana-container');
+            const sectionDiv = document.createElement('div');
+            sectionDiv.className = 'asana-section';
 
-    const dateVal = section.section_date ? new Date(section.section_date).toISOString().split('T')[0] : '';
-    const sectionTitle = section.title || 'Unscheduled';
-    const sectionDesc = section.description || 'Add description...';
+            const dateVal = section.section_date ? new Date(section.section_date).toISOString().split('T')[0] : '';
+            const sectionTitle = section.title || 'Unscheduled';
+            const sectionDesc = section.description || 'Add description...';
 
-    sectionDiv.innerHTML = `
+            sectionDiv.innerHTML = `
         <div class="asana-header" style="display: flex; align-items: center; gap: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 10px;">
             <span style="cursor:pointer; flex-shrink: 0;" onclick="flyToSection('${sectionTitle}')">▼</span>
             ${section.id ? `<input type="date" value="${dateVal}" class="inline-edit-input" style="width: 35px; overflow:hidden; padding:0; border:none; flex-shrink: 0;" onchange="updateSectionMetadata(${section.id}, 'section_date', this.value)">` : ''}
             <span class="inline-edit section-title-text" contenteditable="true" style="font-weight: bold; flex-shrink: 0;" onblur="updateSectionMetadata(${section.id}, 'title', this.innerText)">${sectionTitle}</span>
-            <span class="inline-edit" contenteditable="true" 
+            <span class="inline-edit" contenteditable="true"
                   onblur="updateSectionMetadata(${section.id}, 'description', this.innerText)"
                   style="font-size: 0.85em; color: #95a5a6; font-style: italic; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                   ${sectionDesc}
@@ -2017,7 +2101,7 @@ function renderSectionUI(section, tasks, gridCols) {
                 ${section.id ? `<button class="delete-btn" title="Delete Section" onclick="deleteSection('${sectionTitle}')">🗑️</button>` : ''}
             </div>
         </div>
-        
+
         <div class="task-table-header" style="grid-template-columns: ${gridCols};">
             <div>Task Name</div>
             ${document.getElementById('col-category').checked ? '<div>Category</div>' : ''}
@@ -2028,24 +2112,24 @@ function renderSectionUI(section, tasks, gridCols) {
         </div>
     `;
 
-    const taskListContainer = document.createElement('div');
-    taskListContainer.className = 'sortable-task-list';
-    taskListContainer.dataset.section = sectionTitle;
+            const taskListContainer = document.createElement('div');
+            taskListContainer.className = 'sortable-task-list';
+            taskListContainer.dataset.section = sectionTitle;
 
-    tasks.forEach(task => {
-        if (!task.parent_id) {
-            renderTaskCard(taskListContainer, task, gridCols, allItinerary);
+            tasks.forEach(task => {
+                if (!task.parent_id) {
+                    renderTaskCard(taskListContainer, task, gridCols, allItinerary);
+                }
+            });
+
+            const inlineAdd = document.createElement('div');
+            inlineAdd.style.padding = '10px 15px';
+            inlineAdd.innerHTML = `<input type="text" placeholder="+ Add task to this section..." style="border:none; border-bottom:1px dashed #ccc; padding:5px; outline:none; background:transparent; width:100%; font-size:0.9em;" onkeydown="if(event.key==='Enter') createInlineTask(this, '${sectionTitle}')">`;
+
+            sectionDiv.appendChild(taskListContainer);
+            sectionDiv.appendChild(inlineAdd);
+            container.appendChild(sectionDiv);
         }
-    });
-
-    const inlineAdd = document.createElement('div');
-    inlineAdd.style.padding = '10px 15px';
-    inlineAdd.innerHTML = `<input type="text" placeholder="+ Add task to this section..." style="border:none; border-bottom:1px dashed #ccc; padding:5px; outline:none; background:transparent; width:100%; font-size:0.9em;" onkeydown="if(event.key==='Enter') createInlineTask(this, '${sectionTitle}')">`;
-
-    sectionDiv.appendChild(taskListContainer);
-    sectionDiv.appendChild(inlineAdd);
-    container.appendChild(sectionDiv);
-}
 
         // GPX Upload Handler
         document.getElementById('gpx-file').addEventListener('change', function (e) {
