@@ -840,6 +840,7 @@
         let lastCalculatedRoute = null; // Stores multi-stop route until Enter is pressed
         let ADMIN_KEY = null, elevationChart = null;
         let directionsControl = null; // Holds the Mapbox Directions UI
+        let currentSmartProfile = 'driving'; // Safely tracks the active routing mode
 
         const groupColors = { 'Hikers': '#2ecc71', 'Runners': '#e67e22', 'Staff': '#9b59b6', 'Transport': '#f1c40f' };
 
@@ -948,10 +949,11 @@
 
                     const distKm = (lastCalculatedRoute.distance / 1000).toFixed(2);
                     const durationMins = Math.round(lastCalculatedRoute.duration / 60);
-                    // Accurately capture the Mapbox UI profile (driving, walking, cycling)
-                    const activeProfile = directionsControl ? directionsControl.getProfile().replace('mapbox/', '') : 'driving';
+                    
+                    // CRITICAL FIX: Use our safely tracked variable instead of the non-existent Mapbox function!
+                    const activeProfile = currentSmartProfile;
 
-                    // --- THE INSTANT FIX: Extract the decoded GeoJSON directly from the map BEFORE destroying the UI ---
+                    // --- THE INSTANT FIX: Extract the decoded GeoJSON directly from the map BEFORE destroying
                     let validGeoJSONGeometry = null;
                     const dirSource = map.getSource('directions');
                     if (dirSource && dirSource._data && dirSource._data.features) {
@@ -1590,6 +1592,12 @@
             isRouting = true;
             routePoints = [];
             lastCalculatedRoute = null;
+            currentSmartProfile = 'driving';
+
+            // Track profile changes (driving, walking, cycling) safely!
+            directionsControl.on('profile', (e) => {
+                currentSmartProfile = e.profile.replace('mapbox/', '');
+            });
 
             // Capture the route data when the UI finds a path
             directionsControl.on('route', (e) => {
