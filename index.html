@@ -1061,8 +1061,17 @@
                     else if (task.category_line_type === 'dotted') dashArray = [0.1, 2];
 
                     if (geom.kind === 'point' && geom.lat && geom.lng) {
-                        // Use default Mapbox marker with custom color to prevent text rendering on map
-                        const marker = new mapboxgl.Marker({ color: markerColor })
+                        // Create a beautiful custom HTML pin that perfectly centers the emoji
+                        const el = document.createElement('div');
+                        el.innerHTML = `
+                            <div style="background-color: ${markerColor}; border-radius: 50%; width: 28px; height: 28px; display: flex; justify-content: center; align-items: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); font-size: 14px; overflow: hidden; white-space: nowrap;">
+                                ${renderIcon}
+                            </div>
+                            <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid ${markerColor}; margin: -1px auto 0;"></div>
+                        `;
+                        el.style.cursor = 'pointer';
+
+                        const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
                             .setLngLat([geom.lng, geom.lat])
                             .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
                         <h4 style="border-left: 4px solid ${markerColor}; padding-left: 8px;">${renderIcon} ${geom.title}</h4>
