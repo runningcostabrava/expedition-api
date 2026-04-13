@@ -68,6 +68,7 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS link TEXT",
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS comments TEXT",
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS distance NUMERIC",
+      "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS duration NUMERIC",
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS gain NUMERIC",
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS loss NUMERIC",
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS parent_track_id INTEGER",
@@ -138,10 +139,10 @@ app.get('/tracks', async (req, res) => {
 
 app.post('/tracks', adminAuth, async (req, res) => {
   console.log("DEBUG POST /tracks payload:", req.body);
-  const { title, geojson_data, color, target_group, tasks, existing_task_id } = req.body;
+  const { title, geojson_data, color, target_group, tasks, existing_task_id, distance, duration, comments, link } = req.body;
   try {
-    const result = await pool.query('INSERT INTO tracks (title, geojson_data, color, target_group) VALUES ($1, $2, $3, $4) RETURNING id',
-      [title, geojson_data, color || '#3498db', target_group]);
+    const result = await pool.query('INSERT INTO tracks (title, geojson_data, color, target_group, distance, duration, comments, link) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
+      [title, geojson_data, color || '#3498db', target_group, distance, duration, comments, link]);
     const trackId = result.rows[0].id;
 
     const geometryType = geojson_data.features[0].geometry.type;
@@ -169,11 +170,11 @@ app.post('/tracks', adminAuth, async (req, res) => {
 
 app.put('/tracks/:id', adminAuth, async (req, res) => {
   const { id } = req.params;
-  const { geojson_data, title, color, target_group, tasks, existing_task_id, link, comments, distance, gain, loss, parent_track_id } = req.body;
+  const { geojson_data, title, color, target_group, tasks, existing_task_id, link, comments, distance, duration, gain, loss, parent_track_id } = req.body;
   try {
     await pool.query(
-      'UPDATE tracks SET geojson_data = COALESCE($1, geojson_data), title = COALESCE($2, title), color = COALESCE($3, color), target_group = COALESCE($4, target_group), link = COALESCE($6, link), comments = COALESCE($7, comments), distance = COALESCE($8, distance), gain = COALESCE($9, gain), loss = COALESCE($10, loss), parent_track_id = COALESCE($11, parent_track_id) WHERE id = $5',
-      [geojson_data, title, color, target_group, id, link, comments, distance, gain, loss, parent_track_id]
+      'UPDATE tracks SET geojson_data = COALESCE($1, geojson_data), title = COALESCE($2, title), color = COALESCE($3, color), target_group = COALESCE($4, target_group), link = COALESCE($6, link), comments = COALESCE($7, comments), distance = COALESCE($8, distance), gain = COALESCE($9, gain), loss = COALESCE($10, loss), parent_track_id = COALESCE($11, parent_track_id), duration = COALESCE($12, duration) WHERE id = $5',
+      [geojson_data, title, color, target_group, id, link, comments, distance, gain, loss, parent_track_id, duration]
     );
 
     let anchorId;
@@ -425,6 +426,7 @@ app.get('/itinerary', async (req, res) => {
                    'link', COALESCE(w.link, tr.link),
                    'comments', COALESCE(w.comments, tr.comments),
                    'distance', tr.distance,
+                   'duration', tr.duration,
                    'gain', tr.gain,
                    'loss', tr.loss,
                    'parent_track_id', tr.parent_track_id
