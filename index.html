@@ -11,8 +11,11 @@
         type="text/css">
     <script id="search-js" src="https://api.mapbox.com/search-js/v1.0.0-beta.21/web.js"></script>
 
-    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
-    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css" type="text/css">
+    <script
+        src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
+    <link rel="stylesheet"
+        href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css"
+        type="text/css">
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.0/mapbox-gl-draw.js"></script>
     <script src="https://unpkg.com/togeojson@0.16.0/togeojson.js"></script>
@@ -182,7 +185,8 @@
         }
 
         .task-row {
-            display: flex; /* Changed from grid to flex for better card control */
+            display: flex;
+            /* Changed from grid to flex for better card control */
             align-items: stretch;
             background: #ffffff !important;
             border: 1px solid #e2e8f0;
@@ -205,7 +209,8 @@
             display: flex;
             flex-direction: column;
             justify-content: center;
-            min-width: 0; /* Allows truncation to work inside flex */
+            min-width: 0;
+            /* Allows truncation to work inside flex */
         }
 
         .task-title-large {
@@ -218,9 +223,11 @@
         }
 
         .task-meta-aside {
-            width: 160px; /* Fixed width for the sub-rows section */
+            width: 160px;
+            /* Fixed width for the sub-rows section */
             display: grid;
-            grid-template-rows: 1fr 1fr; /* Two sub-rows */
+            grid-template-rows: 1fr 1fr;
+            /* Two sub-rows */
             border-left: 1px solid #edf2f7;
             background: #fcfcfc;
         }
@@ -296,33 +303,41 @@
             border: 1px solid #e2e8f0;
             transition: all 0.2s;
         }
+
         .geom-row:hover {
             background: #fdfdfd;
             border-color: #cbd5e0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
         }
-        
+
         /* Deep Indentation & Hierarchy */
         .geom-row.nested-geom {
-            margin-left: 45px; /* Deeper indent from track */
+            margin-left: 45px;
+            /* Deeper indent from track */
             margin-top: 0;
             margin-bottom: 0;
             padding: 6px 10px;
             position: relative;
-            background: transparent; /* Simpler style: transparent background */
-            border: none; /* Remove heavy box border */
-            border-bottom: 1px solid #f1f5f9; /* Subtle divider between items */
+            background: transparent;
+            /* Simpler style: transparent background */
+            border: none;
+            /* Remove heavy box border */
+            border-bottom: 1px solid #f1f5f9;
+            /* Subtle divider between items */
             border-left-width: 3px !important;
             border-left-style: solid !important;
             border-radius: 0;
             box-shadow: none;
         }
+
         .geom-row.nested-geom:last-child {
             border-bottom: none;
         }
+
         .geom-row.nested-geom:hover {
             background: #f8fafc;
         }
+
         /* L-shaped connector */
         .geom-row.nested-geom::before {
             content: '';
@@ -336,12 +351,14 @@
             border-bottom-left-radius: 6px;
             z-index: 0;
         }
+
         /* Simpler text for nested items */
         .geom-row.nested-geom .geom-title {
             font-size: 0.95em;
             font-weight: 500;
             color: #4a5568;
         }
+
         .geom-row.nested-geom .stat-badge {
             background: transparent;
             border: none;
@@ -356,6 +373,7 @@
             gap: 12px;
             width: 100%;
         }
+
         .geom-left-controls {
             display: flex;
             align-items: center;
@@ -363,14 +381,17 @@
             padding-top: 2px;
             flex-shrink: 0;
         }
+
         .geom-main-content {
             flex: 1;
-            min-width: 0; /* Allows text wrapping */
+            min-width: 0;
+            /* Allows text wrapping */
             display: flex;
             flex-direction: column;
             gap: 6px;
             cursor: pointer;
         }
+
         .geom-title {
             color: #1a202c;
             font-size: 1.05em;
@@ -378,14 +399,15 @@
             word-break: break-word;
             line-height: 1.2;
         }
-        
+
         /* Action Buttons Styling */
         .geom-actions {
-            display: flex; 
+            display: flex;
             align-items: center;
             gap: 4px;
             flex-shrink: 0;
         }
+
         .action-icon-btn {
             background: #f1f5f9;
             border: 1px solid #e2e8f0;
@@ -399,16 +421,18 @@
             align-items: center;
             transition: all 0.2s;
         }
+
         .action-icon-btn:hover {
             background: #e2e8f0;
             color: #1a202c;
         }
+
         .action-icon-btn.delete:hover {
             background: #fee2e2;
             color: #dc2626;
             border-color: #fca5a5;
         }
-        
+
         /* Stat Badges */
         .stat-badge {
             display: inline-flex;
@@ -421,12 +445,25 @@
             font-size: 0.8em;
             color: #475569;
         }
-        .stat-badge.gain { color: #16a34a; background: #f0fdf4; border-color: #bbf7d0; }
-        .stat-badge.loss { color: #dc2626; background: #fef2f2; border-color: #fecaca; }
+
+        .stat-badge.gain {
+            color: #16a34a;
+            background: #f0fdf4;
+            border-color: #bbf7d0;
+        }
+
+        .stat-badge.loss {
+            color: #dc2626;
+            background: #fef2f2;
+            border-color: #fecaca;
+        }
+
         .geom-row:hover .geom-actions {
             opacity: 1;
         }
-        .edit-btn, .delete-btn {
+
+        .edit-btn,
+        .delete-btn {
             font-size: 0.9em !important;
             padding: 2px 4px !important;
         }
@@ -760,10 +797,11 @@
             padding: 4px 8px !important;
             right: 4px !important;
             top: 4px !important;
-            background: rgba(255,255,255,0.8) !important;
+            background: rgba(255, 255, 255, 0.8) !important;
             border-radius: 50% !important;
             transition: 0.2s;
         }
+
         .mapboxgl-popup-close-button:hover {
             background: #eee !important;
             color: #e74c3c !important;
@@ -771,23 +809,38 @@
 
         /* 2. Dynamic Zoom Scaling Variables */
         #map {
-            --pin-scale: 1; /* Default scale, overridden by JS */
+            --pin-scale: 1;
+            /* Default scale, overridden by JS */
         }
+
         .custom-map-pin {
             transform: scale(var(--pin-scale));
             transform-origin: bottom center;
             transition: transform 0.1s ease-out, opacity 0.2s ease-in-out;
         }
-        
+
         /* Hide markers entirely when zoomed out */
         #map.hide-markers .custom-map-pin {
             visibility: hidden;
             pointer-events: none;
         }
-        .section-content { display: block; }
-        .section-content.collapsed { display: none; }
-        .section-toggle-icon { transition: transform 0.2s; cursor: pointer; }
-        .section-toggle-icon.collapsed { transform: rotate(-90deg); }
+
+        .section-content {
+            display: block;
+        }
+
+        .section-content.collapsed {
+            display: none;
+        }
+
+        .section-toggle-icon {
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+
+        .section-toggle-icon.collapsed {
+            transform: rotate(-90deg);
+        }
     </style>
 </head>
 
@@ -1089,7 +1142,7 @@
                 container: 'map',
                 style: 'mapbox://styles/mapbox/outdoors-v12',
                 // Longitude first, then Latitude! Centered on Trapani/Bonagia, Sicily
-                center: [12.5928, 38.0662], 
+                center: [12.5928, 38.0662],
                 zoom: 10 // Slightly zoomed out so you can see the whole coast
             });
 
@@ -1137,8 +1190,8 @@
 
             // 2. Search Box API Result (New v1 API)
             searchBox.addEventListener('retrieve', (e) => {
-                if (isRouting) return; 
-                
+                if (isRouting) return;
+
                 const feature = e.detail.features[0];
                 draw.deleteAll();
                 draw.add(feature);
@@ -1160,7 +1213,7 @@
 
                     const distKm = (lastCalculatedRoute.distance / 1000).toFixed(2);
                     const durationMins = Math.round(lastCalculatedRoute.duration / 60);
-                    
+
                     // CRITICAL FIX: Use our safely tracked variable instead of the non-existent Mapbox function!
                     const activeProfile = currentSmartProfile;
 
@@ -1186,7 +1239,7 @@
 
                     // Clean up map and transfer the line to our custom Drawing tool
                     draw.deleteAll();
-                    
+
                     const routeFeature = {
                         type: 'Feature',
                         geometry: validGeoJSONGeometry,
@@ -1232,7 +1285,7 @@
                 const zoom = map.getZoom();
                 const scale = Math.max(0.4, Math.min(1.5, zoom / 14));
                 document.getElementById('map').style.setProperty('--pin-scale', scale);
-                
+
                 // 1. Hide markers entirely if zoom is less than 14 (Island level)
                 if (zoom < 14) {
                     document.getElementById('map').classList.add('hide-markers');
@@ -1247,7 +1300,7 @@
                     document.getElementById('map').classList.remove('show-pin-labels');
                 }
             });
-            
+
             // Trigger once on load to set initial state
             const initZoom = map.getZoom();
             document.getElementById('map').style.setProperty('--pin-scale', Math.max(0.4, Math.min(1.5, initZoom / 14)));
@@ -1257,7 +1310,7 @@
             map.on('draw.create', (e) => {
                 const feature = e.features[0];
                 let centerPoint;
-                
+
                 // Safely extract coordinates based on Geometry type
                 if (feature.geometry.type === 'Point') {
                     centerPoint = feature.geometry.coordinates;
@@ -1298,7 +1351,7 @@
 
                     // 1. Logic for Colors & Icons
                     const markerColor = task.category_color || geom.color || '#3498db';
-                    const trackColor = geom.color || '#3498db'; 
+                    const trackColor = geom.color || '#3498db';
                     // Priority: 1. Individual Waypoint Icon (if valid and not empty), 2. Category Icon, 3. Default
                     const renderIcon = (geom.icon && geom.icon !== 'marker' && geom.icon.trim() !== '') ? geom.icon : (task.category_icon || '📍');
 
@@ -1516,7 +1569,7 @@
             let distances = [], elevations = [], cumulative = 0;
             let cumulativeGains = [], currentGain = 0;
             const coords = geojson.features[0].geometry.type === 'Polygon' ? geojson.features[0].geometry.coordinates[0] : geojson.features[0].geometry.coordinates;
-            
+
             coords.forEach((c, i) => {
                 elevations.push(c[2] || 0);
                 if (i > 0) {
@@ -1538,7 +1591,7 @@
                         const snapped = turf.nearestPointOnLine(trackFeature, [g.lng, g.lat]);
                         const sliced = turf.lineSlice(coords[0], snapped, trackFeature);
                         const distOnTrack = turf.length(sliced, { units: 'kilometers' });
-                        
+
                         waypointDataset.push({
                             x: distOnTrack.toFixed(2),
                             y: snapped.geometry.coordinates[2] || 0,
@@ -1554,27 +1607,27 @@
             if (elevationChart) elevationChart.destroy();
             elevationChart = new Chart(document.getElementById('elevation-chart'), {
                 type: 'line',
-                data: { 
-                    labels: distances, 
+                data: {
+                    labels: distances,
                     datasets: [
-                        { 
-                            label: 'Waypoints', 
-                            data: waypointDataset, 
-                            type: 'scatter', 
-                            backgroundColor: '#e67e22', 
+                        {
+                            label: 'Waypoints',
+                            data: waypointDataset,
+                            type: 'scatter',
+                            backgroundColor: '#e67e22',
                             borderColor: '#fff',
                             borderWidth: 2,
-                            pointRadius: 6, 
+                            pointRadius: 6,
                             pointHoverRadius: 9,
-                            zIndex: 10 
+                            zIndex: 10
                         },
                         { label: title, data: elevations, fill: true, tension: 0.4, borderColor: '#3498db', backgroundColor: 'rgba(52, 152, 219, 0.2)' }
-                    ] 
+                    ]
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     interaction: { mode: 'index', intersect: false }, // Improved tracking
-                    plugins: { 
+                    plugins: {
                         legend: { display: false },
                         tooltip: {
                             callbacks: {
@@ -1636,15 +1689,15 @@
 
         let activeContextPopup = null;
 
-function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, editConfig = null, existingIcon = '📍', existingColor = '#3498db', existingLink = '') {
-    if (activeContextPopup) activeContextPopup.remove();
+        function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, editConfig = null, existingIcon = '📍', existingColor = '#3498db', existingLink = '') {
+            if (activeContextPopup) activeContextPopup.remove();
 
-    const taskWarning = activeTaskId ? `<div style="color:#27ae60; font-size:0.8em; margin-bottom:10px;">✅ Attaching to highlighted task</div>` : `<div style="color:#e74c3c; font-size:0.8em; margin-bottom:10px;">⚠️ No Task Selected (Will save unassigned)</div>`;
+            const taskWarning = activeTaskId ? `<div style="color:#27ae60; font-size:0.8em; margin-bottom:10px;">✅ Attaching to highlighted task</div>` : `<div style="color:#e74c3c; font-size:0.8em; margin-bottom:10px;">⚠️ No Task Selected (Will save unassigned)</div>`;
 
-    const popupContent = document.createElement('div');
-    popupContent.style.padding = '5px';
-    popupContent.style.width = '200px';
-    popupContent.innerHTML = `
+            const popupContent = document.createElement('div');
+            popupContent.style.padding = '5px';
+            popupContent.style.width = '200px';
+            popupContent.innerHTML = `
         <h4 style="margin: 0 0 5px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">Save to Map</h4>
         ${taskWarning}
         <input type="text" id="ctx-title" value="${defaultTitle}" placeholder="Title" style="width: 100%; margin-bottom: 5px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing:border-box;">
@@ -2083,7 +2136,7 @@ function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, edi
 
         function editSmartRoute(trackId) {
             const track = allItinerary.flatMap(t => t.geometries).find(g => g.track_id === trackId);
-            const stops = track?.geojson?.features?.[0]?.properties?.stops; 
+            const stops = track?.geojson?.features?.[0]?.properties?.stops;
             if (!stops || stops.length < 2) return alert("No valid stops found for this route.");
 
             startSmartRoute(); // Open the UI
@@ -2234,7 +2287,7 @@ function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, edi
 
             // Redefined: WIDER title (2.5fr) and NARROWER category (100px)
             let gridCols = '2.5fr ';
-            if (showCategory) gridCols += '100px '; 
+            if (showCategory) gridCols += '100px ';
             if (showAssignee) gridCols += '1fr ';
             if (showTime) gridCols += '80px ';
             if (showGroup) gridCols += '90px ';
@@ -2398,7 +2451,7 @@ function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, edi
                         </div>
                         ${task.responsible ? `<div style="font-size:0.75em; color:#a0aec0;">👤 ${task.responsible}</div>` : ''}
                     </div>
-                    
+
                     <div class="task-meta-aside">
                         <div class="meta-sub-row" title="Time & Category">
                             <span style="font-weight:bold; color:#2d3748;">🕒 ${timeOnly}</span>
@@ -2448,7 +2501,7 @@ function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, edi
                 const layerId = `layer-${g.track_id}`;
                 const isVisible = map.getLayer(layerId) ? map.getLayoutProperty(layerId, 'visibility') !== 'none' : true;
                 const color = g.color || '#3498db';
-                
+
                 let displayTitle = g.title || 'Location';
                 let d = g.distance;
                 let elevGain = g.gain;
@@ -2474,32 +2527,32 @@ function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, edi
                 let html = `
                     <div class="geom-row ${isNested ? 'nested-geom' : ''}" style="border-left: 4px solid ${color};">
                         <div class="geom-header-layout">
-                            
+
                             <div class="geom-left-controls">
                                 <button class="visibility-btn ${!isVisible ? 'hidden' : ''}" title="Toggle Visibility" onclick="event.stopPropagation(); toggleLayerVisibility('${layerId}', this)">${isVisible ? '👁️' : '🙈'}</button>
                                 <span style="font-size: 1.2em;">${emoji}</span>
                             </div>
-                            
+
                             <div class="geom-main-content" onclick="event.stopPropagation(); flyToGeometry(${g.lng}, ${g.lat}, '${g.kind}', '${layerId}')">
                                 <div class="geom-title">${displayTitle}</div>
-                                
+
                                 ${hasStats ? `
                                 <div style="display: flex; flex-wrap: wrap; gap: 6px;">
                                     ${d ? `<span class="stat-badge">📏 ${parseFloat(d).toFixed(2)}km</span>` : ''}
                                     ${elevGain ? `<span class="stat-badge gain">▲ +${parseFloat(elevGain).toFixed(0)}m</span>` : ''}
                                     ${elevLoss ? `<span class="stat-badge loss">▼ -${Math.abs(parseFloat(elevLoss)).toFixed(0)}m</span>` : ''}
                                 </div>` : ''}
-                                
+
                                 ${g.comments ? `<div style="font-size:0.85em; color:#718096; font-style:italic;">📝 ${g.comments}</div>` : ''}
                             </div>
-                            
+
                             <div class="geom-actions">
                                 ${g.link ? `<a href="${g.link.startsWith('http') ? g.link : 'https://' + g.link}" target="_blank" class="action-icon-btn" title="Open Link" onclick="event.stopPropagation()">🔗</a>` : ''}
                                 ${g.kind === 'line' ? `<button class="action-icon-btn" title="Analyze Segment" onclick="event.stopPropagation(); startSegmentAnalysis(${task.task_id}, ${g.track_id})">📊</button>` : ''}
                                 <button class="action-icon-btn" title="Edit Location" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})">⚙️</button>
                                 <button class="action-icon-btn delete" title="Delete Location" onclick="event.stopPropagation(); deleteGeometry('${g.kind}', ${g.waypoint_id || g.track_id})">🗑️</button>
                             </div>
-                            
+
                         </div>
                     </div>`;
 
@@ -2594,7 +2647,7 @@ function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, edi
 
             // Clear any lingering mapbox popups
             const popups = document.getElementsByClassName('mapboxgl-popup');
-            while(popups.length > 0) {
+            while (popups.length > 0) {
                 popups[0].remove();
             }
 
@@ -2626,13 +2679,13 @@ function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, edi
             const container = document.getElementById('asana-container');
             const sectionDiv = document.createElement('div');
             sectionDiv.className = 'asana-section';
-            
+
             const dateVal = section.section_date ? new Date(section.section_date).toISOString().split('T')[0] : '';
             const sectionTitle = section.title || 'Unscheduled';
             const sectionDesc = section.description || 'Add description...';
 
             sectionDiv.innerHTML = `
-                <div class="asana-header" style="display: flex; align-items: center; gap: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 10px; cursor: pointer;" 
+                <div class="asana-header" style="display: flex; align-items: center; gap: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 10px; cursor: pointer;"
                      onclick="const content = this.parentElement.querySelector('.section-content'); content.classList.toggle('collapsed'); this.querySelector('.section-toggle-icon').classList.toggle('collapsed');">
                     <span class="section-toggle-icon" style="flex-shrink: 0;">▼</span>
                     ${section.id ? `<input type="date" value="${dateVal}" class="inline-edit-input" style="width: 35px; overflow:hidden; padding:0; border:none; flex-shrink: 0;" onchange="updateSectionMetadata(${section.id}, 'section_date', this.value)" onclick="event.stopPropagation()">` : ''}
