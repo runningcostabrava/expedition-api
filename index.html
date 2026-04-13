@@ -946,40 +946,52 @@
                     isRouting = false;
                     map.getCanvas().style.cursor = '';
 
-                    // Remove the Mapbox UI box
+                    const distKm = (lastCalculatedRoute.distance / 1000).toFixed(2);
+                    const durationMins = Math.round(lastCalculatedRoute.duration / 60);
+                    // Accurately capture the Mapbox UI profile (driving, walking, cycling)
+                    const activeProfile = directionsControl ? directionsControl.getProfile().replace('mapbox/', '') : 'driving';
+
+                    // --- THE INSTANT FIX: Extract the decoded GeoJSON directly from the map BEFORE destroying the UI ---
+                    let validGeoJSONGeometry = null;
+                    const dirSource = map.getSource('directions');
+                    if (dirSource && dirSource._data && dirSource._data.features) {
+                        // Find the actual blue line drawn on the map
+                        const lineFeature = dirSource._data.features.find(f => f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString');
+                        if (lineFeature) validGeoJSONGeometry = lineFeature.geometry;
+                    }
+
+                    // Now it is safe to remove the Mapbox UI box (this erases the 'directions' source!)
                     if (directionsControl) {
                         map.removeControl(directionsControl);
                         directionsControl = null;
                     }
 
-                    // Fallback to 'driving' if the custom select box is removed later
-                    const profileInput = document.getElementById('route-profile');
-                    const profile = profileInput ? profileInput.value : 'driving';
-                    const distKm = (lastCalculatedRoute.distance / 1000).toFixed(2);
-                    const durationMins = Math.round(lastCalculatedRoute.duration / 60);
+                    if (!validGeoJSONGeometry) {
+                        alert("Could not extract route geometry. Please try again.");
+                        return;
+                    }
 
-                    // Clean up intermediate stop markers, leave only the final line
+                    // Clean up map and transfer the line to our custom Drawing tool
                     draw.deleteAll();
                     
-                    // CRITICAL FIX: Build a strictly valid GeoJSON Feature before passing it to Draw
                     const routeFeature = {
                         type: 'Feature',
-                        geometry: lastCalculatedRoute.geometry,
+                        geometry: validGeoJSONGeometry,
                         properties: {
                             route_type: 'smart',
-                            profile: profile,
+                            profile: activeProfile,
                             stops: routePoints,
                             distance: distKm,
                             duration: durationMins,
-                            title: `Smart ${profile} Route`
+                            title: `Smart Route (${distKm}km)`
                         }
                     };
                     draw.add(routeFeature);
 
-                    const centerIndex = Math.floor(lastCalculatedRoute.geometry.coordinates.length / 2);
-                    const centerPoint = lastCalculatedRoute.geometry.coordinates[centerIndex];
+                    const centerIndex = Math.floor(validGeoJSONGeometry.coordinates.length / 2);
+                    const centerPoint = validGeoJSONGeometry.coordinates[centerIndex];
 
-                    showGeometryContextPopup(centerPoint, lastCalculatedRoute.geometry, `Multi-stop ${profile} route`, `🚗 Smart Route Stats: Distance ${distKm}km, Time: ${durationMins}m`);
+                    showGeometryContextPopup(centerPoint, validGeoJSONGeometry, `Smart Route`, `🚗 Stats: Distance ${distKm}km, Time: ${durationMins}m`);
                     lastCalculatedRoute = null;
                 } else if (e.key === 'Escape' && isRouting) {
                     isRouting = false;
