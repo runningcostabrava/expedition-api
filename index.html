@@ -113,7 +113,8 @@
 
         /* Push Mapbox native top-left controls below floating tools */
         .mapboxgl-ctrl-top-left {
-            top: 65px;
+            top: 65px !important;
+            left: 10px !important;
         }
 
         /* Persistent Map Tools */
@@ -889,10 +890,8 @@
                 accessToken: mapboxgl.accessToken,
                 mapboxgl: mapboxgl,
                 marker: false,
-                types: 'poi,place,locality',
-                language: 'en,it', // Helps translate English "airport" to Italian POIs
-                limit: 10 // Show 10 results instead of 5 so the airport isn't hidden
-                // Removed proximity: 'ip' because it biases results to your physical location instead of the trip location
+                language: 'it,en', // Prioritize Italian context
+                limit: 10
             });
             map.addControl(geocoder, 'top-right');
 
@@ -1558,7 +1557,11 @@
                 accessToken: mapboxgl.accessToken,
                 unit: 'metric',
                 profile: 'mapbox/driving',
-                controls: { instructions: false, profileSwitcher: true }
+                controls: { instructions: false, profileSwitcher: true },
+                flyTo: false, // Prevents map from wildly jumping while typing
+                geocoder: {
+                    language: 'it,en' // Give the A/B inputs Italian context
+                }
             });
 
             map.addControl(directionsControl, 'top-left');
