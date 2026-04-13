@@ -616,12 +616,12 @@
         .custom-map-pin {
             transform: scale(var(--pin-scale));
             transform-origin: bottom center;
-            transition: transform 0.1s ease-out, opacity 0.2s ease-in-out; /* Added opacity transition */
+            transition: transform 0.1s ease-out, opacity 0.2s ease-in-out;
         }
         
-        /* Hide the markers entirely when this class is applied to the map */
+        /* Hide markers entirely when zoomed out */
         #map.hide-markers .custom-map-pin {
-            opacity: 0;
+            visibility: hidden;
             pointer-events: none;
         }
     </style>
@@ -1068,14 +1068,14 @@
                 const scale = Math.max(0.4, Math.min(1.5, zoom / 14));
                 document.getElementById('map').style.setProperty('--pin-scale', scale);
                 
-                // 1. Hide markers entirely if zoom is less than 13
-                if (zoom < 13) {
+                // 1. Hide markers entirely if zoom is less than 14 (Island level)
+                if (zoom < 14) {
                     document.getElementById('map').classList.add('hide-markers');
                 } else {
                     document.getElementById('map').classList.remove('hide-markers');
                 }
 
-                // 2. Toggle text labels when zoomed in to STREET level (15.5+)
+                // 2. Show text labels only at Street level (15.5+)
                 if (zoom >= 15.5) {
                     document.getElementById('map').classList.add('show-pin-labels');
                 } else {
@@ -1086,7 +1086,7 @@
             // Trigger once on load to set initial state
             const initZoom = map.getZoom();
             document.getElementById('map').style.setProperty('--pin-scale', Math.max(0.4, Math.min(1.5, initZoom / 14)));
-            if (initZoom < 13) document.getElementById('map').classList.add('hide-markers');
+            if (initZoom < 14) document.getElementById('map').classList.add('hide-markers');
             if (initZoom >= 15.5) document.getElementById('map').classList.add('show-pin-labels');
 
             map.on('draw.create', (e) => {
@@ -1185,7 +1185,7 @@
                         });
 
                         map.on('click', layerId, (e) => {
-                            // CRITICAL: Lock onto the task so new waypoints are saved here
+                            // CRITICAL: Lock onto the task so waypoints from the chart go into this task
                             activeTaskId = task.task_id;
                             focusTaskInSidebar(task.task_id);
                             const dist = turf.length(geom.geojson, { units: 'kilometers' }).toFixed(2);
@@ -1397,7 +1397,7 @@
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
-                    interaction: { mode: 'nearest', intersect: true },
+                    interaction: { mode: 'index', intersect: false }, // Improved tracking
                     plugins: { 
                         legend: { display: false },
                         tooltip: {
@@ -1407,6 +1407,23 @@
                                     return `Elev: ${context.parsed.y}m`;
                                 }
                             }
+                        }
+                    },
+                    // RESTORED: Move dot on map when hovering chart
+                    onHover: (event, activeElements) => {
+                        if (activeElements.length > 0) {
+                            const index = activeElements[0].index;
+                            const coord = coords[index];
+                            if (!elevationHoverMarker) {
+                                elevationHoverMarker = new mapboxgl.Marker({ color: '#f1c40f' })
+                                    .setLngLat([coord[0], coord[1]])
+                                    .addTo(map);
+                            } else {
+                                elevationHoverMarker.setLngLat([coord[0], coord[1]]);
+                            }
+                        } else if (elevationHoverMarker) {
+                            elevationHoverMarker.remove();
+                            elevationHoverMarker = null;
                         }
                     },
                     onClick: (e, activeElements) => {
