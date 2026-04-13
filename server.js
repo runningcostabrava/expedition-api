@@ -388,9 +388,9 @@ app.post('/categories', adminAuth, async (req, res) => {
 });
 
 app.put('/categories/:id', adminAuth, async (req, res) => {
-  const { name, color, icon, line_type } = req.body;
+  const { name, color, icon, line_type, marker_size } = req.body; // Added marker_size
   try {
-    const result = await pool.query('UPDATE categories SET name=$1, color=$2, icon=$3, line_type=$4 WHERE id=$5 RETURNING *', [name, color, icon, line_type, req.params.id]);
+    const result = await pool.query('UPDATE categories SET name=$1, color=$2, icon=$3, line_type=$4, marker_size=$5 WHERE id=$6 RETURNING *', [name, color, icon, line_type, marker_size, req.params.id]);
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -410,6 +410,7 @@ app.get('/itinerary', async (req, res) => {
          c.color AS category_color,
          c.icon AS category_icon,
          c.line_type AS category_line_type,
+         c.marker_size AS category_marker_size, -- Add this line
          COALESCE(
                json_agg(
                  json_build_object(
@@ -440,7 +441,7 @@ app.get('/itinerary', async (req, res) => {
       LEFT JOIN spatial_anchors sa ON ta.anchor_id = sa.id
       LEFT JOIN waypoints w ON sa.waypoint_id = w.id
       LEFT JOIN tracks tr ON sa.track_id = tr.id
-      GROUP BY t.id, s.section_date, c.color, c.icon, c.line_type -- Group by section_date and category fields
+      GROUP BY t.id, s.section_date, c.color, c.icon, c.line_type, c.marker_size -- Group by section_date and category fields
       ORDER BY s.section_date ASC, t.starts_at ASC; -- This handles the "Auto Arrange"
     `;
     const result = await pool.query(query);
