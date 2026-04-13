@@ -1061,16 +1061,8 @@
                     else if (task.category_line_type === 'dotted') dashArray = [0.1, 2];
 
                     if (geom.kind === 'point' && geom.lat && geom.lng) {
-                        const el = document.createElement('div');
-                        el.style.fontSize = '22px';
-
-                        // If using FontAwesome, you'd apply a class;
-                        // for now, we'll support the current emoji/text structure
-                        el.innerText = renderIcon;
-                        el.style.filter = `drop-shadow(0px 0px 4px ${markerColor})`;
-                        el.style.cursor = 'pointer';
-
-                        const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+                        // Use default Mapbox marker with custom color to prevent text rendering on map
+                        const marker = new mapboxgl.Marker({ color: markerColor })
                             .setLngLat([geom.lng, geom.lat])
                             .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
                         <h4 style="border-left: 4px solid ${markerColor}; padding-left: 8px;">${renderIcon} ${geom.title}</h4>
