@@ -879,8 +879,9 @@
             map = new mapboxgl.Map({
                 container: 'map',
                 style: 'mapbox://styles/mapbox/outdoors-v12',
-                center: [2.1734, 41.3851],
-                zoom: 12
+                // Longitude first, then Latitude! Centered on Trapani/Bonagia, Sicily
+                center: [12.5928, 38.0662], 
+                zoom: 10 // Slightly zoomed out so you can see the whole coast
             });
 
             draw = new MapboxDraw({ displayControlsDefault: false, controls: { trash: true } });
