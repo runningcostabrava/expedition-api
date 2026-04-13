@@ -879,12 +879,14 @@
             draw = new MapboxDraw({ displayControlsDefault: false, controls: { trash: true } });
             map.addControl(draw);
 
-            const geocoder = new MapboxGeocoder({ 
-                accessToken: mapboxgl.accessToken, 
-                mapboxgl: mapboxgl, 
+            const geocoder = new MapboxGeocoder({
+                accessToken: mapboxgl.accessToken,
+                mapboxgl: mapboxgl,
                 marker: false,
-                types: 'poi,place,address,locality', // Forces POIs (like airports) into the results
-                proximity: 'ip' // Biases results closer to the user's current location/map view
+                types: 'poi,place,locality',
+                language: 'en,it', // Helps translate English "airport" to Italian POIs
+                limit: 10 // Show 10 results instead of 5 so the airport isn't hidden
+                // Removed proximity: 'ip' because it biases results to your physical location instead of the trip location
             });
             map.addControl(geocoder, 'top-right');
 
@@ -927,9 +929,9 @@
                     // Add searched location to the route
                     routePoints.push(e.result.center);
                     calculateSmartRoute();
-                    
+
                     // Clear the search box so user can quickly type the next stop
-                    setTimeout(() => geocoder.clear(), 200); 
+                    setTimeout(() => geocoder.clear(), 200);
                 } else {
                     // Normal behavior: drop a single pin
                     draw.deleteAll();
@@ -1817,7 +1819,7 @@
                 if (!a.starts_at && !b.starts_at) return 0;
                 if (!a.starts_at) return 1; // Send empty times to the bottom
                 if (!b.starts_at) return -1;
-                
+
                 // Extract just the "HH:MM" string for bulletproof sorting within the day
                 const timeA = a.starts_at.length >= 16 ? a.starts_at.substring(11, 16) : '23:59';
                 const timeB = b.starts_at.length >= 16 ? b.starts_at.substring(11, 16) : '23:59';
