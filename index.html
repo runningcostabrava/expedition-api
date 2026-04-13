@@ -1020,11 +1020,20 @@
             map.on('draw.create', (e) => {
                 const feature = e.features[0];
                 let centerPoint;
-                if (feature.geometry.type === 'Point') centerPoint = feature.geometry.coordinates;
-                else if (feature.geometry.type === 'LineString') centerPoint = feature.geometry.coordinates[Math.floor(feature.geometry.coordinates.length / 2)];
-                else centerPoint = feature.geometry.coordinates[0][0]; // Polygon approximation
+                
+                // Safely extract coordinates based on Geometry type
+                if (feature.geometry.type === 'Point') {
+                    centerPoint = feature.geometry.coordinates;
+                } else if (feature.geometry.type === 'LineString') {
+                    centerPoint = feature.geometry.coordinates[Math.floor(feature.geometry.coordinates.length / 2)];
+                } else if (feature.geometry.type === 'Polygon') {
+                    centerPoint = feature.geometry.coordinates[0][0];
+                }
 
-                showGeometryContextPopup(centerPoint, feature.geometry, `New ${feature.geometry.type}`, '');
+                // If draw tool was used, open the Save Context Popup
+                if (centerPoint) {
+                    showGeometryContextPopup(centerPoint, feature.geometry, `New ${feature.geometry.type}`, '');
+                }
             });
         }
 
@@ -2199,9 +2208,11 @@
             const geom = task?.geometries.find(g => g.anchor_id === anchorId);
             if (!geom) { alert("Geometry not found!"); return; }
 
-            // Clear mapbox popups that might trap the click
+            // Clear any lingering mapbox popups
             const popups = document.getElementsByClassName('mapboxgl-popup');
-            if (popups.length) popups[0].remove();
+            while(popups.length > 0) {
+                popups[0].remove();
+            }
 
             isEditingGeometry = true;
             activeTaskId = taskId;
@@ -2211,8 +2222,9 @@
             const editConfig = { kind: geom.kind, id: geom.waypoint_id || geom.track_id };
 
             if (geom.kind === 'point') {
-                const feature = { type: 'Feature', geometry: { type: 'Point', coordinates: [geom.lng, geom.lat] }, properties: {} };
+                const feature = { type: 'Feature', id: 'edit-point', geometry: { type: 'Point', coordinates: [geom.lng, geom.lat] }, properties: {} };
                 draw.add(feature);
+                draw.changeMode('direct_select', { featureId: 'edit-point' }); // Enable dragging for editing
                 centerPoint = [geom.lng, geom.lat];
                 showGeometryContextPopup(centerPoint, feature.geometry, geom.title, '', editConfig);
             } else if (geom.geojson) {
