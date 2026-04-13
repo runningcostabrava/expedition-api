@@ -312,23 +312,18 @@
 
         /* Deep Indentation & Hierarchy */
         .geom-row.nested-geom {
-            margin-left: 45px;
-            /* Deeper indent from track */
-            margin-top: 0;
-            margin-bottom: 0;
-            padding: 6px 10px;
-            position: relative;
-            background: transparent;
-            /* Simpler style: transparent background */
-            border: none;
-            /* Remove heavy box border */
-            border-bottom: 1px solid #f1f5f9;
-            /* Subtle divider between items */
-            border-left-width: 3px !important;
-            border-left-style: solid !important;
-            border-radius: 0;
+            margin-left: 20px;
+            margin-top: -2px;
+            margin-bottom: 8px;
+            padding: 8px 10px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #94a3b8 !important; /* Thick left border to denote it's a child */
+            border-radius: 0 8px 8px 0;
             box-shadow: none;
+            position: relative;
         }
+        .geom-row.nested-geom:hover { background: #f1f5f9; }
 
         .geom-row.nested-geom:last-child {
             border-bottom: none;
@@ -1425,18 +1420,18 @@
                                 else loss -= diff;
                             }
 
-                            new mapboxgl.Popup({ focusAfterOpen: false })
+                            new mapboxgl.Popup({ focusAfterOpen: false, anchor: 'bottom', offset: 15, className: 'custom-popup' })
                                 .setLngLat(e.lngLat)
                                 .setHTML(`
-                                    <div style="padding-right: 15px;">
-                                        <h4 style="margin-top:0;">${geom.kind === 'polygon' ? '🛑' : '📈'} ${geom.title}</h4>
-                                        <p style="margin: 5px 0;">Distance: ${dist} km</p>
-                                        <p style="margin: 0; font-size: 0.9em; color: #666;">Task: ${task.task_name || task.task || 'Unnamed Task'}</p>
-                                        <p style="margin: 5px 0; font-size: 0.85em; color: #333;">🔺 +${gain.toFixed(0)}m | 🔻 ${loss.toFixed(0)}m</p>
-                                        <div style="margin-top: 10px; display: flex; gap: 5px;">
-                                            <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="padding: 5px 10px; flex: 1;">Edit</button>
-                                            ${geom.kind === 'line' ? `<button onclick="startSegmentAnalysis(${task.task_id}, ${geom.track_id})" style="padding: 5px 10px; flex: 1;">Analyze</button>` : ''}
-                                            <button onclick="deleteGeometry('${geom.kind}', ${geom.track_id})" style="padding: 5px 10px; flex: 1; background:#e74c3c;">🗑️ Delete</button>
+                                    <div style="padding-right: 5px;">
+                                        <h4 style="margin-top:0; font-size:1.1em; color:#2c3e50;">${geom.kind === 'polygon' ? '🛑' : '📈'} ${geom.title}</h4>
+                                        <p style="margin: 5px 0; font-weight:bold;">Distance: ${dist} km</p>
+                                        <p style="margin: 0; font-size: 0.9em; color: #7f8c8d;">Task: ${task.task_name || task.task || 'Unnamed Task'}</p>
+                                        <p style="margin: 8px 0; font-size: 0.85em; color: #e74c3c; font-weight:bold;">🔺 +${gain.toFixed(0)}m &nbsp;|&nbsp; 🔻 ${loss.toFixed(0)}m</p>
+                                        <div style="margin-top: 12px; display: flex; gap: 8px;">
+                                            <button class="popup-btn edit" onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})">Edit</button>
+                                            ${geom.kind === 'line' ? `<button class="popup-btn analyze" onclick="startSegmentAnalysis(${task.task_id}, ${geom.track_id})">Analyze</button>` : ''}
+                                            <button class="popup-btn delete" onclick="deleteGeometry('${geom.kind}', ${geom.track_id})">Delete</button>
                                         </div>
                                     </div>
                                 `)
@@ -1548,8 +1543,10 @@
         }
 
         let elevationHoverMarker = null;
+        let currentElevationTrackId = null;
 
         function showElevationProfile(geojson, title, metadata = null, trackId = null) {
+            currentElevationTrackId = trackId;
             document.getElementById('elevation-panel').style.display = 'block';
             const statsHeader = document.getElementById('elevation-stats-header');
             const props = metadata || geojson.features?.[0]?.properties || {};
@@ -1810,6 +1807,25 @@
                 });
                 renderProjectView();
                 renderMapGeometries();
+                
+                // Hot-reload Elevation Chart if it's currently open
+                if (document.getElementById('elevation-panel').style.display === 'block' && currentElevationTrackId) {
+                    let trackGeom = null;
+                    let trackTitle = null;
+                    allItinerary.forEach(t => {
+                        const g = (t.geometries || []).find(geo => geo.track_id === currentElevationTrackId);
+                        if (g) { trackGeom = g; trackTitle = g.title; }
+                    });
+                    if (trackGeom) {
+                        const props = trackGeom.geojson.features[0].properties || {};
+                        showElevationProfile(trackGeom.geojson, trackTitle, {
+                            distance: trackGeom.distance || turf.length(trackGeom.geojson, { units: 'kilometers' }).toFixed(2),
+                            gain: trackGeom.gain,
+                            loss: trackGeom.loss
+                        }, currentElevationTrackId);
+                    }
+                }
+                
             } catch (err) {
                 console.error("Data Load Error:", err);
                 if (allItinerary.length === 0) {
