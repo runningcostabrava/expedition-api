@@ -341,18 +341,20 @@
         }
         .geom-title-group {
             display: flex;
-            align-items: center;
-            gap: 6px;
+            align-items: flex-start; /* Align top so icons stay aligned if text wraps */
+            gap: 8px;
             flex: 1;
-            min-width: 0; /* Critical for text-overflow to work inside flex */
+            min-width: 0; 
             cursor: pointer;
         }
         .geom-title {
             color: #2d3748;
-            font-size: 1.1em;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            font-size: 1.05em;
+            font-weight: bold;
+            word-break: break-word; /* Allows long text to wrap to the next line safely */
+            white-space: normal; /* Removes the squishing behavior */
+            line-height: 1.3;
+            margin-top: -2px;
         }
         
         /* Stat Badges */
@@ -1278,14 +1280,22 @@
                         `;
                         el.style.cursor = 'pointer';
 
-                        // focusAfterOpen: false is the magic command that prevents the ARIA warning!
+                        // Add click listener to highlight the sidebar task
+                        el.addEventListener('click', () => focusTaskInSidebar(task.task_id));
+
+                        // focusAfterOpen: false prevents the ARIA warning
                         const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
                             .setLngLat([geom.lng, geom.lat])
                             .setPopup(new mapboxgl.Popup({ offset: 25, focusAfterOpen: false }).setHTML(`
-                        <h4 style="border-left: 4px solid ${markerColor}; padding-left: 8px;">${renderIcon} ${geom.title}</h4>
-                        <p>Task: ${task.task_name || 'Unnamed'}</p>
-                        <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})">Edit</button>
-                    `))
+                                <div style="padding-right: 15px;">
+                                    <h4 style="border-left: 4px solid ${markerColor}; padding-left: 8px; margin-top:0;">${renderIcon} ${geom.title}</h4>
+                                    <p style="margin: 5px 0;">Task: ${task.task_name || 'Unnamed'}</p>
+                                    <div style="display: flex; gap: 5px; margin-top: 10px;">
+                                        <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="flex:1;">Edit</button>
+                                        <button onclick="deleteGeometry('point', ${geom.waypoint_id || geom.anchor_id})" style="flex:1; background:#e74c3c;">🗑️ Delete</button>
+                                    </div>
+                                </div>
+                            `))
                             .addTo(map);
                         activeMarkers.push(marker);
                     } else if (geom.geojson) {
@@ -1327,13 +1337,16 @@
                             new mapboxgl.Popup({ focusAfterOpen: false })
                                 .setLngLat(e.lngLat)
                                 .setHTML(`
-                                    <h4>${geom.kind === 'polygon' ? '🛑' : '📈'} ${geom.title}</h4>
-                                    <p style="margin: 5px 0;">Distance: ${dist} km</p>
-                    <p style="margin: 0; font-size: 0.9em; color: #666;">Task: ${task.task_name || task.task || 'Unnamed Task'}</p>
-                                    <p style="margin: 5px 0; font-size: 0.85em; color: #333;">🔺 +${gain.toFixed(0)}m | 🔻 ${loss.toFixed(0)}m</p>
-                                    <div style="margin-top: 10px; display: flex; gap: 5px;">
-                                        <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="padding: 5px 10px; flex: 1;">Edit</button>
-                                        <button onclick="startSegmentAnalysis(${task.task_id}, ${geom.track_id})" style="padding: 5px 10px; flex: 1;">Analyze</button>
+                                    <div style="padding-right: 15px;">
+                                        <h4 style="margin-top:0;">${geom.kind === 'polygon' ? '🛑' : '📈'} ${geom.title}</h4>
+                                        <p style="margin: 5px 0;">Distance: ${dist} km</p>
+                                        <p style="margin: 0; font-size: 0.9em; color: #666;">Task: ${task.task_name || task.task || 'Unnamed Task'}</p>
+                                        <p style="margin: 5px 0; font-size: 0.85em; color: #333;">🔺 +${gain.toFixed(0)}m | 🔻 ${loss.toFixed(0)}m</p>
+                                        <div style="margin-top: 10px; display: flex; gap: 5px;">
+                                            <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="padding: 5px 10px; flex: 1;">Edit</button>
+                                            ${geom.kind === 'line' ? `<button onclick="startSegmentAnalysis(${task.task_id}, ${geom.track_id})" style="padding: 5px 10px; flex: 1;">Analyze</button>` : ''}
+                                            <button onclick="deleteGeometry('${geom.kind}', ${geom.track_id})" style="padding: 5px 10px; flex: 1; background:#e74c3c;">🗑️ Delete</button>
+                                        </div>
                                     </div>
                                 `)
                                 .addTo(map);
@@ -1345,7 +1358,7 @@
                                 profile: props.profile,
                                 gain: gain.toFixed(0),
                                 loss: loss.toFixed(0)
-                            });
+                            }, geom.track_id); // CRITICAL: Pass the track ID down!
                         });
                     }
                 });
@@ -1445,7 +1458,7 @@
 
         let elevationHoverMarker = null;
 
-        function showElevationProfile(geojson, title, metadata = null) {
+        function showElevationProfile(geojson, title, metadata = null, trackId = null) {
             document.getElementById('elevation-panel').style.display = 'block';
             const statsHeader = document.getElementById('elevation-stats-header');
             const props = metadata || geojson.features?.[0]?.properties || {};
@@ -1570,6 +1583,7 @@
                                 // Correctly passing the pre-calculated stats to the save popup
                                 const dist = distances[index];
                                 const gain = cumulativeGains[index];
+                                activeParentTrackId = trackId; // LINK IT: Tells the save popup to nest this point
                                 showGeometryContextPopup([activeCoord[0], activeCoord[1]], feat.geometry, `KM ${dist}`, `📏 ${dist}km | 🔺 +${gain}m`, null, '📍');
                             }
                         }
@@ -2367,6 +2381,19 @@ function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, edi
                 activeTaskId = task.task_id;
                 const acc = document.getElementById(`acc-${task.task_id}`);
                 if (acc) acc.classList.toggle('open');
+
+                // Fly the map to all geometries attached to this task
+                if (task.geometries && task.geometries.length > 0) {
+                    const features = [];
+                    task.geometries.forEach(g => {
+                        if (g.kind === 'point' && g.lat && g.lng) features.push(turf.point([g.lng, g.lat]));
+                        else if (g.geojson) features.push(...g.geojson.features);
+                    });
+                    if (features.length > 0) {
+                        const bbox = turf.bbox(turf.featureCollection(features));
+                        map.fitBounds(bbox, { padding: 80, maxZoom: 16, duration: 1200 });
+                    }
+                }
             };
 
             const accordionEl = document.createElement('div');
@@ -2384,17 +2411,35 @@ function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, edi
                 const isVisible = map.getLayer(layerId) ? map.getLayoutProperty(layerId, 'visibility') !== 'none' : true;
                 const color = g.color || '#3498db';
                 
-                // Let CSS handle truncation gracefully based on available screen width
-                const displayTitle = g.title || 'Location';
-                const hasStats = g.distance || g.gain || g.loss;
+                let displayTitle = g.title || 'Location';
+                let d = g.distance;
+                let elevGain = g.gain;
+                let elevLoss = g.loss;
+
+                // ON-THE-FLY CALCULATION: If the DB is missing track stats, calculate them instantly!
+                if (g.kind === 'line' && g.geojson) {
+                    const coords = g.geojson.features[0].geometry.type === 'Polygon' ? g.geojson.features[0].geometry.coordinates[0] : g.geojson.features[0].geometry.coordinates;
+                    if (!d || d == 0) d = turf.length(g.geojson, { units: 'kilometers' }).toFixed(2);
+                    if (!elevGain && !elevLoss) {
+                        let cg = 0, cl = 0;
+                        for (let i = 1; i < coords.length; i++) {
+                            const diff = (coords[i][2] || 0) - (coords[i - 1][2] || 0);
+                            if (diff > 0) cg += diff; else cl -= diff;
+                        }
+                        elevGain = cg.toFixed(0);
+                        elevLoss = cl.toFixed(0);
+                    }
+                }
+
+                const hasStats = d || elevGain || elevLoss;
 
                 let html = `
                     <div class="geom-row ${isNested ? 'nested-geom' : ''}" style="border-left: 4px solid ${color};">
                         <div class="geom-info-header">
                             <div class="geom-title-group" onclick="event.stopPropagation(); flyToGeometry(${g.lng}, ${g.lat}, '${g.kind}', '${layerId}')">
-                                <button class="visibility-btn ${!isVisible ? 'hidden' : ''}" title="Toggle Visibility" onclick="event.stopPropagation(); toggleLayerVisibility('${layerId}', this)">${isVisible ? '👁️' : '🙈'}</button>
-                                <span style="font-size: 1.1em;">${emoji}</span>
-                                <strong class="geom-title" title="${g.title}">${displayTitle}</strong>
+                                <button class="visibility-btn ${!isVisible ? 'hidden' : ''}" title="Toggle Visibility" onclick="event.stopPropagation(); toggleLayerVisibility('${layerId}', this)" style="margin-top:-2px;">${isVisible ? '👁️' : '🙈'}</button>
+                                <span style="font-size: 1.2em; margin-top:-2px;">${emoji}</span>
+                                <strong class="geom-title">${displayTitle}</strong>
                             </div>
                             <div class="geom-actions">
                                 ${g.link ? `<a href="${g.link.startsWith('http') ? g.link : 'https://' + g.link}" target="_blank" class="geom-link-btn" title="Open Link" onclick="event.stopPropagation()">🔗 Link</a>` : ''}
@@ -2405,13 +2450,13 @@ function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, edi
                         </div>
                         
                         ${hasStats ? `
-                        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
-                            ${g.distance ? `<span class="stat-badge">📏 ${parseFloat(g.distance).toFixed(2)}km</span>` : ''}
-                            ${g.gain ? `<span class="stat-badge gain">▲ +${parseFloat(g.gain).toFixed(0)}m</span>` : ''}
-                            ${g.loss ? `<span class="stat-badge loss">▼ -${Math.abs(parseFloat(g.loss)).toFixed(0)}m</span>` : ''}
+                        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-left: 32px;">
+                            ${d ? `<span class="stat-badge">📏 ${parseFloat(d).toFixed(2)}km</span>` : ''}
+                            ${elevGain ? `<span class="stat-badge gain">▲ +${parseFloat(elevGain).toFixed(0)}m</span>` : ''}
+                            ${elevLoss ? `<span class="stat-badge loss">▼ -${Math.abs(parseFloat(elevLoss)).toFixed(0)}m</span>` : ''}
                         </div>` : ''}
                         
-                        ${g.comments ? `<div style="margin-top:6px; font-size:0.9em; color:#718096; font-style:italic; padding-left:2px;">📝 ${g.comments}</div>` : ''}
+                        ${g.comments ? `<div style="margin-top:6px; font-size:0.9em; color:#718096; font-style:italic; padding-left:32px;">📝 ${g.comments}</div>` : ''}
                     </div>`;
 
                 const myChildren = children.filter(child => child.parent_track_id === (g.track_id || g.waypoint_id));
