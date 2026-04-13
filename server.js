@@ -72,6 +72,7 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS gain NUMERIC",
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS loss NUMERIC",
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS parent_track_id INTEGER",
+      "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS parent_track_id INTEGER",
       "ALTER TABLE categories ADD COLUMN IF NOT EXISTS line_type TEXT DEFAULT 'solid'",
       "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_milestone BOOLEAN DEFAULT false",
       "ALTER TABLE categories ADD COLUMN IF NOT EXISTS marker_size INTEGER DEFAULT 28"
@@ -227,10 +228,10 @@ app.get('/waypoints', async (req, res) => {
 
 app.post('/waypoints', adminAuth, async (req, res) => {
   console.log("DEBUG POST /waypoints payload:", req.body);
-  const { title, lat, lng, description, category, tasks, existing_task_id, color, icon } = req.body;
+  const { title, lat, lng, description, category, tasks, existing_task_id, color, icon, parent_track_id } = req.body;
   try {
-    const wp = await pool.query('INSERT INTO waypoints (title, lat, lng, description, category, color, icon) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
-      [title, lat, lng, description, category, color || '#e74c3c', icon || 'marker']);
+    const wp = await pool.query('INSERT INTO waypoints (title, lat, lng, description, category, color, icon, parent_track_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
+      [title, lat, lng, description, category, color || '#e74c3c', icon || 'marker', parent_track_id]);
     const wpId = wp.rows[0].id;
 
     const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, waypoint_id) VALUES ($1, $2) RETURNING id', ['point', wpId]);
@@ -432,7 +433,7 @@ app.get('/itinerary', async (req, res) => {
                    'duration', tr.duration,
                    'gain', tr.gain,
                    'loss', tr.loss,
-                   'parent_track_id', tr.parent_track_id
+                   'parent_track_id', COALESCE(w.parent_track_id, tr.parent_track_id)
                  )
                ) FILTER (WHERE ta.anchor_id IS NOT NULL), '[]'
              ) as geometries
