@@ -1185,6 +1185,8 @@
                         });
 
                         map.on('click', layerId, (e) => {
+                            // CRITICAL: Set this as the global active task so waypoints show in the chart
+                            activeTaskId = task.task_id;
                             focusTaskInSidebar(task.task_id);
                             const dist = turf.length(geom.geojson, { units: 'kilometers' }).toFixed(2);
 
@@ -1423,7 +1425,10 @@
                                 const feat = { type: 'Feature', geometry: { type: 'Point', coordinates: [activeCoord[0], activeCoord[1]] } };
                                 draw.add(feat);
                                 map.flyTo({ center: [activeCoord[0], activeCoord[1]], zoom: 15 });
-                                showGeometryContextPopup([activeCoord[0], activeCoord[1]], feat.geometry, `KM ${distances[index]}`, `📏 ${distances[index]}km | 🔺 +${cumulativeGains[index]}m`, null, '📍');
+                                // Correctly passing the pre-calculated stats to the save popup
+                                const dist = distances[index];
+                                const gain = cumulativeGains[index];
+                                showGeometryContextPopup([activeCoord[0], activeCoord[1]], feat.geometry, `KM ${dist}`, `📏 ${dist}km | 🔺 +${gain}m`, null, '📍');
                             }
                         }
                     },
