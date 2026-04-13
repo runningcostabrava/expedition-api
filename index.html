@@ -9,8 +9,7 @@
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.0/mapbox-gl-draw.css"
         type="text/css">
-    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
-    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css" type="text/css">
+    <script id="search-js" src="https://api.mapbox.com/search-js/v1.0.0-beta.21/web.js"></script>
 
     <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
     <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css" type="text/css">
@@ -886,14 +885,11 @@
             draw = new MapboxDraw({ displayControlsDefault: false, controls: { trash: true } });
             map.addControl(draw);
 
-            const geocoder = new MapboxGeocoder({
-                accessToken: mapboxgl.accessToken,
-                mapboxgl: mapboxgl,
-                marker: false,
-                language: 'it,en', // Prioritize Italian context
-                limit: 10
-            });
-            map.addControl(geocoder, 'top-right');
+            // Use the NEW Mapbox Search Box API (v1)
+            const searchBox = new mapboxsearch.MapboxSearchBox();
+            searchBox.accessToken = mapboxgl.accessToken;
+            searchBox.options = { language: 'it,en' };
+            map.addControl(searchBox, 'top-right');
 
             // 1. Unified Click Handler for Routing and Analysis
             map.on('click', async (e) => {
@@ -927,18 +923,21 @@
                 }
             });
 
-            // 2. Geocoder Result
-            geocoder.on('result', (e) => {
-                if (isRouting) {
-                    // Ignore global search box when routing; use the Directions UI boxes instead
-                    return;
-                } else {
-                    // Normal behavior: drop a single pin
-                    draw.deleteAll();
-                    const feature = { type: 'Feature', geometry: { type: 'Point', coordinates: e.result.center } };
-                    draw.add(feature);
-                    showGeometryContextPopup(e.result.center, feature.geometry, e.result.text, '');
-                }
+            // 2. Search Box API Result (New v1 API)
+            searchBox.addEventListener('retrieve', (e) => {
+                if (isRouting) return; 
+                
+                const feature = e.detail.features[0];
+                draw.deleteAll();
+                draw.add(feature);
+
+                // Calculate a safe center point for the popup (works for Points, Lines, and Polygons)
+                let centerPoint;
+                if (feature.geometry.type === 'Point') centerPoint = feature.geometry.coordinates;
+                else if (feature.geometry.type === 'LineString') centerPoint = feature.geometry.coordinates[Math.floor(feature.geometry.coordinates.length / 2)];
+                else centerPoint = feature.geometry.coordinates[0][0];
+
+                showGeometryContextPopup(centerPoint, feature.geometry, feature.properties.name || feature.properties.place_formatted, '');
             });
 
             // Listen for ENTER to finish Multi-stop Route
@@ -961,22 +960,26 @@
 
                     // Clean up intermediate stop markers, leave only the final line
                     draw.deleteAll();
-                    draw.add(lastCalculatedRoute.geometry);
-
-                    const feature = lastCalculatedRoute.geometry;
-                    // Persist the original stops so they can be re-edited later
-                    feature.properties = {
-                        route_type: 'smart',
-                        profile: profile,
-                        stops: routePoints,
-                        distance: distKm,
-                        duration: durationMins,
-                        title: `Smart ${profile} Route`
+                    
+                    // CRITICAL FIX: Build a strictly valid GeoJSON Feature before passing it to Draw
+                    const routeFeature = {
+                        type: 'Feature',
+                        geometry: lastCalculatedRoute.geometry,
+                        properties: {
+                            route_type: 'smart',
+                            profile: profile,
+                            stops: routePoints,
+                            distance: distKm,
+                            duration: durationMins,
+                            title: `Smart ${profile} Route`
+                        }
                     };
-                    const centerIndex = Math.floor(feature.coordinates.length / 2);
-                    const centerPoint = feature.coordinates[centerIndex];
+                    draw.add(routeFeature);
 
-                    showGeometryContextPopup(centerPoint, feature, `Multi-stop ${profile} route`, `🚗 Smart Route Stats: Distance ${distKm}km, Time: ${durationMins}m`);
+                    const centerIndex = Math.floor(lastCalculatedRoute.geometry.coordinates.length / 2);
+                    const centerPoint = lastCalculatedRoute.geometry.coordinates[centerIndex];
+
+                    showGeometryContextPopup(centerPoint, lastCalculatedRoute.geometry, `Multi-stop ${profile} route`, `🚗 Smart Route Stats: Distance ${distKm}km, Time: ${durationMins}m`);
                     lastCalculatedRoute = null;
                 } else if (e.key === 'Escape' && isRouting) {
                     isRouting = false;
@@ -1317,6 +1320,10 @@
                 // Append the link to the description text if it exists
                 const finalDesc = link ? `${statsText}\nLink: ${link}` : statsText;
 
+                // CRITICAL FIX: Extract the full valid Feature directly from the map drawing engine to preserve Properties
+                const drawnFeatures = draw.getAll().features;
+                const featureToSave = drawnFeatures.length > 0 ? drawnFeatures[0] : { type: 'Feature', geometry: geometry, properties: {} };
+
                 try {
                     const headers = { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY };
 
@@ -1328,7 +1335,7 @@
                             });
                         } else {
                             await fetch(`${API_URL}/tracks/${editConfig.id}`, {
-                                method: 'PUT', headers, body: JSON.stringify({ title, color, geojson_data: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry }] }, description: finalDesc })
+                                method: 'PUT', headers, body: JSON.stringify({ title, color, geojson_data: { type: 'FeatureCollection', features: [featureToSave] }, description: finalDesc })
                             });
                         }
                     } else {
@@ -1339,7 +1346,7 @@
                             });
                         } else {
                             await fetch(`${API_URL}/tracks`, {
-                                method: 'POST', headers, body: JSON.stringify({ title, color, existing_task_id: activeTaskId, parent_track_id: segmentTrackId, geojson_data: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry }] }, description: finalDesc })
+                                method: 'POST', headers, body: JSON.stringify({ title, color, existing_task_id: activeTaskId, parent_track_id: segmentTrackId, geojson_data: { type: 'FeatureCollection', features: [featureToSave] }, description: finalDesc })
                             });
                         }
                     }
@@ -1701,7 +1708,8 @@
 
         function editSmartRoute(trackId) {
             const track = allItinerary.flatMap(t => t.geometries).find(g => g.track_id === trackId);
-            if (!track || !track.properties.stops || track.properties.stops.length < 2) return alert("No valid stops found for this route.");
+            const stops = track?.geojson?.features?.[0]?.properties?.stops; // Safely traverse the GeoJSON properties
+            if (!stops || stops.length < 2) return alert("No valid stops found for this route.");
 
             startSmartRoute(); // Open the UI
 

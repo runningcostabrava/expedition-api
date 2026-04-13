@@ -180,7 +180,8 @@ app.put('/tracks/:id', adminAuth, async (req, res) => {
     const existingAnchor = await pool.query('SELECT id FROM spatial_anchors WHERE track_id = $1', [id]);
     if (existingAnchor.rows.length > 0) {
       anchorId = existingAnchor.rows[0].id;
-    } else {
+    } else if (geojson_data && geojson_data.features && geojson_data.features.length > 0) {
+      // Safely ensure geojson_data exists before attempting to read its properties
       const geometryType = geojson_data.features[0].geometry.type;
       const kind = geometryType === 'Polygon' ? 'polygon' : 'line';
       const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, track_id) VALUES ($1, $2) RETURNING id', [kind, id]);
