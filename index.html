@@ -1560,7 +1560,8 @@
                 controls: { instructions: false, profileSwitcher: true },
                 flyTo: false, // Prevents map from wildly jumping while typing
                 geocoder: {
-                    language: 'it,en' // Give the A/B inputs Italian context
+                    language: 'it,en', // Give the A/B inputs Italian context
+                    types: 'poi,place,locality' // BANS street addresses (like 'Rua') so airports show up first!
                 }
             });
 
