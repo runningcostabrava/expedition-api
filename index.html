@@ -1708,12 +1708,11 @@
 
         function editSmartRoute(trackId) {
             const track = allItinerary.flatMap(t => t.geometries).find(g => g.track_id === trackId);
-            const stops = track?.geojson?.features?.[0]?.properties?.stops; // Safely traverse the GeoJSON properties
+            const stops = track?.geojson?.features?.[0]?.properties?.stops; 
             if (!stops || stops.length < 2) return alert("No valid stops found for this route.");
 
             startSmartRoute(); // Open the UI
 
-            const stops = track.properties.stops;
             // MapboxDirections needs a slight delay to initialize before setting points
             setTimeout(() => {
                 directionsControl.setOrigin(stops[0]);
