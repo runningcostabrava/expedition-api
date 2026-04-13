@@ -9,11 +9,11 @@
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.0/mapbox-gl-draw.css"
         type="text/css">
-    <script
-        src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
-    <link rel="stylesheet"
-        href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css"
-        type="text/css">
+    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css" type="text/css">
+
+    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css" type="text/css">
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.0/mapbox-gl-draw.js"></script>
     <script src="https://unpkg.com/togeojson@0.16.0/togeojson.js"></script>
@@ -834,6 +834,7 @@
         let routePoints = [], segmentPoints = [], activeAnalysisTrack = null;
         let lastCalculatedRoute = null; // Stores multi-stop route until Enter is pressed
         let ADMIN_KEY = null, elevationChart = null;
+        let directionsControl = null; // Holds the Mapbox Directions UI
 
         const groupColors = { 'Hikers': '#2ecc71', 'Runners': '#e67e22', 'Staff': '#9b59b6', 'Transport': '#f1c40f' };
 
@@ -917,21 +918,16 @@
                 }
 
                 if (isRouting) {
-                    routePoints.push([e.lngLat.lng, e.lngLat.lat]);
-                    calculateSmartRoute();
-                    return; // Keep routing active until Enter is pressed
+                    // With MapboxDirections UI, the plugin natively handles map clicks.
+                    return;
                 }
             });
 
             // 2. Geocoder Result
             geocoder.on('result', (e) => {
                 if (isRouting) {
-                    // Add searched location to the route
-                    routePoints.push(e.result.center);
-                    calculateSmartRoute();
-
-                    // Clear the search box so user can quickly type the next stop
-                    setTimeout(() => geocoder.clear(), 200);
+                    // Ignore global search box when routing; use the Directions UI boxes instead
+                    return;
                 } else {
                     // Normal behavior: drop a single pin
                     draw.deleteAll();
@@ -947,7 +943,15 @@
                     isRouting = false;
                     map.getCanvas().style.cursor = '';
 
-                    const profile = document.getElementById('route-profile').value;
+                    // Remove the Mapbox UI box
+                    if (directionsControl) {
+                        map.removeControl(directionsControl);
+                        directionsControl = null;
+                    }
+
+                    // Fallback to 'driving' if the custom select box is removed later
+                    const profileInput = document.getElementById('route-profile');
+                    const profile = profileInput ? profileInput.value : 'driving';
                     const distKm = (lastCalculatedRoute.distance / 1000).toFixed(2);
                     const durationMins = Math.round(lastCalculatedRoute.duration / 60);
 
@@ -973,6 +977,10 @@
                 } else if (e.key === 'Escape' && isRouting) {
                     isRouting = false;
                     map.getCanvas().style.cursor = '';
+                    if (directionsControl) {
+                        map.removeControl(directionsControl);
+                        directionsControl = null;
+                    }
                     draw.deleteAll();
                     routePoints = [];
                     lastCalculatedRoute = null;
@@ -1532,11 +1540,42 @@
         }
 
         function startSmartRoute() {
+            // Toggle off if it's already open
+            if (directionsControl) {
+                map.removeControl(directionsControl);
+                directionsControl = null;
+                isRouting = false;
+                return;
+            }
+
+            // Spawn the official Mapbox UI
+            directionsControl = new MapboxDirections({
+                accessToken: mapboxgl.accessToken,
+                unit: 'metric',
+                profile: 'mapbox/driving',
+                controls: { instructions: false, profileSwitcher: true }
+            });
+
+            map.addControl(directionsControl, 'top-left');
             isRouting = true;
             routePoints = [];
             lastCalculatedRoute = null;
-            map.getCanvas().style.cursor = 'crosshair';
-            alert("Multi-stop Route: Click points on the map sequentially. Press ENTER to save, or ESC to cancel.");
+
+            // Capture the route data when the UI finds a path
+            directionsControl.on('route', (e) => {
+                if (e.route && e.route.length > 0) {
+                    lastCalculatedRoute = e.route[0];
+
+                    // Extract all waypoints (origin, destination, and intermediates)
+                    let stops = [];
+                    if (directionsControl.getOrigin().geometry) stops.push(directionsControl.getOrigin().geometry.coordinates);
+                    directionsControl.getWaypoints().forEach(wp => {
+                        if (wp.geometry) stops.push(wp.geometry.coordinates);
+                    });
+                    if (directionsControl.getDestination().geometry) stops.push(directionsControl.getDestination().geometry.coordinates);
+                    routePoints = stops;
+                }
+            });
         }
 
         async function syncDbSchema() {
@@ -1653,16 +1692,21 @@
 
         function editSmartRoute(trackId) {
             const track = allItinerary.flatMap(t => t.geometries).find(g => g.track_id === trackId);
-            if (!track || !track.properties.stops) return alert("No stops found for this route.");
+            if (!track || !track.properties.stops || track.properties.stops.length < 2) return alert("No valid stops found for this route.");
 
-            isRouting = true;
-            routePoints = [...track.properties.stops];
-            draw.deleteAll();
-            // Re-draw the stops as points so user can see them
-            routePoints.forEach((pt, idx) => {
-                draw.add({ id: `stop-${idx}`, type: 'Feature', geometry: { type: 'Point', coordinates: pt } });
-            });
-            alert("Routing mode re-activated. Add new points or click Enter to re-calculate.");
+            startSmartRoute(); // Open the UI
+
+            const stops = track.properties.stops;
+            // MapboxDirections needs a slight delay to initialize before setting points
+            setTimeout(() => {
+                directionsControl.setOrigin(stops[0]);
+                directionsControl.setDestination(stops[stops.length - 1]);
+
+                // Add any intermediate stops
+                for (let i = 1; i < stops.length - 1; i++) {
+                    directionsControl.addWaypoint(i - 1, stops[i]);
+                }
+            }, 100);
         }
 
         async function updateTaskInline(taskId, field, value) {
