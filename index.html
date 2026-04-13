@@ -182,31 +182,68 @@
         }
 
         .task-row {
-            display: grid;
-            /* grid-template-columns is set dynamically in JS */
-            align-items: center;
+            display: flex; /* Changed from grid to flex for better card control */
+            align-items: stretch;
             background: #ffffff !important;
-            /* White background */
-            color: #333 !important;
-            /* Dark text */
-            border: 1px solid #eee;
-            border-radius: 8px;
-            padding: 10px 15px;
-            margin: 4px 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            margin: 6px 10px;
             transition: all 0.2s ease;
             cursor: pointer;
             overflow: hidden;
+            min-height: 60px;
         }
 
         .task-row:hover {
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
-            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border-color: #cbd5e0;
         }
 
-        .task-row.active-task {
-            background: #fcfcfc !important;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            transform: scale(1.01);
+        .task-main-content {
+            flex: 1;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-width: 0; /* Allows truncation to work inside flex */
+        }
+
+        .task-title-large {
+            font-weight: 700;
+            font-size: 0.95em;
+            color: #1a202c;
+            line-height: 1.3;
+            margin-bottom: 4px;
+            word-break: break-word;
+        }
+
+        .task-meta-aside {
+            width: 160px; /* Fixed width for the sub-rows section */
+            display: grid;
+            grid-template-rows: 1fr 1fr; /* Two sub-rows */
+            border-left: 1px solid #edf2f7;
+            background: #fcfcfc;
+        }
+
+        .meta-sub-row {
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            font-size: 0.75em;
+            color: #718096;
+            gap: 6px;
+            border-bottom: 1px solid #f7fafc;
+        }
+
+        .meta-sub-row:last-child {
+            border-bottom: none;
+        }
+
+        .task-actions-inline {
+            display: flex;
+            justify-content: flex-end;
+            gap: 2px;
+            padding-right: 5px;
         }
 
         .task-cell {
@@ -2203,73 +2240,64 @@
         }
 
         function renderTaskCard(parentContainer, task, gridCols, allTasks) {
-            const timeOnly = (task.starts_at && task.starts_at.length >= 16) ? task.starts_at.substring(11, 16) : '';
-            const doneUI = task.is_completed ? '✅ ' : '';
-
-            // Ensure we have a valid category color or default to light gray
+            const timeOnly = (task.starts_at && task.starts_at.length >= 16) ? task.starts_at.substring(11, 16) : '--:--';
             const catColor = task.category_color || '#dfe6e9';
             const isFite = task.is_milestone;
 
             const taskContainer = document.createElement('div');
-            // Margin is now handled by the nested list container, but we keep the visual line indicator
-            taskContainer.style.borderLeft = (task.parent_id && !isFite) ? '2px solid #3498db' : 'none';
+            taskContainer.style.position = 'relative';
 
             const taskEl = document.createElement('div');
             taskEl.id = `task-row-${task.task_id}`;
 
             if (isFite) {
-                // RENDER AS A FITE (NODE ON LINE)
+                // RENDER AS A FITE (NODE ON LINE) - Keep existing logic but clean it up
                 taskEl.className = 'fite-row';
                 taskEl.innerHTML = `
                     <div class="fite-dot" style="border-color: ${catColor}"></div>
-                    <div class="fite-text" style="display: flex; align-items: center;">
-                        <input type="time" class="inline-edit time" style="width: 75px; padding: 0; color:#7f8c8d; font-size:0.85em; margin-right:8px; border: none; background: transparent; cursor: pointer;" value="${timeOnly}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()">
-                        <span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">${task.task_name || 'Event'}</span>
+                    <div class="fite-text" style="display: flex; align-items: center; flex: 1;">
+                        <span style="color:#718096; font-size:0.8em; margin-right:8px;">${timeOnly}</span>
+                        <span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">${task.task_name || 'Milestone'}</span>
                     </div>
-                    <div style="margin-left:auto; display:flex; gap:5px;">
-                        <button class="edit-btn" style="font-size:0.8em;" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
-                        <button class="delete-btn" style="font-size:0.8em;" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
+                    <div class="geom-actions" style="opacity:1">
+                        <button class="edit-btn" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
+                        <button class="delete-btn" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
                     </div>
                 `;
             } else {
-                // RENDER AS A TASK (WHITE CARD)
+                // RENDER AS A TASK CARD (2 COLUMNS, 2 SUB-ROWS)
                 taskEl.className = 'task-row';
-                taskEl.style.gridTemplateColumns = gridCols;
-
-                // THE NEW STYLE: White background + thick inner left border
-                taskEl.style.backgroundColor = '#ffffff';
-                taskEl.style.borderLeft = `10px solid ${catColor}`; // Visual color indicator
+                taskEl.style.borderLeft = `8px solid ${catColor}`;
 
                 if (task.is_completed) taskEl.style.opacity = '0.6';
 
-                const showCategory = document.getElementById('col-category').checked;
-                const showAssignee = document.getElementById('col-assignee').checked;
-                const showTime = document.getElementById('col-time').checked;
-                const showGroup = document.getElementById('col-group').checked;
+                // Find Category Info
+                const cat = allCategories.find(c => c.id === task.category_id);
+                const catName = cat ? cat.name : 'No Category';
+                const catIcon = cat ? cat.icon : '🏷️';
 
-                let cellsHtml = `<div class="task-cell name"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">${doneUI}${task.task_name || task.task || 'Unnamed Task'}</span></div>`;
-
-                // Add Category Dropdown Cell
-                if (showCategory) {
-                    let catOptions = `<option value="">-</option>`;
-                    allCategories.forEach(cat => {
-                        const isSel = task.category_id === cat.id ? 'selected' : '';
-                        catOptions += `<option value="${cat.id}" ${isSel}>${cat.icon} ${cat.name}</option>`;
-                    });
-                    cellsHtml += `<div class="task-cell"><select class="inline-edit" style="width:100%; border:none; background:transparent;" onchange="updateTaskInline(${task.task_id}, 'category_id', this.value)" onclick="event.stopPropagation()">${catOptions}</select></div>`;
-                }
-
-                if (showAssignee) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'responsible', this.innerText)" onclick="event.stopPropagation()">${task.responsible || '-'}</span></div>`;
-                if (showTime) cellsHtml += `<div class="task-cell time"><input type="time" class="inline-edit" style="width:100%" value="${timeOnly}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()"></div>`;
-                if (showGroup) cellsHtml += `<div class="task-cell"><span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'target_group', this.innerText)" onclick="event.stopPropagation()">${task.target_group || '-'}</span></div>`;
-
-                cellsHtml += `
-                    <div class="task-cell" style="gap:2px;">
-                        <button class="edit-btn" title="Add Subtask" onclick="event.stopPropagation(); createSubtask(${task.task_id}, '${task.day_label || ''}')">➕</button>
-                        <button class="edit-btn" title="Edit Task" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
-                        <button class="delete-btn" title="Delete Task" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
-                    </div>`;
-                taskEl.innerHTML = cellsHtml;
+                taskEl.innerHTML = `
+                    <div class="task-main-content">
+                        <div class="task-title-large">
+                            <span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">
+                                ${task.is_completed ? '✅ ' : ''}${task.task_name || 'Unnamed Task'}
+                            </span>
+                        </div>
+                        ${task.responsible ? `<div style="font-size:0.75em; color:#a0aec0;">👤 ${task.responsible}</div>` : ''}
+                    </div>
+                    
+                    <div class="task-meta-aside">
+                        <div class="meta-sub-row" title="Time & Category">
+                            <span style="font-weight:bold; color:#2d3748;">🕒 ${timeOnly}</span>
+                            <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${catIcon} ${catName}</span>
+                        </div>
+                        <div class="meta-sub-row task-actions-inline">
+                            <button class="edit-btn" title="Add Subtask" onclick="event.stopPropagation(); createSubtask(${task.task_id}, '${task.day_label || ''}')">➕</button>
+                            <button class="edit-btn" title="Edit Task" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
+                            <button class="delete-btn" title="Delete Task" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
+                        </div>
+                    </div>
+                `;
             }
 
             taskEl.onclick = () => {
@@ -2466,14 +2494,6 @@
                     </div>
                 </div>
                 <div class="section-content">
-                    <div class="task-table-header" style="display: grid; grid-template-columns: ${gridCols}; font-size: 0.75em; color: #7f8c8d; padding: 0 15px 5px 15px;">
-                        <div>Task Name</div>
-                        ${document.getElementById('col-category').checked ? '<div>Category</div>' : ''}
-                        ${document.getElementById('col-assignee').checked ? '<div>Assignee</div>' : ''}
-                        ${document.getElementById('col-time').checked ? '<div>Time</div>' : ''}
-                        ${document.getElementById('col-group').checked ? '<div>Group</div>' : ''}
-                        <div style="text-align:right">Actions</div>
-                    </div>
                 </div>
             `;
 
