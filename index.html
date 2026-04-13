@@ -592,6 +592,32 @@
             color: #2c3e50;
             margin-left: 10px;
         }
+
+        /* 1. Make the Popup Close Button Highly Visible */
+        .mapboxgl-popup-close-button {
+            color: #333 !important;
+            font-size: 22px !important;
+            padding: 4px 8px !important;
+            right: 4px !important;
+            top: 4px !important;
+            background: rgba(255,255,255,0.8) !important;
+            border-radius: 50% !important;
+            transition: 0.2s;
+        }
+        .mapboxgl-popup-close-button:hover {
+            background: #eee !important;
+            color: #e74c3c !important;
+        }
+
+        /* 2. Dynamic Zoom Scaling Variables */
+        #map {
+            --pin-scale: 1; /* Default scale, overridden by JS */
+        }
+        .custom-map-pin {
+            transform: scale(var(--pin-scale));
+            transform-origin: bottom center;
+            transition: transform 0.1s ease-out; /* Smooth resizing when scrolling */
+        }
     </style>
 </head>
 
@@ -801,9 +827,22 @@
             <div style="display: flex; flex-direction: column; gap: 10px;">
                 <input type="text" id="new-cat-name" placeholder="Name (e.g. Hiking)">
                 <div style="display: flex; gap: 10px;">
-                    <input type="color" id="new-cat-color" value="#3498db"
+                    <input type="color" id="new-cat-color" value="#3498db" title="Pin Color"
                         style="width: 50px; height: 38px; border: none; padding: 0; cursor:pointer;">
-                    <input type="text" id="new-cat-icon" placeholder="Icon (e.g. bus, anchor, hiking)" style="flex: 1;">
+                    <select id="new-cat-icon" style="flex: 1;">
+                        <option value="📍">📍 Pin</option>
+                        <option value="🥾">🥾 Hike / Walk</option>
+                        <option value="🏃‍♂️">🏃‍♂️ Run</option>
+                        <option value="🚌">🚌 Bus</option>
+                        <option value="🚐">🚐 Van / Minibus</option>
+                        <option value="🚗">🚗 Car / Taxi</option>
+                        <option value="⛵">⛵ Boat / Ferry</option>
+                        <option value="🍽️">🍽️ Food / Restaurant</option>
+                        <option value="🏨">🏨 Hotel / Sleep</option>
+                        <option value="📸">📸 Photo / Viewpoint</option>
+                        <option value="🚩">🚩 Start / Finish</option>
+                        <option value="⚠️">⚠️ Alert / Danger</option>
+                    </select>
                 </div>
                 <label>Line Style (for Tracks)</label>
                 <select id="new-cat-line-type" style="margin-bottom: 10px;">
@@ -1017,6 +1056,16 @@
                 refreshData();
             });
 
+            // Engine that dynamically scales map pins based on zoom level
+            map.on('zoom', () => {
+                const zoom = map.getZoom();
+                // Base scale 1.0 at zoom 14. Min scale 0.4 (zoomed out), Max scale 1.5 (zoomed in)
+                const scale = Math.max(0.4, Math.min(1.5, zoom / 14));
+                document.getElementById('map').style.setProperty('--pin-scale', scale);
+            });
+            // Trigger once on load to set initial size
+            document.getElementById('map').style.setProperty('--pin-scale', Math.max(0.4, Math.min(1.5, map.getZoom() / 14)));
+
             map.on('draw.create', (e) => {
                 const feature = e.features[0];
                 let centerPoint;
@@ -1059,19 +1108,20 @@
                     if (geom.kind === 'line' && isSmart && !mapFilters.smart) return;
                     if (geom.kind === 'line' && !isSmart && !mapFilters.line) return;
 
-                    // 1. Logic for Colors
+                    // 1. Logic for Colors & Icons
                     const markerColor = task.category_color || geom.color || '#3498db';
-                    const trackColor = geom.color || '#3498db'; // Tracks IGNORE category color
-                    const renderIcon = task.category_icon || geom.icon || '📍';
+                    const trackColor = geom.color || '#3498db';
+                    // Priority: 1. Individual Waypoint Icon (if valid), 2. Category Icon, 3. Default
+                    const renderIcon = (geom.icon && geom.icon !== 'marker') ? geom.icon : (task.category_icon || '📍');
 
-                    // 2. Logic for Line Style (Inherited from Category)
-                    let dashArray = [1, 0]; // Default solid
+                    // 2. Logic for Line Style
+                    let dashArray = [1, 0];
                     if (task.category_line_type === 'dashed') dashArray = [4, 2];
                     else if (task.category_line_type === 'dotted') dashArray = [0.1, 2];
 
                     if (geom.kind === 'point' && geom.lat && geom.lng) {
-                        // Create a beautiful custom HTML pin that perfectly centers the emoji
                         const el = document.createElement('div');
+                        el.className = 'custom-map-pin'; // Links to our dynamic CSS scaling
                         el.innerHTML = `
                             <div style="background-color: ${markerColor}; border-radius: 50%; width: 28px; height: 28px; display: flex; justify-content: center; align-items: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); font-size: 14px; overflow: hidden; white-space: nowrap;">
                                 ${renderIcon}
@@ -1080,9 +1130,10 @@
                         `;
                         el.style.cursor = 'pointer';
 
+                        // focusAfterOpen: false is the magic command that prevents the ARIA warning!
                         const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
                             .setLngLat([geom.lng, geom.lat])
-                            .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
+                            .setPopup(new mapboxgl.Popup({ offset: 25, focusAfterOpen: false }).setHTML(`
                         <h4 style="border-left: 4px solid ${markerColor}; padding-left: 8px;">${renderIcon} ${geom.title}</h4>
                         <p>Task: ${task.task_name || 'Unnamed'}</p>
                         <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})">Edit</button>
@@ -1123,7 +1174,7 @@
                                 else loss -= diff;
                             }
 
-                            new mapboxgl.Popup()
+                            new mapboxgl.Popup({ focusAfterOpen: false })
                                 .setLngLat(e.lngLat)
                                 .setHTML(`
                                     <h4>${geom.kind === 'polygon' ? '🛑' : '📈'} ${geom.title}</h4>
@@ -1301,7 +1352,7 @@
 
         let activeContextPopup = null;
 
-        function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, editConfig = null) {
+        function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, editConfig = null, existingIcon = '📍') {
             if (activeContextPopup) activeContextPopup.remove();
 
             const taskWarning = activeTaskId ? `<div style="color:#27ae60; font-size:0.8em; margin-bottom:10px;">✅ Attaching to highlighted task</div>` : `<div style="color:#e74c3c; font-size:0.8em; margin-bottom:10px;">⚠️ No Task Selected (Will save unassigned)</div>`;
@@ -1319,9 +1370,15 @@
                     <input type="color" id="ctx-color" value="#3498db" style="width: 40px; height: 25px; padding: 0; cursor: pointer; border: none;">
                     ${geometry.type === 'Point' ? `
                     <select id="ctx-icon" style="flex:1; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
-                        <option value="📍">📍 Pin</option><option value="🏕️">🏕️ Camp</option>
-                        <option value="🍔">🍔 Food</option><option value="📷">📷 Photo</option>
-                        <option value="🚗">🚗 Car</option><option value="⚠️">⚠️ Alert</option>
+                        <option value="📍" ${existingIcon === '📍' ? 'selected' : ''}>📍 Pin</option>
+                        <option value="🥾" ${existingIcon === '🥾' ? 'selected' : ''}>🥾 Hike</option>
+                        <option value="🏃‍♂️" ${existingIcon === '🏃‍♂️' ? 'selected' : ''}>🏃‍♂️ Run</option>
+                        <option value="🚌" ${existingIcon === '🚌' ? 'selected' : ''}>🚌 Bus</option>
+                        <option value="⛵" ${existingIcon === '⛵' ? 'selected' : ''}>⛵ Boat</option>
+                        <option value="🍽️" ${existingIcon === '🍽️' ? 'selected' : ''}>🍽️ Food</option>
+                        <option value="🏨" ${existingIcon === '🏨' ? 'selected' : ''}>🏨 Hotel</option>
+                        <option value="📸" ${existingIcon === '📸' ? 'selected' : ''}>📸 Photo</option>
+                        <option value="⚠️" ${existingIcon === '⚠️' ? 'selected' : ''}>⚠️ Alert</option>
                     </select>` : ''}
                 </div>
                 <button id="ctx-save" style="width: 100%; padding: 8px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight:bold;">Save Shape</button>
@@ -2226,7 +2283,7 @@
                 draw.add(feature);
                 draw.changeMode('direct_select', { featureId: 'edit-point' }); // Enable dragging for editing
                 centerPoint = [geom.lng, geom.lat];
-                showGeometryContextPopup(centerPoint, feature.geometry, geom.title, '', editConfig);
+                showGeometryContextPopup(centerPoint, feature.geometry, geom.title, '', editConfig, geom.icon); // PASS EXISTING ICON
             } else if (geom.geojson) {
                 draw.add(geom.geojson);
                 const feature = geom.geojson.features[0];
