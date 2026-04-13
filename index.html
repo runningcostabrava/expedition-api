@@ -251,24 +251,46 @@
 
         .geom-row {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px;
-            background: #f8f9fa;
-            margin-bottom: 5px;
-            border-radius: 4px;
-            font-size: 0.85em;
+            flex-direction: column;
+            padding: 6px 10px;
+            background: #ffffff;
+            margin-bottom: 4px;
+            border-radius: 6px;
+            font-size: 0.75em; /* Smaller letters as requested */
+            border: 1px solid #edf2f7;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+            transition: all 0.2s;
         }
-
         .geom-row:hover {
-            background: #e9ecef;
-            cursor: pointer;
+            background: #f7fafc;
+            border-color: #cbd5e0;
         }
-
-        .geom-info {
-            display: flex;
+        .geom-info-header {
+            display: flex; 
+            justify-content: space-between; 
             align-items: center;
-            gap: 8px;
+            width: 100%;
+        }
+        .geom-stats-bar {
+            display: flex; 
+            gap: 8px; 
+            margin-top: 2px; 
+            font-size: 0.85em; 
+            color: #718096;
+            font-weight: 600;
+        }
+        .geom-actions {
+            display: flex; 
+            gap: 2px;
+            opacity: 0.3; /* Discreet until hover */
+            transition: opacity 0.2s;
+        }
+        .geom-row:hover .geom-actions {
+            opacity: 1;
+        }
+        .edit-btn, .delete-btn {
+            font-size: 0.9em !important;
+            padding: 2px 4px !important;
         }
 
         .visibility-btn {
@@ -2257,48 +2279,61 @@
             accordionEl.className = 'task-accordion';
             accordionEl.id = `acc-${task.task_id}`;
 
-            let geomHtml = '';
-            (task.geometries || []).forEach(g => {
-                const emoji = g.kind === 'point' ? '📍' : (g.kind === 'polygon' ? '🛑' : '📈');
+            const geoms = task.geometries || [];
+            // 1. Separate parents from children
+            const parents = geoms.filter(g => g.parent_track_id === null);
+            const children = geoms.filter(g => g.parent_track_id !== null);
+
+            const renderGeomUI = (g, isNested = false) => {
+                const emoji = g.kind === 'point' ? (g.icon || '📍') : (g.kind === 'polygon' ? '🛑' : '📈');
                 const layerId = `layer-${g.track_id}`;
                 const isVisible = map.getLayer(layerId) ? map.getLayoutProperty(layerId, 'visibility') !== 'none' : true;
                 const color = g.color || '#3498db';
                 const stats = g.properties || {};
-                const isSegment = g.parent_track_id !== null;
 
-                geomHtml += `
-                    <div class="geom-row" style="display:flex; flex-direction:column; padding:10px; border-left:4px solid ${color}; margin-bottom:8px; background:#fff; border-radius:4px; box-shadow:0 1px 3px rgba(0,0,0,0.05); ${isSegment ? 'margin-left:20px; border-left-style:dashed;' : ''}">
-                        ${isSegment ? `<div style="font-size:0.7em; color:#95a5a6; margin-bottom:2px;">↳ Segment of ${g.parent_track_name || 'Original'}</div>` : ''}
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div class="geom-info" onclick="event.stopPropagation(); flyToGeometry(${g.lng}, ${g.lat}, '${g.kind}', '${layerId}')" style="cursor:pointer; display:flex; align-items:center; gap:8px;">
-                                <button class="visibility-btn ${!isVisible ? 'hidden' : ''}" onclick="event.stopPropagation(); toggleLayerVisibility('${layerId}', this)">${isVisible ? '👁️' : '🙈'}</button>
-                                <span>${emoji}</span><strong>${g.title}</strong>
+                let html = `
+                    <div class="geom-row" style="border-left: 3px solid ${color}; ${isNested ? 'margin-left: 15px; border-left-style: dashed; border-left-width: 2px; margin-top: 2px;' : 'margin-top: 6px;'}">
+                        <div class="geom-info-header">
+                            <div style="display:flex; align-items:center; gap:6px; cursor:pointer;" onclick="event.stopPropagation(); flyToGeometry(${g.lng}, ${g.lat}, '${g.kind}', '${layerId}')">
+                                <button class="visibility-btn ${!isVisible ? 'hidden' : ''}" style="font-size:1em;" onclick="event.stopPropagation(); toggleLayerVisibility('${layerId}', this)">${isVisible ? '👁️' : '🙈'}</button>
+                                <span style="font-size: 1.1em;">${emoji}</span>
+                                <strong style="color: #2d3748; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">${g.title}</strong>
                             </div>
-                            <div style="display: flex; gap: 5px;">
-                                ${stats.route_type === 'smart' ? `<button class="edit-btn" title="Edit Route Stops" onclick="event.stopPropagation(); editSmartRoute(${g.track_id})">🔄</button>` : ''}
+                            <div class="geom-actions">
+                                ${g.kind === 'line' ? `<button class="edit-btn" title="Analyze" onclick="event.stopPropagation(); startSegmentAnalysis(${task.task_id}, ${g.track_id})">📊</button>` : ''}
                                 <button class="edit-btn" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})">⚙️</button>
                                 <button class="delete-btn" onclick="event.stopPropagation(); deleteGeometry('${g.kind}', ${g.waypoint_id || g.track_id})">🗑️</button>
                             </div>
                         </div>
+                        
                         ${g.kind === 'line' ? `
-                        <div style="display:flex; gap:12px; margin-top:5px; font-size:0.8em; font-weight:bold; color:#7f8c8d;">
-                            <span>📏 ${stats.distance || '0'}km</span>
-                            ${stats.duration ? `<span>⏳ ${stats.duration} min</span>` : ''}
-                            <span style="color:#27ae60;">▲ ${stats.gain || '0'}m</span>
-                            <span style="color:#e74c3c;">▼ ${stats.loss || '0'}m</span>
+                        <div class="geom-stats-bar">
+                            <span>📏 ${g.distance || '0'}km</span>
+                            <span style="color:#38a169;">▲ ${g.gain || '0'}m</span>
+                            <span style="color:#e53e3e;">▼ ${g.loss || '0'}m</span>
                         </div>` : ''}
-                        <div style="margin-top:8px; padding-top:8px; border-top:1px solid #eee; display:flex; flex-direction:column; gap:4px; font-size:0.85em;">
-                            <div style="display:flex; align-items:center; gap:5px;">
-                                🔗 <span class="inline-edit" contenteditable="true" style="color:#3498db; text-decoration:underline;" onblur="updateGeomMeta('${g.kind}', ${g.waypoint_id || g.track_id}, 'link', this.innerText)" onclick="event.stopPropagation()">${g.link || 'Add link...'}</span>
-                                ${g.link ? `<a href="${g.link.startsWith('http') ? g.link : 'https://' + g.link}" target="_blank" onclick="event.stopPropagation()">↗️</a>` : ''}
-                            </div>
-                            <div style="display:flex; align-items:center; gap:5px;">
-                                📝 <span class="inline-edit" contenteditable="true" style="font-style:italic; color:#7f8c8d;" onblur="updateGeomMeta('${g.kind}', ${g.waypoint_id || g.track_id}, 'comments', this.innerText)" onclick="event.stopPropagation()">${g.comments || 'Add comment...'}</span>
-                            </div>
+
+                        <div style="margin-top:4px; font-size:0.85em; color:#718096; display:flex; flex-direction:column; gap:2px;">
+                            ${g.link ? `<div style="display:flex; align-items:center; gap:4px;">🔗 <a href="${g.link.startsWith('http') ? g.link : 'https://' + g.link}" target="_blank" style="color:#3182ce; text-decoration:none;">${g.link.substring(0, 20)}...</a></div>` : ''}
+                            ${g.comments ? `<div style="font-style:italic; display:flex; align-items:start; gap:4px;"><span>📝</span> <span>${g.comments}</span></div>` : ''}
                         </div>
                     </div>`;
+
+                // 2. Recursively find and render children (Waypoints or Segments)
+                const myChildren = children.filter(child => child.parent_track_id === (g.track_id || g.waypoint_id));
+                myChildren.forEach(child => {
+                    html += renderGeomUI(child, true);
+                });
+
+                return html;
+            };
+
+            let finalGeomHtml = '';
+            parents.forEach(p => {
+                finalGeomHtml += renderGeomUI(p);
             });
-            accordionEl.innerHTML = geomHtml || `<div style="color: #95a5a6; font-size: 0.85em; font-style: italic;">No locations attached.</div>`;
+
+            accordionEl.innerHTML = finalGeomHtml || `<div style="color: #a0aec0; font-size: 0.8em; font-style: italic; padding: 5px 0;">No locations attached.</div>`;
 
             taskContainer.appendChild(taskEl);
             taskContainer.appendChild(accordionEl);
