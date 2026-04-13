@@ -304,25 +304,49 @@
         
         /* Deep Indentation & Hierarchy */
         .geom-row.nested-geom {
-            margin-left: 35px; /* Deeper indent from track */
-            margin-top: 4px;
+            margin-left: 45px; /* Deeper indent from track */
+            margin-top: 0;
+            margin-bottom: 0;
+            padding: 6px 10px;
             position: relative;
-            background: #f8fafc; 
+            background: transparent; /* Simpler style: transparent background */
+            border: none; /* Remove heavy box border */
+            border-bottom: 1px solid #f1f5f9; /* Subtle divider between items */
             border-left-width: 3px !important;
-            border-left-style: dashed !important;
+            border-left-style: solid !important;
+            border-radius: 0;
+            box-shadow: none;
+        }
+        .geom-row.nested-geom:last-child {
+            border-bottom: none;
+        }
+        .geom-row.nested-geom:hover {
+            background: #f8fafc;
         }
         /* L-shaped connector */
         .geom-row.nested-geom::before {
             content: '';
             position: absolute;
-            left: -22px;
-            top: 16px;
-            height: 20px;
-            width: 18px;
+            left: -20px;
+            top: -12px;
+            height: 28px;
+            width: 16px;
             border-left: 2px solid #cbd5e0;
             border-bottom: 2px solid #cbd5e0;
             border-bottom-left-radius: 6px;
             z-index: 0;
+        }
+        /* Simpler text for nested items */
+        .geom-row.nested-geom .geom-title {
+            font-size: 0.95em;
+            font-weight: 500;
+            color: #4a5568;
+        }
+        .geom-row.nested-geom .stat-badge {
+            background: transparent;
+            border: none;
+            padding: 0 4px;
+            font-size: 0.85em;
         }
 
         /* 3-Column Layout */
@@ -2415,9 +2439,9 @@ function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, edi
             accordionEl.id = `acc-${task.task_id}`;
 
             const geoms = task.geometries || [];
-            // 1. Separate parents from children
-            const parents = geoms.filter(g => g.parent_track_id === null);
-            const children = geoms.filter(g => g.parent_track_id !== null);
+            // 1. Separate parents from children (Safely handle null/undefined)
+            const parents = geoms.filter(g => !g.parent_track_id);
+            const children = geoms.filter(g => g.parent_track_id);
 
             const renderGeomUI = (g, isNested = false) => {
                 const emoji = g.kind === 'point' ? (g.icon || '📍') : (g.kind === 'polygon' ? '🛑' : '📈');
@@ -2479,7 +2503,8 @@ function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, edi
                         </div>
                     </div>`;
 
-                const myChildren = children.filter(child => child.parent_track_id === (g.track_id || g.waypoint_id));
+                // Use == instead of === to prevent string/integer mismatch bugs
+                const myChildren = children.filter(child => child.parent_track_id == (g.track_id || g.waypoint_id));
                 myChildren.forEach(child => {
                     html += renderGeomUI(child, true);
                 });
