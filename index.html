@@ -1356,6 +1356,9 @@
                             const feat = { type: 'Feature', geometry: { type: 'Point', coordinates: [activeCoord[0], activeCoord[1]] } };
                             draw.add(feat);
 
+                            // Fly the camera to the clicked location
+                            map.flyTo({ center: [activeCoord[0], activeCoord[1]], zoom: 15 });
+
                             // 2. Trigger the "Save to Map" popup, pre-filled with the calculated stats!
                             showGeometryContextPopup(
                                 [activeCoord[0], activeCoord[1]],
@@ -1425,7 +1428,8 @@
                 <button id="ctx-save" style="width: 100%; padding: 8px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight:bold;">Save Shape</button>
             `;
 
-            activeContextPopup = new mapboxgl.Popup({ closeOnClick: false, anchor: 'bottom', offset: 15 })
+            // Added focusAfterOpen: false to prevent the ARIA warning on the close button
+            activeContextPopup = new mapboxgl.Popup({ closeOnClick: false, anchor: 'bottom', offset: 15, focusAfterOpen: false })
                 .setLngLat(lngLat)
                 .setDOMContent(popupContent)
                 .addTo(map);
@@ -2322,9 +2326,12 @@
             if (geom.kind === 'point') {
                 const feature = { type: 'Feature', id: 'edit-point', geometry: { type: 'Point', coordinates: [geom.lng, geom.lat] }, properties: {} };
                 draw.add(feature);
-                draw.changeMode('direct_select', { featureId: 'edit-point' }); // Enable dragging for editing
+
+                // CRITICAL FIX: Points must use 'simple_select' to be moved, not 'direct_select'!
+                draw.changeMode('simple_select', { featureIds: ['edit-point'] });
+
                 centerPoint = [geom.lng, geom.lat];
-                showGeometryContextPopup(centerPoint, feature.geometry, geom.title, '', editConfig, geom.icon); // PASS EXISTING ICON
+                showGeometryContextPopup(centerPoint, feature.geometry, geom.title, '', editConfig, geom.icon);
             } else if (geom.geojson) {
                 draw.add(geom.geojson);
                 const feature = geom.geojson.features[0];
