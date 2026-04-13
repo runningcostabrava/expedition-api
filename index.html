@@ -1523,22 +1523,22 @@
 
         let activeContextPopup = null;
 
-        function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, editConfig = null, existingIcon = '📍') {
-            if (activeContextPopup) activeContextPopup.remove();
+function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, editConfig = null, existingIcon = '📍', existingColor = '#3498db', existingLink = '') {
+    if (activeContextPopup) activeContextPopup.remove();
 
-            const taskWarning = activeTaskId ? `<div style="color:#27ae60; font-size:0.8em; margin-bottom:10px;">✅ Attaching to highlighted task</div>` : `<div style="color:#e74c3c; font-size:0.8em; margin-bottom:10px;">⚠️ No Task Selected (Will save unassigned)</div>`;
+    const taskWarning = activeTaskId ? `<div style="color:#27ae60; font-size:0.8em; margin-bottom:10px;">✅ Attaching to highlighted task</div>` : `<div style="color:#e74c3c; font-size:0.8em; margin-bottom:10px;">⚠️ No Task Selected (Will save unassigned)</div>`;
 
-            const popupContent = document.createElement('div');
-            popupContent.style.padding = '5px';
-            popupContent.style.width = '200px';
-            popupContent.innerHTML = `
-                <h4 style="margin: 0 0 5px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">Save to Map</h4>
-                ${taskWarning}
-                <input type="text" id="ctx-title" value="${defaultTitle}" placeholder="Shape Title" style="width: 100%; margin-bottom: 5px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing:border-box;">
-                <input type="url" id="ctx-link" placeholder="https:// link (optional)" style="width: 100%; margin-bottom: 8px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing:border-box; font-size:0.85em;">
-                <div style="display: flex; gap: 5px; margin-bottom: 10px; align-items: center;">
-                    <label style="font-size: 0.8em; margin:0;">Color:</label>
-                    <input type="color" id="ctx-color" value="#3498db" style="width: 40px; height: 25px; padding: 0; cursor: pointer; border: none;">
+    const popupContent = document.createElement('div');
+    popupContent.style.padding = '5px';
+    popupContent.style.width = '200px';
+    popupContent.innerHTML = `
+        <h4 style="margin: 0 0 5px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">Save to Map</h4>
+        ${taskWarning}
+        <input type="text" id="ctx-title" value="${defaultTitle}" placeholder="Title" style="width: 100%; margin-bottom: 5px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing:border-box;">
+        <input type="url" id="ctx-link" value="${existingLink || ''}" placeholder="https:// link (optional)" style="width: 100%; margin-bottom: 8px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing:border-box; font-size:0.85em;">
+        <div style="display: flex; gap: 5px; margin-bottom: 10px; align-items: center;">
+            <label style="font-size: 0.8em; margin:0;">Color:</label>
+            <input type="color" id="ctx-color" value="${existingColor || '#3498db'}" style="width: 40px; height: 25px; padding: 0; cursor: pointer; border: none;">
                     ${geometry.type === 'Point' ? `
                     <select id="ctx-icon" style="flex:1; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
                         <option value="📍" ${existingIcon === '📍' ? 'selected' : ''}>📍 Pin</option>
@@ -1586,22 +1586,22 @@
                         // UPDATE Existing Shape (PUT)
                         if (editConfig.kind === 'point') {
                             await fetch(`${API_URL}/waypoints/${editConfig.id}`, {
-                                method: 'PUT', headers, body: JSON.stringify({ title, color, icon, lat: geometry.coordinates[1], lng: geometry.coordinates[0], description: finalDesc })
+                                method: 'PUT', headers, body: JSON.stringify({ title, color, icon, link, lat: geometry.coordinates[1], lng: geometry.coordinates[0], description: finalDesc })
                             });
                         } else {
                             await fetch(`${API_URL}/tracks/${editConfig.id}`, {
-                                method: 'PUT', headers, body: JSON.stringify({ title, color, geojson_data: { type: 'FeatureCollection', features: [featureToSave] }, comments: finalDesc, distance: props.distance, duration: props.duration })
+                                method: 'PUT', headers, body: JSON.stringify({ title, color, link, geojson_data: { type: 'FeatureCollection', features: [featureToSave] }, comments: finalDesc, distance: props.distance, duration: props.duration })
                             });
                         }
                     } else {
                         // CREATE New Shape (POST)
                         if (geometry.type === 'Point') {
                             await fetch(`${API_URL}/waypoints`, {
-                                method: 'POST', headers, body: JSON.stringify({ title, color, icon, existing_task_id: activeTaskId, lat: geometry.coordinates[1], lng: geometry.coordinates[0], description: finalDesc })
+                                method: 'POST', headers, body: JSON.stringify({ title, color, icon, link, existing_task_id: activeTaskId, lat: geometry.coordinates[1], lng: geometry.coordinates[0], description: finalDesc })
                             });
                         } else {
                             await fetch(`${API_URL}/tracks`, {
-                                method: 'POST', headers, body: JSON.stringify({ title, color, existing_task_id: activeTaskId, parent_track_id: segmentTrackId, geojson_data: { type: 'FeatureCollection', features: [featureToSave] }, comments: finalDesc, distance: props.distance, duration: props.duration })
+                                method: 'POST', headers, body: JSON.stringify({ title, color, link, existing_task_id: activeTaskId, parent_track_id: segmentTrackId, geojson_data: { type: 'FeatureCollection', features: [featureToSave] }, comments: finalDesc, distance: props.distance, duration: props.duration })
                             });
                         }
                     }
@@ -2458,12 +2458,12 @@
                 draw.changeMode('simple_select', { featureIds: ['edit-point'] });
 
                 centerPoint = [geom.lng, geom.lat];
-                showGeometryContextPopup(centerPoint, feature.geometry, geom.title, '', editConfig, geom.icon);
+                showGeometryContextPopup(centerPoint, feature.geometry, geom.title, '', editConfig, geom.icon, geom.color, geom.link);
             } else if (geom.geojson) {
                 draw.add(geom.geojson);
                 const feature = geom.geojson.features[0];
                 centerPoint = feature.geometry.type === 'Polygon' ? feature.geometry.coordinates[0][0] : feature.geometry.coordinates[Math.floor(feature.geometry.coordinates.length / 2)];
-                showGeometryContextPopup(centerPoint, feature.geometry, geom.title, '', editConfig);
+                showGeometryContextPopup(centerPoint, feature.geometry, geom.title, '', editConfig, '📈', geom.color, geom.link);
             }
         }
 
