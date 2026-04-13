@@ -1059,12 +1059,21 @@
             // Engine that dynamically scales map pins based on zoom level
             map.on('zoom', () => {
                 const zoom = map.getZoom();
-                // Base scale 1.0 at zoom 14. Min scale 0.4 (zoomed out), Max scale 1.5 (zoomed in)
                 const scale = Math.max(0.4, Math.min(1.5, zoom / 14));
                 document.getElementById('map').style.setProperty('--pin-scale', scale);
+                
+                // Toggle text labels when zoomed in to STREET level (15.5+)
+                if (zoom >= 15.5) {
+                    document.getElementById('map').classList.add('show-pin-labels');
+                } else {
+                    document.getElementById('map').classList.remove('show-pin-labels');
+                }
             });
-            // Trigger once on load to set initial size
-            document.getElementById('map').style.setProperty('--pin-scale', Math.max(0.4, Math.min(1.5, map.getZoom() / 14)));
+            
+            // Trigger once on load to set initial size and labels
+            const initZoom = map.getZoom();
+            document.getElementById('map').style.setProperty('--pin-scale', Math.max(0.4, Math.min(1.5, initZoom / 14)));
+            if (initZoom >= 15.5) document.getElementById('map').classList.add('show-pin-labels');
 
             map.on('draw.create', (e) => {
                 const feature = e.features[0];
@@ -1110,9 +1119,9 @@
 
                     // 1. Logic for Colors & Icons
                     const markerColor = task.category_color || geom.color || '#3498db';
-                    const trackColor = geom.color || '#3498db';
-                    // Priority: 1. Individual Waypoint Icon (if valid), 2. Category Icon, 3. Default
-                    const renderIcon = (geom.icon && geom.icon !== 'marker') ? geom.icon : (task.category_icon || '📍');
+                    const trackColor = geom.color || '#3498db'; 
+                    // Priority: 1. Individual Waypoint Icon (if valid and not empty), 2. Category Icon, 3. Default
+                    const renderIcon = (geom.icon && geom.icon !== 'marker' && geom.icon.trim() !== '') ? geom.icon : (task.category_icon || '📍');
 
                     // 2. Logic for Line Style
                     let dashArray = [1, 0];
@@ -1299,7 +1308,6 @@
             document.getElementById('elevation-panel').style.display = 'block';
             const statsHeader = document.getElementById('elevation-stats-header');
 
-            // If no metadata passed, try to extract from geojson properties (Mapbox data)
             const props = metadata || geojson.features?.[0]?.properties || {};
 
             statsHeader.innerHTML = `
@@ -1310,13 +1318,23 @@
                 ${props.duration ? `<span style="color:#000;">🕒 <strong>${props.duration} min</strong></span>` : ''}
             `;
 
-            let distances = [0], elevations = [], cumulative = 0;
+            let distances = [], elevations = [], cumulative = 0;
+            let cumulativeGains = [], currentGain = 0;
+
             const coords = geojson.features[0].geometry.type === 'Polygon' ? geojson.features[0].geometry.coordinates[0] : geojson.features[0].geometry.coordinates;
+            
+            // Calculate exact distance and gain for every single node in the route
             coords.forEach((c, i) => {
                 elevations.push(c[2] || 0);
-                if (i > 0) cumulative += turf.distance(turf.point(coords[i - 1]), turf.point(c), { units: 'kilometers' });
+                if (i > 0) {
+                    cumulative += turf.distance(turf.point(coords[i - 1]), turf.point(c), { units: 'kilometers' });
+                    const diff = (c[2] || 0) - (coords[i - 1][2] || 0);
+                    if (diff > 0) currentGain += diff;
+                }
                 distances.push(cumulative.toFixed(2));
+                cumulativeGains.push(currentGain.toFixed(0));
             });
+
             if (elevationChart) elevationChart.destroy();
             elevationChart = new Chart(document.getElementById('elevation-chart'), {
                 type: 'line',
@@ -1326,6 +1344,29 @@
                     maintainAspectRatio: false,
                     interaction: { mode: 'index', intersect: false },
                     plugins: { legend: { display: true } },
+                    onClick: (e, activeElements) => {
+                        if (activeElements.length > 0) {
+                            const index = activeElements[0].index;
+                            const activeCoord = coords[index];
+                            const dist = distances[index];
+                            const gain = cumulativeGains[index];
+
+                            // 1. Spawn a temporary point on the map to visualize the click
+                            draw.deleteAll();
+                            const feat = { type: 'Feature', geometry: { type: 'Point', coordinates: [activeCoord[0], activeCoord[1]] } };
+                            draw.add(feat);
+
+                            // 2. Trigger the "Save to Map" popup, pre-filled with the calculated stats!
+                            showGeometryContextPopup(
+                                [activeCoord[0], activeCoord[1]],
+                                feat.geometry,
+                                `KM ${dist}`,
+                                `📏 ${dist}km | 🔺 +${gain}m`,
+                                null,
+                                '📍'
+                            );
+                        }
+                    },
                     scales: {
                         y: { beginAtZero: false, ticks: { color: '#000', font: { weight: 'bold' } }, title: { display: true, text: 'Elevation (m)', color: '#000' } },
                         x: { ticks: { color: '#000', font: { weight: 'bold' } }, title: { display: true, text: 'Distance (km)', color: '#000' } }
