@@ -646,6 +646,10 @@
             visibility: hidden;
             pointer-events: none;
         }
+        .section-content { display: block; }
+        .section-content.collapsed { display: none; }
+        .section-toggle-icon { transition: transform 0.2s; cursor: pointer; }
+        .section-toggle-icon.collapsed { transform: rotate(-90deg); }
     </style>
 </head>
 
@@ -953,6 +957,7 @@
 
             draw = new MapboxDraw({ displayControlsDefault: false, controls: { trash: true } });
             map.addControl(draw);
+            map.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
             // Use the NEW Mapbox Search Box API (v1)
             const searchBox = new mapboxsearch.MapboxSearchBox();
@@ -2077,11 +2082,11 @@
             const showTime = document.getElementById('col-time').checked;
             const showGroup = document.getElementById('col-group').checked;
 
-            let gridCols = '1.5fr ';
-            if (showCategory) gridCols += '120px '; // Add space for category dropdown
-            gridCols += '1fr ';
-            if (showAssignee) gridCols += '90px ';
-            if (showTime) gridCols += '90px ';
+            // Redefined: WIDER title (2.5fr) and NARROWER category (100px)
+            let gridCols = '2.5fr ';
+            if (showCategory) gridCols += '100px '; 
+            if (showAssignee) gridCols += '1fr ';
+            if (showTime) gridCols += '80px ';
             if (showGroup) gridCols += '90px ';
             gridCols += '100px';
 
@@ -2289,7 +2294,9 @@
                 const layerId = `layer-${g.track_id}`;
                 const isVisible = map.getLayer(layerId) ? map.getLayoutProperty(layerId, 'visibility') !== 'none' : true;
                 const color = g.color || '#3498db';
-                const stats = g.properties || {};
+                
+                // Show 15 characters then truncate
+                const displayTitle = g.title ? (g.title.length > 15 ? g.title.substring(0, 15) + '...' : g.title) : 'Location';
 
                 let html = `
                     <div class="geom-row" style="border-left: 3px solid ${color}; ${isNested ? 'margin-left: 15px; border-left-style: dashed; border-left-width: 2px; margin-top: 2px;' : 'margin-top: 6px;'}">
@@ -2297,7 +2304,7 @@
                             <div style="display:flex; align-items:center; gap:6px; cursor:pointer;" onclick="event.stopPropagation(); flyToGeometry(${g.lng}, ${g.lat}, '${g.kind}', '${layerId}')">
                                 <button class="visibility-btn ${!isVisible ? 'hidden' : ''}" style="font-size:1em;" onclick="event.stopPropagation(); toggleLayerVisibility('${layerId}', this)">${isVisible ? '👁️' : '🙈'}</button>
                                 <span style="font-size: 1.1em;">${emoji}</span>
-                                <strong style="color: #2d3748; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">${g.title}</strong>
+                                <strong title="${g.title}" style="color: #2d3748;">${displayTitle}</strong>
                             </div>
                             <div class="geom-actions">
                                 ${g.kind === 'line' ? `<button class="edit-btn" title="Analyze" onclick="event.stopPropagation(); startSegmentAnalysis(${task.task_id}, ${g.track_id})">📊</button>` : ''}
@@ -2306,20 +2313,14 @@
                             </div>
                         </div>
                         
-                        ${g.kind === 'line' ? `
-                        <div class="geom-stats-bar">
+                        ${(g.distance || g.gain || g.loss) ? `
+                        <div class="geom-stats-bar" style="display: flex; gap: 8px; font-size: 0.85em; margin-top: 2px; color: #718096;">
                             <span>📏 ${g.distance || '0'}km</span>
                             <span style="color:#38a169;">▲ ${g.gain || '0'}m</span>
                             <span style="color:#e53e3e;">▼ ${g.loss || '0'}m</span>
                         </div>` : ''}
-
-                        <div style="margin-top:4px; font-size:0.85em; color:#718096; display:flex; flex-direction:column; gap:2px;">
-                            ${g.link ? `<div style="display:flex; align-items:center; gap:4px;">🔗 <a href="${g.link.startsWith('http') ? g.link : 'https://' + g.link}" target="_blank" style="color:#3182ce; text-decoration:none;">${g.link.substring(0, 20)}...</a></div>` : ''}
-                            ${g.comments ? `<div style="font-style:italic; display:flex; align-items:start; gap:4px;"><span>📝</span> <span>${g.comments}</span></div>` : ''}
-                        </div>
                     </div>`;
 
-                // 2. Recursively find and render children (Waypoints or Segments)
                 const myChildren = children.filter(child => child.parent_track_id === (g.track_id || g.waypoint_id));
                 myChildren.forEach(child => {
                     html += renderGeomUI(child, true);
@@ -2442,65 +2443,59 @@
             const container = document.getElementById('asana-container');
             const sectionDiv = document.createElement('div');
             sectionDiv.className = 'asana-section';
-
+            
             const dateVal = section.section_date ? new Date(section.section_date).toISOString().split('T')[0] : '';
             const sectionTitle = section.title || 'Unscheduled';
             const sectionDesc = section.description || 'Add description...';
 
             sectionDiv.innerHTML = `
-        <div class="asana-header" style="display: flex; align-items: center; gap: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 10px;">
-            <span style="cursor:pointer; flex-shrink: 0;" onclick="flyToSection('${sectionTitle}')">▼</span>
-            ${section.id ? `<input type="date" value="${dateVal}" class="inline-edit-input" style="width: 35px; overflow:hidden; padding:0; border:none; flex-shrink: 0;" onchange="updateSectionMetadata(${section.id}, 'section_date', this.value)">` : ''}
-            <span class="inline-edit section-title-text" contenteditable="true" style="font-weight: bold; flex-shrink: 0;" onblur="updateSectionMetadata(${section.id}, 'title', this.innerText)">${sectionTitle}</span>
-            <span class="inline-edit" contenteditable="true"
-                  onblur="updateSectionMetadata(${section.id}, 'description', this.innerText)"
-                  style="font-size: 0.85em; color: #95a5a6; font-style: italic; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                  ${sectionDesc}
-            </span>
-            <div style="display:flex; gap:2px; margin-left:auto; flex-shrink: 0;">
-                <button class="edit-btn" title="Center Map" onclick="flyToSection('${sectionTitle}')">🎯</button>
-                ${section.id ? `<button class="delete-btn" title="Delete Section" onclick="deleteSection('${sectionTitle}')">🗑️</button>` : ''}
-            </div>
-        </div>
-
-        <div class="task-table-header" style="grid-template-columns: ${gridCols};">
-            <div>Task Name</div>
-            ${document.getElementById('col-category').checked ? '<div>Category</div>' : ''}
-            ${document.getElementById('col-assignee').checked ? '<div>Assignee</div>' : ''}
-            ${document.getElementById('col-time').checked ? '<div>Start Time</div>' : ''}
-            ${document.getElementById('col-group').checked ? '<div>Group</div>' : ''}
-            <div>Actions</div>
-        </div>
-    `;
+                <div class="asana-header" style="display: flex; align-items: center; gap: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 10px; cursor: pointer;" 
+                     onclick="const content = this.parentElement.querySelector('.section-content'); content.classList.toggle('collapsed'); this.querySelector('.section-toggle-icon').classList.toggle('collapsed');">
+                    <span class="section-toggle-icon" style="flex-shrink: 0;">▼</span>
+                    ${section.id ? `<input type="date" value="${dateVal}" class="inline-edit-input" style="width: 35px; overflow:hidden; padding:0; border:none; flex-shrink: 0;" onchange="updateSectionMetadata(${section.id}, 'section_date', this.value)" onclick="event.stopPropagation()">` : ''}
+                    <span class="inline-edit section-title-text" contenteditable="true" style="font-weight: bold; flex-shrink: 0;" onblur="updateSectionMetadata(${section.id}, 'title', this.innerText)" onclick="event.stopPropagation()">${sectionTitle}</span>
+                    <span class="inline-edit" contenteditable="true"
+                          onblur="updateSectionMetadata(${section.id}, 'description', this.innerText)"
+                          onclick="event.stopPropagation()"
+                          style="font-size: 0.85em; color: #95a5a6; font-style: italic; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                          ${sectionDesc}
+                    </span>
+                    <div style="display:flex; gap:2px; margin-left:auto; flex-shrink: 0;" onclick="event.stopPropagation()">
+                        <button class="edit-btn" title="Center Map" onclick="flyToSection('${sectionTitle}')">🎯</button>
+                        ${section.id ? `<button class="delete-btn" title="Delete Section" onclick="deleteSection('${sectionTitle}')">🗑️</button>` : ''}
+                    </div>
+                </div>
+                <div class="section-content">
+                    <div class="task-table-header" style="display: grid; grid-template-columns: ${gridCols}; font-size: 0.75em; color: #7f8c8d; padding: 0 15px 5px 15px;">
+                        <div>Task Name</div>
+                        ${document.getElementById('col-category').checked ? '<div>Category</div>' : ''}
+                        ${document.getElementById('col-assignee').checked ? '<div>Assignee</div>' : ''}
+                        ${document.getElementById('col-time').checked ? '<div>Time</div>' : ''}
+                        ${document.getElementById('col-group').checked ? '<div>Group</div>' : ''}
+                        <div style="text-align:right">Actions</div>
+                    </div>
+                </div>
+            `;
 
             const taskListContainer = document.createElement('div');
             taskListContainer.className = 'sortable-task-list';
-            taskListContainer.dataset.section = sectionTitle;
             taskListContainer.dataset.sectionId = section.id || 'null';
 
             tasks.forEach(task => {
-                if (!task.parent_id) {
-                    renderTaskCard(taskListContainer, task, gridCols, allItinerary);
-                }
+                if (!task.parent_id) renderTaskCard(taskListContainer, task, gridCols, allItinerary);
             });
 
             const inlineAdd = document.createElement('div');
             inlineAdd.style.padding = '10px 15px';
-            // Pass both section.id and safe sectionTitle
-            const safeTitle = sectionTitle.replace(/'/g, "\\'");
-
-            // Wrap the input and a new Fite checkbox in a flex container
             inlineAdd.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 10px; border-bottom: 1px dashed #ccc; padding-right: 5px;">
-                    <input type="text" placeholder="+ Add task to this section..." style="flex: 1; border:none; padding:5px; outline:none; background:transparent; font-size:0.9em;" onkeydown="if(event.key==='Enter') createInlineTask(this, ${section.id || null}, '${safeTitle}')">
-                    <label style="font-size: 0.85em; color: #7f8c8d; cursor: pointer; display: flex; align-items: center; gap: 4px; margin: 0;" title="Mark as Milestone (Fite)">
-                        <input type="checkbox" class="inline-fite-checkbox"> 📍 Fite
-                    </label>
+                <div style="display: flex; align-items: center; gap: 10px; border-bottom: 1px dashed #ccc;">
+                    <input type="text" placeholder="+ Add task..." style="flex: 1; border:none; padding:5px; outline:none; background:transparent; font-size:0.9em;" onkeydown="if(event.key==='Enter') createInlineTask(this, ${section.id || null}, '${sectionTitle.replace(/'/g, "\\'")}')">
                 </div>
             `;
 
-            sectionDiv.appendChild(taskListContainer);
-            sectionDiv.appendChild(inlineAdd);
+            const sectionContent = sectionDiv.querySelector('.section-content');
+            sectionContent.appendChild(taskListContainer);
+            sectionContent.appendChild(inlineAdd);
             container.appendChild(sectionDiv);
         }
 
