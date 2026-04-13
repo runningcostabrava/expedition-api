@@ -73,7 +73,8 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS loss NUMERIC",
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS parent_track_id INTEGER",
       "ALTER TABLE categories ADD COLUMN IF NOT EXISTS line_type TEXT DEFAULT 'solid'",
-      "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_milestone BOOLEAN DEFAULT false"
+      "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_milestone BOOLEAN DEFAULT false",
+      "ALTER TABLE categories ADD COLUMN IF NOT EXISTS marker_size INTEGER DEFAULT 28"
     ];
 
     // Execute safely one by one
@@ -380,9 +381,10 @@ app.get('/categories', async (req, res) => {
 });
 
 app.post('/categories', adminAuth, async (req, res) => {
-  const { name, color, icon, line_type } = req.body;
+  const { name, color, icon, line_type, marker_size } = req.body;
   try {
-    const result = await pool.query('INSERT INTO categories (name, color, icon, line_type) VALUES ($1, $2, $3, $4) RETURNING *', [name, color || '#3498db', icon || 'tag', line_type || 'solid']);
+    const result = await pool.query('INSERT INTO categories (name, color, icon, line_type, marker_size) VALUES ($1, $2, $3, $4, $5) RETURNING *', 
+      [name, color || '#3498db', icon || '📍', line_type || 'solid', marker_size || 28]);
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

@@ -1185,7 +1185,7 @@
                         });
 
                         map.on('click', layerId, (e) => {
-                            // CRITICAL: Set this as the global active task so waypoints show in the chart
+                            // CRITICAL: Lock onto the task so new waypoints are saved here
                             activeTaskId = task.task_id;
                             focusTaskInSidebar(task.task_id);
                             const dist = turf.length(geom.geojson, { units: 'kilometers' }).toFixed(2);
