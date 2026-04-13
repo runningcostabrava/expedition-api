@@ -1559,16 +1559,21 @@
                 return;
             }
 
+            // Create a wide bounding box around the current map center (~1000km)
+            // This STRICTLY blocks the Smart Route tool from returning results in Brazil or the USA!
+            const c = map.getCenter();
+            const searchBbox = [c.lng - 10, c.lat - 10, c.lng + 10, c.lat + 10];
+
             // Spawn the official Mapbox UI
             directionsControl = new MapboxDirections({
                 accessToken: mapboxgl.accessToken,
                 unit: 'metric',
                 profile: 'mapbox/driving',
                 controls: { instructions: false, profileSwitcher: true },
-                flyTo: false, // Prevents map from wildly jumping while typing
+                flyTo: false,
                 geocoder: {
-                    language: 'it,en', // Give the A/B inputs Italian context
-                    types: 'poi,place,locality' // BANS street addresses (like 'Rua') so airports show up first!
+                    language: 'it,en',
+                    bbox: searchBbox 
                 }
             });
 
