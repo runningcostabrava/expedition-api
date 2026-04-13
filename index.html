@@ -1559,11 +1559,6 @@
                 return;
             }
 
-            // Create a wide bounding box around the current map center (~1000km)
-            // This STRICTLY blocks the Smart Route tool from returning results in Brazil or the USA!
-            const c = map.getCenter();
-            const searchBbox = [c.lng - 10, c.lat - 10, c.lng + 10, c.lat + 10];
-
             // Spawn the official Mapbox UI
             directionsControl = new MapboxDirections({
                 accessToken: mapboxgl.accessToken,
@@ -1573,7 +1568,8 @@
                 flyTo: false,
                 geocoder: {
                     language: 'it,en',
-                    bbox: searchBbox 
+                    // The ultimate fix: Restrict the old geocoder exclusively to Italy and Spain
+                    countries: 'it,es'
                 }
             });
 
