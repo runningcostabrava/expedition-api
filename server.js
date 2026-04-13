@@ -458,7 +458,8 @@ app.get('/itinerary', async (req, res) => {
 app.get('/api/config', (req, res) => {
   res.json({
     MAPBOX_TOKEN: process.env.MAPBOX_TOKEN,
-    ADMIN_KEY: process.env.ADMIN_KEY
+    ADMIN_KEY: process.env.ADMIN_KEY,
+    GOOGLE_PLACES_API_KEY: process.env.GOOGLE_PLACES_API_KEY
   });
 });
 

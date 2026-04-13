@@ -333,20 +333,6 @@
             background: #f8fafc;
         }
 
-        /* L-shaped connector */
-        .geom-row.nested-geom::before {
-            content: '';
-            position: absolute;
-            left: -20px;
-            top: -12px;
-            height: 28px;
-            width: 16px;
-            border-left: 2px solid #cbd5e0;
-            border-bottom: 2px solid #cbd5e0;
-            border-bottom-left-radius: 6px;
-            z-index: 0;
-        }
-
         /* Simpler text for nested items */
         .geom-row.nested-geom .geom-title {
             font-size: 0.95em;
@@ -785,22 +771,6 @@
             margin-left: 10px;
         }
 
-        /* 1. Make the Popup Close Button Highly Visible */
-        .mapboxgl-popup-close-button {
-            color: #333 !important;
-            font-size: 22px !important;
-            padding: 4px 8px !important;
-            right: 4px !important;
-            top: 4px !important;
-            background: rgba(255, 255, 255, 0.8) !important;
-            border-radius: 50% !important;
-            transition: 0.2s;
-        }
-
-        .mapboxgl-popup-close-button:hover {
-            background: #eee !important;
-            color: #e74c3c !important;
-        }
 
         /* 2. Dynamic Zoom Scaling Variables */
         #map {
@@ -1129,9 +1099,22 @@
         async function initializeApp() {
             const configRes = await fetch(`${API_URL}/api/config`);
             const config = await configRes.json();
+            
             document.getElementById('loading-overlay').style.display = 'none';
             mapboxgl.accessToken = config.MAPBOX_TOKEN;
             ADMIN_KEY = config.ADMIN_KEY;
+
+            // --- DYNAMICALLY LOAD GOOGLE PLACES SCRIPT ---
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${config.GOOGLE_PLACES_API_KEY}&libraries=places`;
+            script.async = true;
+            script.defer = true;
+            document.head.appendChild(script);
+
+            script.onload = () => {
+                // Initialize your Google Search logic once the script is ready
+                initGoogleSearch(); 
+            };
 
             map = new mapboxgl.Map({
                 container: 'map',
@@ -1322,6 +1305,59 @@
             });
         }
 
+        function initGoogleSearch() {
+            const searchInput = document.createElement('input');
+            searchInput.id = 'google-search-input';
+            searchInput.placeholder = '🔍 Search Google Places...';
+            // Styling to match your floating tools
+            searchInput.style = 'position:absolute; top:15px; right:60px; z-index:100; width:300px; padding:10px; border-radius:8px; border:1px solid #ccc; box-shadow:0 2px 10px rgba(0,0,0,0.2); outline:none;';
+            document.getElementById('map-wrapper').appendChild(searchInput);
+
+            const autocomplete = new google.maps.places.Autocomplete(searchInput, {
+                fields: ["place_id", "geometry", "name", "formatted_address", "rating", "website", "photos"],
+                types: ["establishment", "geocode"]
+            });
+
+            // Bias to current map view
+            map.on('moveend', () => {
+                const bounds = map.getBounds();
+                autocomplete.setBounds(new google.maps.LatLngBounds(
+                    { lat: bounds.getSouth(), lng: bounds.getWest() },
+                    { lat: bounds.getNorth(), lng: bounds.getEast() }
+                ));
+            });
+
+            autocomplete.addListener("place_changed", () => {
+                const place = autocomplete.getPlace();
+                if (!place.geometry) return;
+
+                const coords = [place.geometry.location.lng(), place.geometry.location.lat()];
+                map.flyTo({ center: coords, zoom: 16 });
+
+                // Get the photo URL if it exists
+                const photoUrl = place.photos && place.photos.length > 0 ? place.photos[0].getUrl({ maxWidth: 400 }) : null;
+
+                draw.deleteAll();
+                const feat = { 
+                    type: 'Feature', 
+                    geometry: { type: 'Point', coordinates: coords },
+                    properties: { photo: photoUrl } // Pass photo to the popup
+                };
+                draw.add(feat);
+
+                showGeometryContextPopup(
+                    coords, 
+                    feat.geometry, 
+                    place.name, 
+                    `⭐ ${place.rating || 'No'} Rating | 📍 ${place.formatted_address}`,
+                    null, 
+                    '🍽️', 
+                    '#e74c3c', 
+                    place.website || ''
+                );
+            });
+        }
+
         function renderMapGeometries() {
             activeMarkers.forEach(m => m.remove());
             activeMarkers = [];
@@ -1372,13 +1408,13 @@
                         // focusAfterOpen: false prevents the ARIA warning
                         const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
                             .setLngLat([geom.lng, geom.lat])
-                            .setPopup(new mapboxgl.Popup({ offset: 25, focusAfterOpen: false }).setHTML(`
-                                <div style="padding-right: 15px;">
-                                    <h4 style="border-left: 4px solid ${markerColor}; padding-left: 8px; margin-top:0;">${renderIcon} ${geom.title}</h4>
-                                    <p style="margin: 5px 0;">Task: ${task.task_name || 'Unnamed'}</p>
-                                    <div style="display: flex; gap: 5px; margin-top: 10px;">
-                                        <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="flex:1;">Edit</button>
-                                        <button onclick="deleteGeometry('point', ${geom.waypoint_id || geom.anchor_id})" style="flex:1; background:#e74c3c;">🗑️ Delete</button>
+                            .setPopup(new mapboxgl.Popup({ offset: 25, focusAfterOpen: false, className: 'custom-popup' }).setHTML(`
+                                <div style="padding-right: 5px;">
+                                    <h4 style="margin-top:0; font-size:1.1em; color:#2c3e50;">${renderIcon} ${geom.title}</h4>
+                                    <p style="margin: 0; font-size: 0.9em; color: #7f8c8d;">Task: ${task.task_name || 'Unnamed Task'}</p>
+                                    <div style="margin-top: 12px; display: flex; gap: 8px;">
+                                        <button class="popup-btn edit" onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})">Edit</button>
+                                        <button class="popup-btn delete" onclick="deleteGeometry('point', ${geom.waypoint_id || geom.anchor_id})">Delete</button>
                                     </div>
                                 </div>
                             `))
