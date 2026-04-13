@@ -141,10 +141,10 @@ app.get('/tracks', async (req, res) => {
 
 app.post('/tracks', adminAuth, async (req, res) => {
   console.log("DEBUG POST /tracks payload:", req.body);
-  const { title, geojson_data, color, target_group, tasks, existing_task_id, distance, duration, comments, link } = req.body;
+  const { title, geojson_data, color, target_group, tasks, existing_task_id, distance, duration, comments, link, parent_track_id } = req.body;
   try {
-    const result = await pool.query('INSERT INTO tracks (title, geojson_data, color, target_group, distance, duration, comments, link) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
-      [title, geojson_data, color || '#3498db', target_group, distance, duration, comments, link]);
+    const result = await pool.query('INSERT INTO tracks (title, geojson_data, color, target_group, distance, duration, comments, link, parent_track_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id',
+      [title, geojson_data, color || '#3498db', target_group, distance, duration, comments, link, parent_track_id]);
     const trackId = result.rows[0].id;
 
     const geometryType = geojson_data.features[0].geometry.type;
