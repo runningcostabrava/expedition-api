@@ -183,70 +183,85 @@
 
         .task-row {
             display: flex;
-            /* Changed from grid to flex for better card control */
-            align-items: stretch;
+            flex-direction: column; /* Stacks header and title vertically */
             background: #ffffff !important;
             border: 1px solid #e2e8f0;
-            border-radius: 10px;
+            border-radius: 8px;
             margin: 6px 10px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
             transition: all 0.2s ease;
             cursor: pointer;
             overflow: hidden;
-            min-height: 60px;
+            position: relative;
         }
 
         .task-row:hover {
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
             border-color: #cbd5e0;
         }
 
-        .task-main-content {
-            flex: 1;
-            padding: 12px;
+        /* Modern Top Bar for Time, Category, & Buttons */
+        .task-header-row {
             display: flex;
-            flex-direction: column;
-            justify-content: center;
-            min-width: 0;
-            /* Allows truncation to work inside flex */
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 10px;
+            background: #f8fafc;
+            border-bottom: 1px solid #f1f5f9;
         }
 
-        .task-title-large {
-            font-weight: 700;
-            font-size: 0.8em; /* Shrunk font size for better fit */
-            color: #1a202c;
-            line-height: 1.3;
-            margin-bottom: 4px;
+        /* Modern Full-Width Title Area */
+        .task-title-row {
+            padding: 10px;
+            font-weight: 600;
+            font-size: 0.85em;
+            color: #1e293b;
+            line-height: 1.4;
             word-break: break-word;
         }
 
-        .task-meta-aside {
-            width: 135px; /* Shrunk column to give title more room */
-            display: grid;
-            grid-template-rows: 1fr 1fr;
-            border-left: 1px solid #edf2f7;
-            background: #fcfcfc;
+        /* Clean, pill-shaped inputs for inline edits */
+        .modern-inline-input {
+            border: 1px solid transparent;
+            background: transparent;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            color: #475569;
+            cursor: pointer;
+            outline: none;
+            font-family: inherit;
+            font-weight: 600;
         }
 
-        .meta-sub-row {
+        .modern-inline-input:hover, .modern-inline-input:focus {
+            border-color: #cbd5e0;
+            background: #fff;
+        }
+
+        /* Modern Action Buttons - Appear on Hover */
+        .task-actions-modern {
             display: flex;
-            align-items: center;
-            padding: 0 10px;
-            font-size: 0.75em;
-            color: #718096;
-            gap: 6px;
-            border-bottom: 1px solid #f7fafc;
-        }
-
-        .meta-sub-row:last-child {
-            border-bottom: none;
-        }
-
-        .task-actions-inline {
-            display: flex;
-            justify-content: flex-end;
             gap: 2px;
-            padding-right: 5px;
+            opacity: 0.1;
+            transition: opacity 0.2s;
         }
+
+        .task-row:hover .task-actions-modern, .fite-row:hover .task-actions-modern {
+            opacity: 1;
+        }
+        
+        .action-btn-modern {
+            background: transparent;
+            border: none;
+            padding: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            color: #64748b;
+        }
+        .action-btn-modern:hover { background: #e2e8f0; color: #0f172a; }
+        .action-btn-modern.del:hover { background: #fef2f2; color: #ef4444; }
 
         .task-cell {
             display: flex;
@@ -2652,9 +2667,9 @@
                               onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())" 
                               onclick="event.stopPropagation()">${task.task_name || 'Milestone'}</span>
                     </div>
-                    <div class="geom-actions" style="opacity:1">
-                        <button class="edit-btn" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
-                        <button class="delete-btn" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
+                    <div class="task-actions-modern" style="margin-left:auto;">
+                        <button class="action-btn-modern" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
+                        <button class="action-btn-modern del" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
                     </div>
                 `;
             } else {
@@ -2664,10 +2679,6 @@
 
                 if (task.is_completed) taskEl.style.opacity = '0.6';
 
-                const cat = allCategories.find(c => c.id === task.category_id);
-                const catName = cat ? cat.name : 'No Category';
-                const catIcon = cat ? cat.icon : '🏷️';
-
                 // Build the Category Dropdown options dynamically
                 let catOptions = `<option value="">🏷️ No Cat</option>`;
                 allCategories.forEach(c => {
@@ -2676,30 +2687,28 @@
                 });
 
                 taskEl.innerHTML = `
-                    <div class="task-main-content">
-                        <div class="task-title-large" style="display: flex; align-items: flex-start;">
+                    <div class="task-header-row">
+                        <div style="display: flex; gap: 4px; align-items: center;">
+                            <input type="time" class="modern-inline-input" value="${timeOnly}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()">
+                            <select class="modern-inline-input" onchange="updateTaskInline(${task.task_id}, 'category_id', this.value)" onclick="event.stopPropagation()" style="max-width: 80px;">
+                                ${catOptions}
+                            </select>
+                        </div>
+                        <div class="task-actions-modern">
+                            <button class="action-btn-modern" title="Add Subtask" onclick="event.stopPropagation(); createSubtask(${task.task_id}, '${task.day_label || ''}')">➕</button>
+                            <button class="action-btn-modern" title="Edit Task" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
+                            <button class="action-btn-modern del" title="Delete Task" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
+                        </div>
+                    </div>
+                    <div class="task-title-row">
+                        <div style="display: flex; align-items: flex-start;">
                             ${task.is_completed ? '<span style="margin-right:5px; user-select:none;">✅</span>' : ''}
                             <span class="inline-edit" contenteditable="true" 
                                   onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }" 
                                   onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())" 
                                   onclick="event.stopPropagation()">${task.task_name || 'Unnamed Task'}</span>
                         </div>
-                        ${task.responsible ? `<div style="font-size:0.8em; color:#a0aec0; margin-top:4px;">👤 ${task.responsible}</div>` : ''}
-                    </div>
-
-                    <div class="task-meta-aside">
-                        <div class="meta-sub-row" title="Time & Category">
-                            <input type="time" class="inline-edit-input" value="${timeOnly}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()" style="font-weight:bold; color:#2d3748; width:75px; padding:2px; font-size:1em; cursor:pointer;">
-                            
-                            <select class="inline-edit-input" onchange="updateTaskInline(${task.task_id}, 'category_id', this.value)" onclick="event.stopPropagation()" style="width:85px; padding:2px; font-size:0.85em; cursor:pointer; text-overflow: ellipsis;">
-                                ${catOptions}
-                            </select>
-                        </div>
-                        <div class="meta-sub-row task-actions-inline" style="justify-content:flex-end;">
-                            <button class="edit-btn" title="Add Subtask" onclick="event.stopPropagation(); createSubtask(${task.task_id}, '${task.day_label || ''}')">➕</button>
-                            <button class="edit-btn" title="Edit Task" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
-                            <button class="delete-btn" title="Delete Task" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
-                        </div>
+                        ${task.responsible ? `<div style="font-size:0.75em; color:#64748b; margin-top:4px; font-weight: 500;">👤 ${task.responsible}</div>` : ''}
                     </div>
                 `;
             }
