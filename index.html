@@ -2719,6 +2719,7 @@
 
         function renderTaskCard(parentContainer, task, gridCols, allTasks) {
             const timeOnly = (task.starts_at && task.starts_at.length >= 16) ? task.starts_at.substring(11, 16) : '--:--';
+            const timeValue = (task.starts_at && task.starts_at.length >= 16) ? task.starts_at.substring(11, 16) : '';
             const catColor = task.category_color || '#dfe6e9';
             const isFite = task.is_milestone;
 
@@ -2763,7 +2764,7 @@
                 taskEl.innerHTML = `
                     <div class="task-header-row">
                         <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-                            <input type="time" class="modern-inline-input" value="${timeOnly}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()" style="width:70px;">
+                            <input type="time" class="modern-inline-input" value="${timeValue}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()" style="width:70px;">
                             <select class="modern-inline-input" onchange="updateTaskInline(${task.task_id}, 'category_id', this.value)" onclick="event.stopPropagation()" style="max-width:110px;">
                                 ${catOptions}
                             </select>
