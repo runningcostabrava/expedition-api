@@ -1520,6 +1520,7 @@
         function renderMapGeometries() {
             activeMarkers.forEach(m => m.remove());
             activeMarkers = [];
+            const renderedAnchors = new Set();
             const style = map.getStyle();
             if (style && style.layers) {
                 style.layers.forEach(layer => {
@@ -1533,6 +1534,11 @@
             allItinerary.forEach(task => {
                 if (!task.geometries) return;
                 task.geometries.forEach(geom => {
+                    // Deduplicate geometries tied to multiple tasks
+                    if (geom.anchor_id) {
+                        if (renderedAnchors.has(geom.anchor_id)) return;
+                        renderedAnchors.add(geom.anchor_id);
+                    }
                     const isSmart = geom.geojson && geom.geojson.features[0].properties && geom.geojson.features[0].properties.route_type === 'smart';
                     if (geom.kind === 'point' && !mapFilters.point) return;
                     if (geom.kind === 'polygon' && !mapFilters.polygon) return;
@@ -2635,6 +2641,27 @@
                                 });
                             } catch (e) {
                                 console.error("Drag Update Failed:", e);
+                            }
+                        }
+
+                        // --- NEW: Calculate and save the new sort_order for the entire list ---
+                        const siblingCards = Array.from(toList.children).filter(el => el.classList.contains('task-row') || el.classList.contains('fite-row') || el.querySelector('.task-row, .fite-row'));
+                        
+                        const newOrderPayload = siblingCards.map((el, index) => {
+                            const row = el.classList.contains('task-row') || el.classList.contains('fite-row') ? el : el.querySelector('.task-row, .fite-row');
+                            const id = parseInt(row.id.replace('task-row-', ''));
+                            return { id: id, sort_order: index };
+                        }).filter(item => !isNaN(item.id));
+
+                        if (newOrderPayload.length > 0) {
+                            try {
+                                await fetch(`${API_URL}/tasks/reorder`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                                    body: JSON.stringify({ tasks: newOrderPayload })
+                                });
+                            } catch (e) {
+                                console.error("Reorder Failed:", e);
                             }
                         }
 

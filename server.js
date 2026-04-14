@@ -80,6 +80,7 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       "ALTER TABLE categories ADD COLUMN IF NOT EXISTS line_type TEXT DEFAULT 'solid'",
       "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_milestone BOOLEAN DEFAULT false",
       "ALTER TABLE categories ADD COLUMN IF NOT EXISTS marker_size INTEGER DEFAULT 28",
+      "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0",
       "CREATE TABLE IF NOT EXISTS team_members (id SERIAL PRIMARY KEY, name TEXT UNIQUE)"
     ];
 
@@ -112,11 +113,11 @@ app.get('/setup-db', adminAuth, async (req, res) => {
 // 2. TRACKS: GPX Upload & Management
 app.post('/tasks', adminAuth, async (req, res) => {
   console.log("DEBUG POST /tasks payload:", req.body); // <-- Debugging added
-  const { task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id, is_milestone, section_id, category_id } = req.body;
+  const { task_name, responsible, target_group, task_type, starts_at, ends_at, is_completed, comments, parent_id, is_milestone, section_id, category_id } = req.body;
   try {
     const result = await pool.query(
-      'INSERT INTO tasks (task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id, is_milestone, section_id, category_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
-      [task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed || false, comments, parent_id, is_milestone || false, section_id, category_id]
+      'INSERT INTO tasks (task_name, responsible, target_group, task_type, starts_at, ends_at, is_completed, comments, parent_id, is_milestone, section_id, category_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
+      [task_name, responsible, target_group, task_type, starts_at, ends_at, is_completed || false, comments, parent_id, is_milestone || false, section_id, category_id]
     );
     res.json(result.rows[0]);
   } catch (err) { 
@@ -127,11 +128,11 @@ app.post('/tasks', adminAuth, async (req, res) => {
 
 app.put('/tasks/:id', adminAuth, async (req, res) => {
   const { id } = req.params;
-  const { task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id, category_id, is_milestone, section_id, characteristics } = req.body;
+  const { task_name, responsible, target_group, task_type, starts_at, ends_at, is_completed, comments, parent_id, category_id, is_milestone, section_id, characteristics } = req.body;
   try {
     const result = await pool.query(
-      'UPDATE tasks SET task_name=$1, responsible=$2, target_group=$3, task_type=$4, day_label=$5, starts_at=$6, ends_at=$7, is_completed=$8, comments=$9, parent_id=$10, category_id=$11, is_milestone=$12, section_id=$14, characteristics=$15 WHERE id=$13 RETURNING *',
-      [task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id, category_id, is_milestone, id, section_id, characteristics]
+      'UPDATE tasks SET task_name=$1, responsible=$2, target_group=$3, task_type=$4, starts_at=$5, ends_at=$6, is_completed=$7, comments=$8, parent_id=$9, category_id=$10, is_milestone=$11, section_id=$13, characteristics=$14 WHERE id=$12 RETURNING *',
+      [task_name, responsible, target_group, task_type, starts_at, ends_at, is_completed, comments, parent_id, category_id, is_milestone, id, section_id, characteristics]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -304,6 +305,27 @@ app.put('/waypoints/:id', adminAuth, async (req, res) => {
 });
 
 
+
+// Bulk update sort_order for drag-and-drop
+app.patch('/tasks/reorder', adminAuth, async (req, res) => {
+  const { tasks } = req.body; // Expects an array of { id, sort_order }
+  if (!tasks || !Array.isArray(tasks)) return res.status(400).json({ error: "Invalid payload" });
+  
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const t of tasks) {
+      await client.query('UPDATE tasks SET sort_order = $1 WHERE id = $2', [t.sort_order, t.id]);
+    }
+    await client.query('COMMIT');
+    res.json({ message: "Order updated successfully" });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
 
 // Delete a specific task
 app.delete('/tasks/:id', adminAuth, async (req, res) => {
@@ -478,7 +500,7 @@ app.get('/itinerary', async (req, res) => {
       LEFT JOIN waypoints w ON sa.waypoint_id = w.id
       LEFT JOIN tracks tr ON sa.track_id = tr.id
       GROUP BY t.id, s.section_date, c.color, c.icon, c.line_type, c.marker_size -- Group by section_date and category fields
-      ORDER BY s.section_date ASC, t.starts_at ASC; -- This handles the "Auto Arrange"
+      ORDER BY s.section_date ASC NULLS FIRST, t.sort_order ASC, t.starts_at ASC; -- This handles the "Auto Arrange"
     `;
     const result = await pool.query(query);
     res.json(result.rows);
