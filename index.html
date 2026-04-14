@@ -9,7 +9,8 @@
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.0/mapbox-gl-draw.css"
         type="text/css">
-    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
+    <script
+        src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
     <link rel="stylesheet"
         href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css"
         type="text/css">
@@ -183,7 +184,8 @@
 
         .task-row {
             display: flex;
-            flex-direction: column; /* Stacks header and title vertically */
+            flex-direction: column;
+            /* Stacks header and title vertically */
             background: #ffffff !important;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
@@ -234,7 +236,8 @@
             font-weight: 600;
         }
 
-        .modern-inline-input:hover, .modern-inline-input:focus {
+        .modern-inline-input:hover,
+        .modern-inline-input:focus {
             border-color: #cbd5e0;
             background: #fff;
         }
@@ -247,10 +250,11 @@
             transition: opacity 0.2s;
         }
 
-        .task-row:hover .task-actions-modern, .fite-row:hover .task-actions-modern {
+        .task-row:hover .task-actions-modern,
+        .fite-row:hover .task-actions-modern {
             opacity: 1;
         }
-        
+
         .action-btn-modern {
             background: transparent;
             border: none;
@@ -260,8 +264,16 @@
             font-size: 0.9em;
             color: #64748b;
         }
-        .action-btn-modern:hover { background: #e2e8f0; color: #0f172a; }
-        .action-btn-modern.del:hover { background: #fef2f2; color: #ef4444; }
+
+        .action-btn-modern:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+
+        .action-btn-modern.del:hover {
+            background: #fef2f2;
+            color: #ef4444;
+        }
 
         .task-cell {
             display: flex;
@@ -889,9 +901,12 @@
         <div id="loading-overlay"
             style="position:absolute; inset:0; background:rgba(255,255,255,0.8); z-index:9999; display:flex; justify-content:center; align-items:center; font-size:20px; font-weight:bold; color:#333;">
             Waking up server (This takes ~50 seconds)...</div>
-        <div style="position:absolute; top:15px; left:50%; transform:translateX(-50%); z-index:100; width:350px;">
-            <input type="text" id="internal-map-search" placeholder="🔍 Search existing locations/tracks on map..." style="width:100%; padding:10px 15px; border-radius:8px; border:1px solid #ccc; box-shadow:0 2px 10px rgba(0,0,0,0.2); outline:none; font-family:sans-serif;">
-            <div id="internal-search-results" style="display:none; background:white; width:100%; max-height:350px; overflow-y:auto; border-radius:8px; margin-top:5px; box-shadow:0 4px 15px rgba(0,0,0,0.2);"></div>
+        <div style="position:absolute; top:90px; left:5%; z-index:100; width:350px;">
+            <input type="text" id="internal-map-search" placeholder="🔍 Search existing locations/tracks on map..."
+                style="width:100%; padding:10px 15px; border-radius:8px; border:1px solid #ccc; box-shadow:0 2px 10px rgba(0,0,0,0.2); outline:none; font-family:sans-serif;">
+            <div id="internal-search-results"
+                style="display:none; background:white; width:100%; max-height:350px; overflow-y:auto; border-radius:8px; margin-top:5px; box-shadow:0 4px 15px rgba(0,0,0,0.2);">
+            </div>
         </div>
         <div id="map" style="position: absolute; top: 0; bottom: 0; width: 100%;"></div>
         <div class="floating-tools">
@@ -965,7 +980,9 @@
                 <div class="form-group">
                     <label style="display: flex; justify-content: space-between; align-items: center;">
                         Task Type
-                        <span onclick="openModal('type-modal')" style="cursor:pointer; font-size: 12px; color: #3498db; text-decoration: underline;">Manage ⚙️</span>
+                        <span onclick="openModal('type-modal')"
+                            style="cursor:pointer; font-size: 12px; color: #3498db; text-decoration: underline;">Manage
+                            ⚙️</span>
                     </label>
                     <select id="task-type-id">
                         <option value="">No Type</option>
@@ -1073,16 +1090,21 @@
         <div class="modal-content" style="max-width: 400px;">
             <span class="close" onclick="closeModal('type-modal')">&times;</span>
             <h3>⚙️ Manage Task Types</h3>
-            <div id="type-list" style="margin-bottom: 20px; max-height: 200px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 8px;"></div>
+            <div id="type-list"
+                style="margin-bottom: 20px; max-height: 200px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 8px;">
+            </div>
             <hr>
             <h4 style="margin-top:15px;">Add New Type</h4>
             <div style="display: flex; flex-direction: column; gap: 10px;">
                 <input type="text" id="new-type-name" placeholder="Name (e.g. Logistics)">
                 <div style="display: flex; gap: 10px;">
-                    <input type="color" id="new-type-color" value="#95a5a6" style="width: 50px; height: 38px; border: none; padding: 0; cursor:pointer;">
+                    <input type="color" id="new-type-color" value="#95a5a6"
+                        style="width: 50px; height: 38px; border: none; padding: 0; cursor:pointer;">
                     <input type="text" id="new-type-icon" placeholder="Emoji 🚗" style="flex: 1;">
                 </div>
-                <button onclick="saveTaskType()" style="background: #27ae60; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer;">Create Type</button>
+                <button onclick="saveTaskType()"
+                    style="background: #27ae60; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer;">Create
+                    Type</button>
             </div>
         </div>
     </div>
@@ -1341,7 +1363,7 @@
             const searchInput = document.getElementById('internal-map-search');
             const resultsContainer = document.getElementById('internal-search-results');
 
-            searchInput.addEventListener('input', function(e) {
+            searchInput.addEventListener('input', function (e) {
                 const query = e.target.value.toLowerCase().trim();
                 if (!query) {
                     resultsContainer.style.display = 'none';
@@ -1369,7 +1391,7 @@
                     uniqueGeoms.forEach(item => {
                         const g = item.geom;
                         const icon = g.kind === 'point' ? (g.icon || '📍') : (g.kind === 'polygon' ? '🛑' : '📈');
-                        
+
                         // Extract fallback center coordinates
                         let centerLng = g.lng;
                         let centerLat = g.lat;
@@ -1378,9 +1400,9 @@
                             centerLng = coords[0];
                             centerLat = coords[1];
                         }
-                        
+
                         html += `
-                            <div style="padding:10px; border-bottom:1px solid #eee; cursor:pointer; display:flex; flex-direction:column;" 
+                            <div style="padding:10px; border-bottom:1px solid #eee; cursor:pointer; display:flex; flex-direction:column;"
                                  onclick="map.flyTo({center: [${centerLng}, ${centerLat}], zoom: 16}); document.getElementById('internal-search-results').style.display='none'; document.getElementById('internal-map-search').value='';">
                                 <div style="font-weight:bold; font-size:0.95em; color:#2c3e50;">${icon} ${g.title || 'Unnamed Shape'}</div>
                                 ${g.comments ? `<div style="font-size:0.8em; color:#7f8c8d; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${g.comments}</div>` : ''}
@@ -1444,7 +1466,7 @@
 
         function renderDiscoverySidebar(places) {
             const container = document.getElementById('asana-container');
-            
+
             // 1. Build the Sidebar Header
             container.innerHTML = `
                 <div style="padding-bottom: 20px;">
@@ -1462,7 +1484,7 @@
             // 3. Generate Sidebar Cards and Map Pins
             places.forEach((place, index) => {
                 const coords = [place.location.lng(), place.location.lat()];
-                
+
                 // Add to map bounds array
                 mapFeatures.push(turf.point(coords));
 
@@ -1470,15 +1492,15 @@
                 draw.add({ type: 'Feature', geometry: { type: 'Point', coordinates: coords } });
 
                 // Get Photo
-                const photoUrl = place.photos && place.photos.length > 0 
-                    ? place.photos[0].getURI({maxWidth: 300}) 
+                const photoUrl = place.photos && place.photos.length > 0
+                    ? place.photos[0].getURI({ maxWidth: 300 })
                     : 'https://via.placeholder.com/300x300?text=No+Photo';
 
                 // Create the UI Card
                 const row = document.createElement('div');
                 row.className = 'task-row';
                 row.style.cssText = 'display:flex; padding:12px; gap:15px; border-bottom:1px solid #eee; cursor:pointer; align-items:flex-start; margin-bottom:12px; background:white;';
-                
+
                 // Fly to location on map click
                 row.onclick = () => map.flyTo({ center: coords, zoom: 17 });
 
@@ -1486,15 +1508,15 @@
                 row.addEventListener('mouseenter', () => {
                     // Remove any existing hover popup to avoid duplicates
                     if (window.discoveryHoverPopup) window.discoveryHoverPopup.remove();
-                    
-                    window.discoveryHoverPopup = new mapboxgl.Popup({ 
-                        closeButton: false, 
-                        closeOnClick: false, 
-                        offset: 15 
+
+                    window.discoveryHoverPopup = new mapboxgl.Popup({
+                        closeButton: false,
+                        closeOnClick: false,
+                        offset: 15
                     })
-                    .setLngLat(coords)
-                    .setHTML(`<div style="font-weight:bold; font-size:1.05em; color:#2c3e50; padding:2px;">${index + 1}. ${place.displayName}</div>`)
-                    .addTo(map);
+                        .setLngLat(coords)
+                        .setHTML(`<div style="font-weight:bold; font-size:1.05em; color:#2c3e50; padding:2px;">${index + 1}. ${place.displayName}</div>`)
+                        .addTo(map);
                 });
 
                 row.addEventListener('mouseleave', () => {
@@ -1527,7 +1549,7 @@
                     e.stopPropagation();
                     draw.deleteAll();
                     draw.add({ type: 'Feature', geometry: { type: 'Point', coordinates: coords }, properties: { photo: photoUrl } });
-                    
+
                     const googleData = { photoUrl: photoUrl, phone: place.nationalPhoneNumber || '', address: place.formattedAddress || '', googleMapsUri: place.googleMapsURI || '' };
                     showGeometryContextPopup(coords, { type: 'Point', coordinates: coords }, place.displayName, `⭐ ${place.rating || 'N/A'} | ${place.formattedAddress || ''}`, null, '🍽️', '#e74c3c', place.websiteURI || '', googleData);
                 };
@@ -1543,7 +1565,7 @@
                     try {
                         await place.fetchFields({ fields: ['reviews', 'regularOpeningHours', 'nationalPhoneNumber'] });
                         renderRichPlaceProfile(place, coords, true);
-                    } catch(err) {
+                    } catch (err) {
                         console.error(err);
                         btnProfile.innerText = 'Error';
                     }
@@ -1557,17 +1579,17 @@
 
             function renderRichPlaceProfile(place, coords, isFromSearchList = false) {
                 const container = document.getElementById('asana-container');
-                const photoUrl = place.photos && place.photos.length > 0 ? place.photos[0].getURI({maxWidth: 600}) : 'https://via.placeholder.com/600x300?text=No+Photo';
+                const photoUrl = place.photos && place.photos.length > 0 ? place.photos[0].getURI({ maxWidth: 600 }) : 'https://via.placeholder.com/600x300?text=No+Photo';
                 const title = place.displayName || 'Unknown Place';
-                    // NEW API FIX: isOpen() is called directly on the 'place' object
-                    const isOpen = place.regularOpeningHours ? (place.isOpen() ? '<span style="color:#27ae60; font-weight:bold;">🟢 Open Now</span>' : '<span style="color:#e74c3c; font-weight:bold;">🔴 Closed</span>') : '';
+                // NEW API FIX: isOpen() is called directly on the 'place' object
+                const isOpen = place.regularOpeningHours ? (place.isOpen() ? '<span style="color:#27ae60; font-weight:bold;">🟢 Open Now</span>' : '<span style="color:#e74c3c; font-weight:bold;">🔴 Closed</span>') : '';
 
-                    const googleData = {
-                        photoUrl: photoUrl,
-                        phone: place.nationalPhoneNumber || '',
-                        address: place.formattedAddress || '',
-                        googleMapsUri: place.googleMapsURI || ''
-                    };
+                const googleData = {
+                    photoUrl: photoUrl,
+                    phone: place.nationalPhoneNumber || '',
+                    address: place.formattedAddress || '',
+                    googleMapsUri: place.googleMapsURI || ''
+                };
 
                 let reviewsHtml = '';
                 if (place.reviews && place.reviews.length > 0) {
@@ -1673,15 +1695,15 @@
                         // focusAfterOpen: false prevents the ARIA warning
                         const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
                             .setLngLat([geom.lng, geom.lat])
-                        .setPopup(new mapboxgl.Popup({ offset: 25, focusAfterOpen: false, className: 'custom-popup', maxWidth: '280px' }).setHTML(`
+                            .setPopup(new mapboxgl.Popup({ offset: 25, focusAfterOpen: false, className: 'custom-popup', maxWidth: '280px' }).setHTML(`
                             <div style="padding: 5px;">
                                 ${geom.photo_url ? `<img src="${geom.photo_url}" style="width:100%; height:120px; object-fit:cover; border-radius:6px; margin-bottom:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1);">` : ''}
                                 <h4 style="margin-top:0; font-size:1.1em; color:#2c3e50; margin-bottom:5px;">${renderIcon} ${geom.title}</h4>
                                 <p style="margin: 0 0 8px 0; font-size: 0.85em; color: #7f8c8d;">Task: ${task.task_name || 'Unnamed Task'}</p>
-                                
+
                                 ${geom.address ? `<div style="font-size:0.8em; margin-bottom:4px; color:#34495e;">📍 ${geom.address}</div>` : ''}
                                 ${geom.phone ? `<div style="font-size:0.8em; margin-bottom:10px; color:#34495e;">📞 ${geom.phone}</div>` : ''}
-                                
+
                                 <div style="display:flex; gap:8px; font-size:0.85em; margin-bottom:12px; border-bottom:1px solid #eee; padding-bottom:10px;">
                                     ${geom.link ? `<a href="${geom.link.startsWith('http') ? geom.link : 'https://' + geom.link}" target="_blank" style="color:#3498db; text-decoration:none; font-weight:bold;">🌐 Website</a>` : ''}
                                     ${geom.google_maps_url ? `<a href="${geom.google_maps_url}" target="_blank" style="color:#27ae60; text-decoration:none; font-weight:bold;">🗺️ Maps</a>` : ''}
@@ -2014,8 +2036,8 @@
                 return `<option value="${s.id}" ${activeTaskSection == s.id ? 'selected' : ''}>${dateStr} ${s.title || ''}</option>`;
             }).join('');
 
-            const taskWarning = activeTaskId 
-                ? `<div style="color:#27ae60; font-size:0.8em; margin-bottom:10px; font-weight:bold;">✅ Attached to active task</div>` 
+            const taskWarning = activeTaskId
+                ? `<div style="color:#27ae60; font-size:0.8em; margin-bottom:10px; font-weight:bold;">✅ Attached to active task</div>`
                 : `<div style="background:#fff3cd; color:#856404; padding:8px; border-radius:4px; font-size:0.8em; margin-bottom:10px; border:1px solid #ffeeba;">
                      ⚠️ <strong>No Task Selected!</strong><br>
                      <button onclick="activeContextPopup.remove(); document.getElementById('left-panel').classList.remove('hidden');" style="margin-top:8px; padding:6px 10px; background:#e67e22; color:white; border:none; border-radius:4px; cursor:pointer; width:100%; font-weight:bold;">← Go to Sidebar & Select Task</button>
@@ -2095,12 +2117,12 @@
                         // CREATE New Shape (POST)
                         if (geometry.type === 'Point') {
                             await fetch(`${API_URL}/waypoints`, {
-                                method: 'POST', headers, body: JSON.stringify({ 
+                                method: 'POST', headers, body: JSON.stringify({
                                     title, color, icon, link, section_id: section_id,
-                                    existing_task_id: activeTaskId, 
-                                    parent_track_id: segmentTrackId, 
-                                    lat: geometry.coordinates[1], 
-                                    lng: geometry.coordinates[0], 
+                                    existing_task_id: activeTaskId,
+                                    parent_track_id: segmentTrackId,
+                                    lat: geometry.coordinates[1],
+                                    lng: geometry.coordinates[0],
                                     description: finalDesc,
                                     photo_url: googleData ? googleData.photoUrl : null,
                                     phone: googleData ? googleData.phone : null,
@@ -2414,7 +2436,7 @@
         document.getElementById('unified-save-btn').onclick = async () => {
             // 1. Grab the ID first so we can fetch existing data
             const existingTaskId = document.getElementById('existing-task').value || null;
-            
+
             // 2. Fetch the existing task to preserve fields not shown in the modal (like parent_id)
             const baseTask = existingTaskId ? (allItinerary.find(t => t.task_id == existingTaskId) || {}) : {};
 
@@ -2432,7 +2454,7 @@
                 comments: document.getElementById('task-comments').value,
                 characteristics: document.getElementById('wp-description').value // <-- FIX: Captures description!
             };
-            
+
             const geomColor = document.getElementById('geom-color').value;
             const features = draw.getAll().features;
             const headers = { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY };
@@ -2440,11 +2462,11 @@
             try {
                 // 1. ALWAYS Save/Update the Task FIRST
                 let finalTaskId = existingTaskId;
-                
+
                 if (!existingTaskId) {
                     // Create a new task
                     const taskRes = await fetch(`${API_URL}/tasks`, { method: 'POST', headers, body: JSON.stringify(taskData) });
-                    if(taskRes.ok) {
+                    if (taskRes.ok) {
                         const newTask = await taskRes.json();
                         finalTaskId = newTask.id;
                     }
@@ -2771,7 +2793,7 @@
 
                         // --- NEW: Calculate and save the new sort_order for the entire list ---
                         const siblingCards = Array.from(toList.children).filter(el => el.classList.contains('task-row') || el.classList.contains('fite-row') || el.querySelector('.task-row, .fite-row'));
-                        
+
                         const newOrderPayload = siblingCards.map((el, index) => {
                             const row = el.classList.contains('task-row') || el.classList.contains('fite-row') ? el : el.querySelector('.task-row, .fite-row');
                             const id = parseInt(row.id.replace('task-row-', ''));
@@ -2815,10 +2837,10 @@
                     <div class="fite-dot" style="border-color: ${catColor}"></div>
                     <div class="fite-text" style="display: flex; align-items: center; flex: 1; min-width:0;">
                         <span style="color:#64748b; font-size:0.75em; margin-right:8px; font-weight:600;">${timeOnly}</span>
-                        <span class="inline-edit" contenteditable="true" 
+                        <span class="inline-edit" contenteditable="true"
                               style="font-size:0.9em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
-                              onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }" 
-                              onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())" 
+                              onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }"
+                              onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())"
                               onclick="event.stopPropagation()">${task.task_name || 'Milestone'}</span>
                     </div>
                     <div class="task-actions-modern" style="opacity:1; margin-left:auto;">
@@ -2857,9 +2879,9 @@
                     </div>
                     <div class="task-title-row">
                         ${task.is_completed ? '<span style="margin-right:5px; user-select:none;">✅</span>' : ''}
-                        <span class="inline-edit" contenteditable="true" 
-                              onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }" 
-                              onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())" 
+                        <span class="inline-edit" contenteditable="true"
+                              onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }"
+                              onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())"
                               onclick="event.stopPropagation()">${task.task_name || 'Unnamed Task'}</span>
                     </div>
                 `;
@@ -3192,19 +3214,19 @@
             const typeSelect = document.getElementById('task-type-id');
             const filterSelect = document.getElementById('type-filter');
             if (!typeSelect || !filterSelect) return;
-            
+
             const currentVal = typeSelect.value;
             const currentFilterVal = filterSelect.value;
-            
+
             typeSelect.innerHTML = '<option value="">No Type</option>';
             filterSelect.innerHTML = '<option value="">All Types</option>';
-            
+
             allTaskTypes.forEach(t => {
                 const opt = `<option value="${t.id}">${t.icon || '🏷️'} ${t.name}</option>`;
                 typeSelect.insertAdjacentHTML('beforeend', opt);
                 filterSelect.insertAdjacentHTML('beforeend', opt);
             });
-            
+
             typeSelect.value = currentVal;
             filterSelect.value = currentFilterVal;
         }
