@@ -2689,27 +2689,25 @@
 
                 taskEl.innerHTML = `
                     <div class="task-header-row">
-                        <div style="display: flex; gap: 4px; align-items: center;">
-                            <input type="time" class="modern-inline-input" value="${timeOnly}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()">
-                            <select class="modern-inline-input" onchange="updateTaskInline(${task.task_id}, 'category_id', this.value)" onclick="event.stopPropagation()" style="max-width: 80px;">
+                        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                            <input type="time" class="modern-inline-input" value="${timeOnly}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()" style="width:70px;">
+                            <select class="modern-inline-input" onchange="updateTaskInline(${task.task_id}, 'category_id', this.value)" onclick="event.stopPropagation()" style="max-width:110px;">
                                 ${catOptions}
                             </select>
+                            ${task.responsible ? `<span style="font-size:0.75em; color:#64748b; background:#e2e8f0; padding:2px 6px; border-radius:10px;">👤 ${task.responsible}</span>` : ''}
                         </div>
-                        <div class="task-actions-modern">
-                            <button class="action-btn-modern" title="Add Subtask" onclick="event.stopPropagation(); createSubtask(${task.task_id}, '${task.day_label || ''}')">➕</button>
-                            <button class="action-btn-modern" title="Edit Task" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
-                            <button class="action-btn-modern del" title="Delete Task" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
+                        <div class="task-actions-modern" onclick="event.stopPropagation()">
+                            <button class="action-btn-modern" title="Add Subtask" onclick="createSubtask(${task.task_id}, '${task.day_label || ''}')">➕</button>
+                            <button class="action-btn-modern" title="Edit Task" onclick="openTaskEditor(${task.task_id})">✏️</button>
+                            <button class="action-btn-modern del" title="Delete Task" onclick="deleteTask(${task.task_id})">🗑️</button>
                         </div>
                     </div>
                     <div class="task-title-row">
-                        <div style="display: flex; align-items: flex-start;">
-                            ${task.is_completed ? '<span style="margin-right:5px; user-select:none;">✅</span>' : ''}
-                            <span class="inline-edit" contenteditable="true" 
-                                  onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }" 
-                                  onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())" 
-                                  onclick="event.stopPropagation()">${task.task_name || 'Unnamed Task'}</span>
-                        </div>
-                        ${task.responsible ? `<div style="font-size:0.75em; color:#64748b; margin-top:4px; font-weight: 500;">👤 ${task.responsible}</div>` : ''}
+                        ${task.is_completed ? '<span style="margin-right:5px; user-select:none;">✅</span>' : ''}
+                        <span class="inline-edit" contenteditable="true" 
+                              onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }" 
+                              onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())" 
+                              onclick="event.stopPropagation()">${task.task_name || 'Unnamed Task'}</span>
                     </div>
                 `;
             }
