@@ -138,11 +138,11 @@ app.get('/setup-db', adminAuth, async (req, res) => {
 
 // 2. TRACKS: GPX Upload & Management
 app.post('/tasks', adminAuth, async (req, res) => {
-  const { task_name, responsible, target_group, task_type_id, starts_at, ends_at, is_completed, comments, parent_id, is_milestone, section_id, category_id } = req.body;
+  const { task_name, responsible, target_group, task_type_id, starts_at, ends_at, is_completed, comments, parent_id, is_milestone, section_id, category_id, characteristics } = req.body;
   try {
     const result = await pool.query(
-      'INSERT INTO tasks (task_name, responsible, target_group, task_type_id, starts_at, ends_at, is_completed, comments, parent_id, is_milestone, section_id, category_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
-      [task_name, responsible, target_group, task_type_id, starts_at, ends_at, is_completed || false, comments, parent_id, is_milestone || false, section_id, category_id]
+      'INSERT INTO tasks (task_name, responsible, target_group, task_type_id, starts_at, ends_at, is_completed, comments, parent_id, is_milestone, section_id, category_id, characteristics) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *',
+      [task_name, responsible, target_group, task_type_id, starts_at, ends_at, is_completed || false, comments, parent_id, is_milestone || false, section_id, category_id, characteristics]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -525,7 +525,7 @@ app.get('/itinerary', async (req, res) => {
   try {
     const query = `
       SELECT t.*, t.id AS task_id, s.section_date,
-             c.color AS category_color, c.icon AS category_icon,
+             c.color AS category_color, c.icon AS category_icon, c.line_type AS category_line_type,
              tt.name AS task_type_name, tt.icon AS task_type_icon,
              COALESCE(
                (
@@ -539,10 +539,19 @@ app.get('/itinerary', async (req, res) => {
                        'kind', sa.kind,
                        'title', COALESCE(w.title, tr.title),
                        'color', COALESCE(w.color, tr.color),
+                       'icon', w.icon,
                        'lat', w.lat, 'lng', w.lng,
                        'geojson', tr.geojson_data,
-                       'distance', tr.distance,
-                       'gain', tr.gain, 'loss', tr.loss
+                       'link', COALESCE(w.link, tr.link),
+                       'comments', COALESCE(w.comments, tr.comments),
+                       'distance', COALESCE(w.distance, tr.distance),
+                       'gain', COALESCE(w.gain, tr.gain),
+                       'loss', COALESCE(w.loss, tr.loss),
+                       'parent_track_id', COALESCE(w.parent_track_id, tr.parent_track_id),
+                       'photo_url', w.photo_url,
+                       'phone', w.phone,
+                       'address', w.address,
+                       'google_maps_url', w.google_maps_url
                      ) AS geom_data
                    FROM task_anchors ta
                    JOIN spatial_anchors sa ON ta.anchor_id = sa.id
@@ -557,7 +566,7 @@ app.get('/itinerary', async (req, res) => {
       LEFT JOIN categories c ON t.category_id = c.id
       LEFT JOIN task_types tt ON t.task_type_id = tt.id
       ${filterClause}
-      GROUP BY t.id, s.section_date, c.color, c.icon, tt.name, tt.icon
+      GROUP BY t.id, s.section_date, c.color, c.icon, c.line_type, tt.name, tt.icon
       ORDER BY s.section_date ASC NULLS FIRST, t.sort_order ASC, t.starts_at ASC;
     `;
     const result = await pool.query(query, params);

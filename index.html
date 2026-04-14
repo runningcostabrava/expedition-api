@@ -809,10 +809,28 @@
     </div>
 
     <div id="left-panel">
-        <div id="panel-header">
-            <div class="search-container">
-                <span>🔍</span>
-                <input type="text" id="search-filter" placeholder="Search tasks..." oninput="renderProjectView()">
+        <div id="panel-header" style="padding: 15px; border-bottom: 1px solid rgba(0,0,0,0.1);">
+            <div class="search-container" style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <input type="text" id="search-filter" placeholder="🔍 Search tasks..." oninput="renderProjectView()" style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid #ddd;">
+            </div>
+            
+            <div style="display: flex; gap: 8px; font-size: 0.8em;">
+                <select id="group-filter" onchange="renderProjectView()" style="flex: 1; padding: 4px; border-radius: 4px; border: 1px solid #ddd;">
+                    <option value="">All Groups</option>
+                    <option value="Staff">Staff</option>
+                    <option value="Hikers">Hikers</option>
+                    <option value="Runners">Runners</option>
+                </select>
+                <select id="type-filter" onchange="renderProjectView()" style="flex: 1; padding: 4px; border-radius: 4px; border: 1px solid #ddd;">
+                    <option value="">All Types</option>
+                </select>
+            </div>
+
+            <div id="column-toggles" style="display: none;">
+                <input type="checkbox" id="col-category" checked>
+                <input type="checkbox" id="col-assignee" checked>
+                <input type="checkbox" id="col-time" checked>
+                <input type="checkbox" id="col-group" checked>
             </div>
         </div>
         <div id="asana-container"></div>
@@ -1055,10 +1073,15 @@
         });
 
         function updateFilters() {
-            mapFilters.point = document.getElementById('filter-points').checked;
-            mapFilters.line = document.getElementById('filter-lines').checked;
-            mapFilters.smart = document.getElementById('filter-smart').checked;
-            mapFilters.polygon = document.getElementById('filter-polygons').checked;
+            const p = document.getElementById('filter-points');
+            const l = document.getElementById('filter-lines');
+            const s = document.getElementById('filter-smart');
+            const poly = document.getElementById('filter-polygons');
+
+            mapFilters.point = p ? p.checked : true;
+            mapFilters.line = l ? l.checked : true;
+            mapFilters.smart = s ? s.checked : true;
+            mapFilters.polygon = poly ? poly.checked : true;
             renderMapGeometries();
         }
 
@@ -1107,30 +1130,6 @@
 
         const groupColors = { 'Hikers': '#2ecc71', 'Runners': '#e67e22', 'Staff': '#9b59b6', 'Transport': '#f1c40f' };
 
-        async function calculateSmartRoute() {
-            if (routePoints.length === 1) {
-                draw.deleteAll();
-                draw.add({ id: 'temp-start-point', type: 'Feature', geometry: { type: 'Point', coordinates: routePoints[0] } });
-            } else if (routePoints.length >= 2 && routePoints.length <= 25) {
-                const profile = document.getElementById('route-profile').value;
-                const coords = routePoints.map(p => `${p[0]},${p[1]}`).join(';');
-                try {
-                    const res = await fetch(`https://api.mapbox.com/directions/v5/mapbox/${profile}/${coords}?geometries=geojson&access_token=${mapboxgl.accessToken}`);
-                    const data = await res.json();
-                    if (data.routes && data.routes.length > 0) {
-                        lastCalculatedRoute = data.routes[0];
-                        draw.deleteAll();
-                        draw.add(lastCalculatedRoute.geometry);
-                    }
-                    // Keep markers for intermediate stops
-                    routePoints.forEach((pt, idx) => {
-                        draw.add({ id: `stop-${idx}`, type: 'Feature', geometry: { type: 'Point', coordinates: pt } });
-                    });
-                } catch (err) {
-                    console.error("Routing error:", err);
-                }
-            }
-        }
 
         async function initializeApp() {
             const configRes = await fetch(`${API_URL}/api/config`);
@@ -1316,12 +1315,12 @@
         let googlePlacesService;
 
         async function quickLinkToActiveTask(anchorId) {
-            if (!activeTaskId) return alert("⚠️ Please click a task in the left sidebar first to make it active!");
+            if (!AppStore.get('activeTaskId')) return alert("⚠️ Please click a task in the left sidebar first to make it active!");
             try {
                 const res = await authFetch(`${API_URL}/link_anchor`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ task_id: activeTaskId, anchor_id: anchorId })
+                    body: JSON.stringify({ task_id: AppStore.get('activeTaskId'), anchor_id: anchorId })
                 });
                 if (!res.ok) throw new Error("Failed to link");
                 alert("✅ Successfully attached to the active task!");
@@ -1714,7 +1713,7 @@
 
                         map.on('click', layerId, (e) => {
                             // CRITICAL: Lock onto the task so waypoints from the chart go into this task
-                            activeTaskId = task.task_id;
+                            AppStore.set('activeTaskId', task.task_id);
                             focusTaskInSidebar(task.task_id);
                             const dist = turf.length(geom.geojson, { units: 'kilometers' }).toFixed(2);
 
@@ -1758,8 +1757,8 @@
             });
         }
 
-        function flyToSection(dayLabel) {
-            const sectionTasks = AppStore.get('itinerary').filter(t => (t.day_label || 'Unscheduled') === dayLabel);
+        function flyToSection(sectionId) {
+            const sectionTasks = AppStore.get('itinerary').filter(t => t.section_id === sectionId || (sectionId === null && !t.section_id));
             const features = [];
             sectionTasks.forEach(task => {
                 if (!task.geometries) return;
@@ -1844,7 +1843,7 @@
             segmentPoints = [];
             activeAnalysisTrack = geom.geojson;
             activeParentTrackId = trackId;
-            activeTaskId = taskId;
+            AppStore.set('activeTaskId', taskId);
             map.getCanvas().style.cursor = 'crosshair';
             alert("Analysis: Click two points on the track to create a subsection.");
         }
@@ -1886,9 +1885,9 @@
             });
 
             // FIND WAYPOINTS: Locate all points belonging to the active task
-            const task = AppStore.get('itinerary').find(t => t.task_id === activeTaskId);
+            const task = AppStore.get('itinerary').find(t => t.task_id === AppStore.get('activeTaskId'));
             const waypointDataset = [];
-            if (task && task.geometries) {
+            if (task && task.geometries && geojson.features[0].geometry.type !== 'Polygon') {
                 const trackFeature = geojson.features[0];
                 task.geometries.forEach(g => {
                     if (g.kind === 'point' && g.lng && g.lat) {
@@ -1997,17 +1996,17 @@
             if (activeContextPopup) activeContextPopup.remove();
 
             let activeTaskSection = '';
-            if (activeTaskId) {
-                const t = AppStore.get('itinerary').find(x => x.task_id === activeTaskId);
+            if (AppStore.get('activeTaskId')) {
+                const t = AppStore.get('itinerary').find(x => x.task_id === AppStore.get('activeTaskId'));
                 if (t && t.section_id) activeTaskSection = t.section_id;
             }
 
-            const sectionOptions = allSections.map(s => {
+            const sectionOptions = (AppStore.get('sections') || []).map(s => {
                 const dateStr = s.section_date ? new Date(s.section_date).toISOString().split('T')[0] : '';
                 return `<option value="${s.id}" ${activeTaskSection == s.id ? 'selected' : ''}>${dateStr} ${s.title || ''}</option>`;
             }).join('');
 
-            const taskWarning = activeTaskId
+            const taskWarning = AppStore.get('activeTaskId')
                 ? `<div style="color:#27ae60; font-size:0.8em; margin-bottom:10px; font-weight:bold;">✅ Attached to active task</div>`
                 : `<div style="background:#fff3cd; color:#856404; padding:8px; border-radius:4px; font-size:0.8em; margin-bottom:10px; border:1px solid #ffeeba;">
                      ⚠️ <strong>No Task Selected!</strong><br>
@@ -2088,7 +2087,7 @@
                             await authFetch(`${API_URL}/waypoints`, {
                                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
                                     title, color, icon, link, section_id: section_id,
-                                    existing_task_id: activeTaskId,
+                                    existing_task_id: AppStore.get('activeTaskId'),
                                     parent_track_id: segmentTrackId,
                                     lat: geometry.coordinates[1],
                                     lng: geometry.coordinates[0],
@@ -2101,7 +2100,7 @@
                             });
                         } else {
                             await authFetch(`${API_URL}/tracks`, {
-                                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, color, link, section_id: section_id, existing_task_id: activeTaskId, parent_track_id: segmentTrackId, geojson_data: { type: 'FeatureCollection', features: [featureToSave] }, comments: finalDesc, distance: props.distance, duration: props.duration })
+                                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, color, link, section_id: section_id, existing_task_id: AppStore.get('activeTaskId'), parent_track_id: segmentTrackId, geojson_data: { type: 'FeatureCollection', features: [featureToSave] }, comments: finalDesc, distance: props.distance, duration: props.duration })
                             });
                         }
                     }
@@ -2124,7 +2123,7 @@
             container.innerHTML = sections.map(s => {
                 const title = s.title || 'Unscheduled';
                 return `
-                <button onclick="flyToSection('${title.replace(/'/g, "\\'")}')" 
+                <button onclick="flyToSection(${s.id || null})"
                         style="padding: 6px 14px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 20px; color: white; font-size: 0.85em; font-weight: 600; cursor: pointer; white-space: nowrap; transition: 0.2s;"
                         onmouseover="this.style.background='rgba(255, 255, 255, 0.2)'"
                         onmouseout="this.style.background='rgba(255, 255, 255, 0.1)'">
@@ -2187,7 +2186,7 @@
             if (!secSelect) return;
             const currentVal = secSelect.value;
             secSelect.innerHTML = '<option value="">Unscheduled</option>';
-            allSections.forEach(sec => {
+            (AppStore.get('sections') || []).forEach(sec => {
                 const opt = document.createElement('option');
                 opt.value = sec.id;
                 const dateStr = sec.section_date ? new Date(sec.section_date).toISOString().split('T')[0] : '';
@@ -2265,12 +2264,14 @@
         }
 
         function resetForm() {
-            activeTaskId = null;
+            AppStore.set('activeTaskId', null);
             activeAnchorId = null;
             activeWaypointId = null;
             activeTrackId = null;
             isEditingGeometry = false;
             document.getElementById('wp-title').value = '';
+            document.getElementById('task-category-id').value = ''; /* CRITICAL FIX */
+            document.getElementById('task-type-id').value = '';     /* CRITICAL FIX */
             document.getElementById('task-section-id').value = '';
             document.getElementById('starts-at').value = '';
             document.getElementById('wp-description').value = '';
@@ -2512,7 +2513,7 @@
                     if (task.starts_at) {
                         datePart = task.starts_at.split('T')[0];
                     } else if (task.section_id) {
-                        const sec = allSections.find(s => s.id === task.section_id);
+                        const sec = (AppStore.get('sections') || []).find(s => s.id === task.section_id);
                         datePart = (sec && sec.section_date) ? new Date(sec.section_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
                     } else {
                         datePart = new Date().toISOString().split('T')[0];
@@ -2576,8 +2577,9 @@
             const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
             if (!task) return;
             resetForm();
-            activeTaskId = taskId;
+            AppStore.set('activeTaskId', taskId);
             document.getElementById('wp-title').value = task.task_name || task.task || '';
+            document.getElementById('task-category-id').value = task.category_id || ''; /* CRITICAL FIX */
             document.getElementById('task-section-id').value = task.section_id || '';
             document.getElementById('task-type-id').value = task.task_type_id || '';
             document.getElementById('starts-at').value = task.starts_at ? task.starts_at.substring(0, 16) : '';
@@ -2848,7 +2850,7 @@
             taskEl.onclick = () => {
                 document.querySelectorAll('.task-row, .fite-row').forEach(row => row.classList.remove('active-task'));
                 taskEl.classList.add('active-task');
-                activeTaskId = task.task_id;
+                AppStore.set('activeTaskId', task.task_id);
                 const acc = document.getElementById(`acc-${task.task_id}`);
                 if (acc) acc.classList.toggle('open');
 
@@ -3040,7 +3042,7 @@
             }
 
             isEditingGeometry = true;
-            activeTaskId = taskId;
+            AppStore.set('activeTaskId', taskId);
 
             draw.deleteAll();
             let centerPoint;
@@ -3094,7 +3096,7 @@
                           ${sectionDesc}
                     </span>
                     <div style="display:flex; gap:2px; margin-left:auto; flex-shrink: 0;" onclick="event.stopPropagation()">
-                        <button class="edit-btn" title="Center Map" onclick="flyToSection('${sectionTitle}')">🎯</button>
+                        <button class="edit-btn" title="Center Map" onclick="event.stopPropagation(); flyToSection(${section.id || null})">🎯</button>
                         ${section.id ? `<button class="delete-btn" title="Delete Section" onclick="deleteSection('${sectionTitle}')">🗑️</button>` : ''}
                     </div>
                 </div>
