@@ -901,7 +901,7 @@
         <div id="loading-overlay"
             style="position:absolute; inset:0; background:rgba(255,255,255,0.8); z-index:9999; display:flex; justify-content:center; align-items:center; font-size:20px; font-weight:bold; color:#333;">
             Waking up server (This takes ~50 seconds)...</div>
-        <div style="position:absolute; top:90px; left:5%; z-index:100; width:350px;">
+        <div style="position:absolute; top:90px; left:15px; z-index:100; width:350px;">
             <input type="text" id="internal-map-search" placeholder="🔍 Search existing locations/tracks on map..."
                 style="width:100%; padding:10px 15px; border-radius:8px; border:1px solid #ccc; box-shadow:0 2px 10px rgba(0,0,0,0.2); outline:none; font-family:sans-serif;">
             <div id="internal-search-results"
@@ -1129,7 +1129,42 @@
         let isEditingGeometry = false, isRouting = false, isAnalyzingSegment = false;
         let routePoints = [], segmentPoints = [], activeAnalysisTrack = null;
         let lastCalculatedRoute = null; // Stores multi-stop route until Enter is pressed
-        let ADMIN_KEY = null, elevationChart = null;
+        let AUTH_TOKEN = sessionStorage.getItem('expedition_token');
+
+        /**
+         * A wrapper for fetch that automatically adds the JWT token.
+         * If no token exists, it prompts for the password and logs in first.
+         */
+        async function authFetch(url, options = {}) {
+            if (!AUTH_TOKEN) {
+                const pass = prompt("Enter Admin Password:");
+                if (!pass) return;
+
+                const res = await fetch(`${API_URL}/api/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: pass })
+                });
+
+                const data = await res.json();
+                if (data.token) {
+                    AUTH_TOKEN = data.token;
+                    sessionStorage.setItem('expedition_token', AUTH_TOKEN);
+                } else {
+                    alert("Unauthorized: Incorrect Password");
+                    return;
+                }
+            }
+
+            // Inject the token into the headers
+            options.headers = {
+                ...options.headers,
+                'Authorization': `Bearer ${AUTH_TOKEN}`
+            };
+            return fetch(url, options);
+        }
+
+        let elevationChart = null;
         let directionsControl = null; // Holds the Mapbox Directions UI
         let currentSmartProfile = 'driving'; // Safely tracks the active routing mode
 
@@ -1166,7 +1201,6 @@
 
             document.getElementById('loading-overlay').style.display = 'none';
             mapboxgl.accessToken = config.MAPBOX_TOKEN;
-            ADMIN_KEY = config.ADMIN_KEY;
 
             // --- DYNAMICALLY LOAD GOOGLE PLACES SCRIPT ---
             const script = document.createElement('script');
@@ -1347,9 +1381,9 @@
         async function quickLinkToActiveTask(anchorId) {
             if (!activeTaskId) return alert("⚠️ Please click a task in the left sidebar first to make it active!");
             try {
-                const res = await fetch(`${API_URL}/link_anchor`, {
+                const res = await authFetch(`${API_URL}/link_anchor`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ task_id: activeTaskId, anchor_id: anchorId })
                 });
                 if (!res.ok) throw new Error("Failed to link");
@@ -2100,24 +2134,22 @@
                 const props = featureToSave.properties || {};
 
                 try {
-                    const headers = { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY };
-
                     if (editConfig) {
                         // UPDATE Existing Shape (PUT)
                         if (editConfig.kind === 'point') {
-                            await fetch(`${API_URL}/waypoints/${editConfig.id}`, {
-                                method: 'PUT', headers, body: JSON.stringify({ title, color, icon, link, section_id: section_id, lat: geometry.coordinates[1], lng: geometry.coordinates[0], description: finalDesc })
+                            await authFetch(`${API_URL}/waypoints/${editConfig.id}`, {
+                                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, color, icon, link, section_id: section_id, lat: geometry.coordinates[1], lng: geometry.coordinates[0], description: finalDesc })
                             });
                         } else {
-                            await fetch(`${API_URL}/tracks/${editConfig.id}`, {
-                                method: 'PUT', headers, body: JSON.stringify({ title, color, link, section_id: section_id, geojson_data: { type: 'FeatureCollection', features: [featureToSave] }, comments: finalDesc, distance: props.distance, duration: props.duration })
+                            await authFetch(`${API_URL}/tracks/${editConfig.id}`, {
+                                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, color, link, section_id: section_id, geojson_data: { type: 'FeatureCollection', features: [featureToSave] }, comments: finalDesc, distance: props.distance, duration: props.duration })
                             });
                         }
                     } else {
                         // CREATE New Shape (POST)
                         if (geometry.type === 'Point') {
-                            await fetch(`${API_URL}/waypoints`, {
-                                method: 'POST', headers, body: JSON.stringify({
+                            await authFetch(`${API_URL}/waypoints`, {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
                                     title, color, icon, link, section_id: section_id,
                                     existing_task_id: activeTaskId,
                                     parent_track_id: segmentTrackId,
@@ -2131,8 +2163,8 @@
                                 })
                             });
                         } else {
-                            await fetch(`${API_URL}/tracks`, {
-                                method: 'POST', headers, body: JSON.stringify({ title, color, link, section_id: section_id, existing_task_id: activeTaskId, parent_track_id: segmentTrackId, geojson_data: { type: 'FeatureCollection', features: [featureToSave] }, comments: finalDesc, distance: props.distance, duration: props.duration })
+                            await authFetch(`${API_URL}/tracks`, {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, color, link, section_id: section_id, existing_task_id: activeTaskId, parent_track_id: segmentTrackId, geojson_data: { type: 'FeatureCollection', features: [featureToSave] }, comments: finalDesc, distance: props.distance, duration: props.duration })
                             });
                         }
                     }
@@ -2267,7 +2299,7 @@
 
         async function deleteCategory(id) {
             if (!confirm("Delete category? Tasks will remain but lose their styling.")) return;
-            await fetch(`${API_URL}/categories/${id}`, { method: 'DELETE', headers: { 'x-api-key': ADMIN_KEY } });
+            await authFetch(`${API_URL}/categories/${id}`, { method: 'DELETE' });
             refreshData();
         }
 
@@ -2282,9 +2314,9 @@
             const method = activeCategoryIdForEdit ? 'PUT' : 'POST';
             const url = activeCategoryIdForEdit ? `${API_URL}/categories/${activeCategoryIdForEdit}` : `${API_URL}/categories`;
 
-            await fetch(url, {
+            await authFetch(url, {
                 method: method,
-                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, color, icon, line_type })
             });
 
@@ -2342,9 +2374,8 @@
                 return;
             }
             if (!confirm("Delete this task?")) return;
-            await fetch(`${API_URL}/tasks/${id}`, {
-                method: 'DELETE',
-                headers: { 'x-api-key': ADMIN_KEY }
+            await authFetch(`${API_URL}/tasks/${id}`, {
+                method: 'DELETE'
             });
             refreshData();
         }
@@ -2352,9 +2383,8 @@
         async function deleteGeometry(type, id) {
             if (!confirm(`Delete this ${type}?`)) return;
             const endpoint = type === 'point' ? `waypoints/${id}` : `tracks/${id}`;
-            await fetch(`${API_URL}/${endpoint}`, {
-                method: 'DELETE',
-                headers: { 'x-api-key': ADMIN_KEY }
+            await authFetch(`${API_URL}/${endpoint}`, {
+                method: 'DELETE'
             });
             refreshData();
         }
@@ -2412,9 +2442,7 @@
 
         async function syncDbSchema() {
             try {
-                const res = await fetch(`${API_URL}/setup-db`, {
-                    headers: { 'x-api-key': ADMIN_KEY }
-                });
+                const res = await authFetch(`${API_URL}/setup-db`);
                 const msg = await res.text();
                 alert(msg);
                 refreshData();
@@ -2457,7 +2485,6 @@
 
             const geomColor = document.getElementById('geom-color').value;
             const features = draw.getAll().features;
-            const headers = { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY };
 
             try {
                 // 1. ALWAYS Save/Update the Task FIRST
@@ -2465,14 +2492,14 @@
 
                 if (!existingTaskId) {
                     // Create a new task
-                    const taskRes = await fetch(`${API_URL}/tasks`, { method: 'POST', headers, body: JSON.stringify(taskData) });
+                    const taskRes = await authFetch(`${API_URL}/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(taskData) });
                     if (taskRes.ok) {
                         const newTask = await taskRes.json();
                         finalTaskId = newTask.id;
                     }
                 } else {
                     // Strictly update existing task to prevent data loss
-                    await fetch(`${API_URL}/tasks/${existingTaskId}`, { method: 'PUT', headers, body: JSON.stringify(taskData) });
+                    await authFetch(`${API_URL}/tasks/${existingTaskId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(taskData) });
                 }
 
                 // 2. Save/Update Geometry SECOND (if drawn)
@@ -2481,23 +2508,23 @@
                     if (isEditingGeometry) {
                         // Update existing shape and ensure it links to the task
                         if (activeWaypointId) {
-                            await fetch(`${API_URL}/waypoints/${activeWaypointId}`, {
-                                method: 'PUT', headers, body: JSON.stringify({ title: taskData.task_name, color: geomColor, existing_task_id: finalTaskId, lat: feat.geometry.coordinates[1], lng: feat.geometry.coordinates[0] })
+                            await authFetch(`${API_URL}/waypoints/${activeWaypointId}`, {
+                                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: taskData.task_name, color: geomColor, existing_task_id: finalTaskId, lat: feat.geometry.coordinates[1], lng: feat.geometry.coordinates[0] })
                             });
                         } else if (activeTrackId) {
-                            await fetch(`${API_URL}/tracks/${activeTrackId}`, {
-                                method: 'PUT', headers, body: JSON.stringify({ title: taskData.task_name, color: geomColor, existing_task_id: finalTaskId, geojson_data: { type: 'FeatureCollection', features } })
+                            await authFetch(`${API_URL}/tracks/${activeTrackId}`, {
+                                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: taskData.task_name, color: geomColor, existing_task_id: finalTaskId, geojson_data: { type: 'FeatureCollection', features } })
                             });
                         }
                     } else {
                         // Create new shape and link it
                         if (feat.geometry.type === 'Point') {
-                            await fetch(`${API_URL}/waypoints`, {
-                                method: 'POST', headers, body: JSON.stringify({ title: taskData.task_name, color: geomColor, existing_task_id: finalTaskId, lat: feat.geometry.coordinates[1], lng: feat.geometry.coordinates[0] })
+                            await authFetch(`${API_URL}/waypoints`, {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: taskData.task_name, color: geomColor, existing_task_id: finalTaskId, lat: feat.geometry.coordinates[1], lng: feat.geometry.coordinates[0] })
                             });
                         } else {
-                            await fetch(`${API_URL}/tracks`, {
-                                method: 'POST', headers, body: JSON.stringify({ title: taskData.task_name, color: geomColor, existing_task_id: finalTaskId, geojson_data: { type: 'FeatureCollection', features } })
+                            await authFetch(`${API_URL}/tracks`, {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: taskData.task_name, color: geomColor, existing_task_id: finalTaskId, geojson_data: { type: 'FeatureCollection', features } })
                             });
                         }
                     }
@@ -2514,9 +2541,9 @@
         // UI Helpers
         async function updateGeomMeta(kind, id, field, value) {
             const route = kind === 'point' ? 'waypoints' : 'tracks';
-            await fetch(`${API_URL}/${route}/${id}`, {
+            await authFetch(`${API_URL}/${route}/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ [field]: value })
             });
             refreshData();
@@ -2567,9 +2594,9 @@
             }
 
             try {
-                const res = await fetch(`${API_URL}/tasks/${taskId}`, {
+                const res = await authFetch(`${API_URL}/tasks/${taskId}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
                 if (!res.ok) throw new Error("Server Error");
@@ -2580,9 +2607,9 @@
         async function updateGeomMeta(type, id, field, value) {
             const endpoint = type === 'point' ? `waypoints/${id}` : `tracks/${id}`;
             try {
-                await fetch(`${API_URL}/${endpoint}`, {
+                await authFetch(`${API_URL}/${endpoint}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ [field]: value })
                 });
                 refreshData();
@@ -2591,22 +2618,22 @@
 
         async function updateSection(oldDay, newDay) {
             if (oldDay === newDay) return;
-            await fetch(`${API_URL}/tasks/section/${encodeURIComponent(oldDay)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY }, body: JSON.stringify({ new_label: newDay }) });
+            await authFetch(`${API_URL}/tasks/section/${encodeURIComponent(oldDay)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ new_label: newDay }) });
             refreshData();
         }
 
         async function deleteSection(day) {
             if (!confirm(`Delete all tasks in ${day}?`)) return;
-            await fetch(`${API_URL}/tasks/section/${encodeURIComponent(day)}`, { method: 'DELETE', headers: { 'x-api-key': ADMIN_KEY } });
+            await authFetch(`${API_URL}/tasks/section/${encodeURIComponent(day)}`, { method: 'DELETE' });
             refreshData();
         }
 
         async function updateSectionMetadata(sectionId, field, value) {
             if (!sectionId) return; // Ignore for "Unscheduled" section
             try {
-                await fetch(`${API_URL}/sections/${sectionId}`, {
+                await authFetch(`${API_URL}/sections/${sectionId}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ [field]: value })
                 });
                 refreshData(); // Refresh to ensure all labels stay in sync
@@ -2781,9 +2808,9 @@
 
                         if (needsUpdate) {
                             try {
-                                await fetch(`${API_URL}/tasks/${taskId}`, {
+                                await authFetch(`${API_URL}/tasks/${taskId}`, {
                                     method: 'PUT',
-                                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                                    headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify(payload)
                                 });
                             } catch (e) {
@@ -2802,9 +2829,9 @@
 
                         if (newOrderPayload.length > 0) {
                             try {
-                                await fetch(`${API_URL}/tasks/reorder`, {
+                                await authFetch(`${API_URL}/tasks/reorder`, {
                                     method: 'PATCH',
-                                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                                    headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ tasks: newOrderPayload })
                                 });
                             } catch (e) {
@@ -3019,9 +3046,9 @@
 
             const name = prompt("Enter subtask name:");
             if (!name) return;
-            await fetch(`${API_URL}/tasks`, {
+            await authFetch(`${API_URL}/tasks`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ task_name: name, day_label: dayLabel, parent_id: parentId })
             });
             refreshData();
@@ -3047,9 +3074,9 @@
                 };
 
                 console.log("DEBUG: Inline Task Payload ->", payload); // <-- Debugging
-                const res = await fetch(`${API_URL}/tasks`, {
+                const res = await authFetch(`${API_URL}/tasks`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
                 if (!res.ok) throw new Error(await res.text()); // <-- Strict error throwing
@@ -3259,7 +3286,7 @@
 
         async function deleteTaskType(id) {
             if (!confirm("Delete this task type?")) return;
-            await fetch(`${API_URL}/task_types/${id}`, { method: 'DELETE', headers: { 'x-api-key': ADMIN_KEY } });
+            await authFetch(`${API_URL}/task_types/${id}`, { method: 'DELETE' });
             refreshData();
         }
 
@@ -3272,9 +3299,9 @@
             const method = activeTypeIdForEdit ? 'PUT' : 'POST';
             const url = activeTypeIdForEdit ? `${API_URL}/task_types/${activeTypeIdForEdit}` : `${API_URL}/task_types`;
 
-            await fetch(url, {
+            await authFetch(url, {
                 method: method,
-                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, color, icon })
             });
 

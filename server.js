@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const jwt = require('jsonwebtoken'); // 1. Import JWT
 const { Pool } = require('pg');
 const bodyParser = require('body-parser');
 
@@ -7,12 +8,31 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
 
+const JWT_SECRET = process.env.JWT_SECRET || 'emergency_fallback_secret'; // 2. Set secret
+
+// REPLACED: adminAuth now verifies tokens, not a static key
 const adminAuth = (req, res, next) => {
-  if (req.headers['x-api-key'] !== process.env.ADMIN_KEY) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  next();
+  const token = req.headers['authorization']?.split(' ')[1]; // Expecting "Bearer <token>"
+  
+  if (!token) return res.status(401).json({ error: 'No token provided' });
+
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    if (err) return res.status(403).json({ error: 'Invalid or expired token' });
+    req.user = decoded; // Token is valid
+    next();
+  });
 };
+
+// NEW: Add a Login endpoint
+app.post('/api/login', (req, res) => {
+  const { password } = req.body;
+  // We use your existing ADMIN_KEY from environment variables as the "password"
+  if (password === process.env.ADMIN_KEY) {
+    const token = jwt.sign({ admin: true }, JWT_SECRET, { expiresIn: '24h' });
+    return res.json({ token });
+  }
+  res.status(401).json({ error: 'Invalid credentials' });
+});
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -554,11 +574,12 @@ app.post('/link_anchor', adminAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// UPDATED: Remove ADMIN_KEY from the public config broadcast
 app.get('/api/config', (req, res) => {
   res.json({
     MAPBOX_TOKEN: process.env.MAPBOX_TOKEN,
-    ADMIN_KEY: process.env.ADMIN_KEY,
     GOOGLE_PLACES_API_KEY: process.env.GOOGLE_PLACES_API_KEY
+    // ADMIN_KEY IS GONE from here!
   });
 });
 
