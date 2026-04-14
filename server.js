@@ -73,6 +73,10 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS loss NUMERIC",
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS parent_track_id INTEGER",
       "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS parent_track_id INTEGER",
+      "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS photo_url TEXT",
+      "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS phone TEXT",
+      "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS address TEXT",
+      "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS google_maps_url TEXT",
       "ALTER TABLE categories ADD COLUMN IF NOT EXISTS line_type TEXT DEFAULT 'solid'",
       "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_milestone BOOLEAN DEFAULT false",
       "ALTER TABLE categories ADD COLUMN IF NOT EXISTS marker_size INTEGER DEFAULT 28",
@@ -228,11 +232,12 @@ app.get('/waypoints', async (req, res) => {
 });
 
 app.post('/waypoints', adminAuth, async (req, res) => {
-  console.log("DEBUG POST /waypoints payload:", req.body);
-  const { title, lat, lng, description, category, tasks, existing_task_id, color, icon, parent_track_id } = req.body;
+  const { title, lat, lng, description, category, tasks, existing_task_id, color, icon, parent_track_id, photo_url, phone, address, google_maps_url } = req.body;
   try {
-    const wp = await pool.query('INSERT INTO waypoints (title, lat, lng, description, category, color, icon, parent_track_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
-      [title, lat, lng, description, category, color || '#e74c3c', icon || 'marker', parent_track_id]);
+    const wp = await pool.query(
+      'INSERT INTO waypoints (title, lat, lng, description, category, color, icon, parent_track_id, photo_url, phone, address, google_maps_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id',
+      [title, lat, lng, description, category, color || '#e74c3c', icon || 'marker', parent_track_id, photo_url, phone, address, google_maps_url]
+    );
     const wpId = wp.rows[0].id;
 
     const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, waypoint_id) VALUES ($1, $2) RETURNING id', ['point', wpId]);
@@ -257,11 +262,11 @@ app.post('/waypoints', adminAuth, async (req, res) => {
 
 app.put('/waypoints/:id', adminAuth, async (req, res) => {
   const { id } = req.params;
-  const { title, lat, lng, description, category, tasks, color, icon, existing_task_id, link, comments, distance, gain, loss, parent_track_id } = req.body;
+  const { title, lat, lng, description, category, tasks, color, icon, existing_task_id, link, comments, distance, gain, loss, parent_track_id, photo_url, phone, address, google_maps_url } = req.body;
   try {
     await pool.query(
-      'UPDATE waypoints SET title = COALESCE($1, title), lat = COALESCE($2, lat), lng = COALESCE($3, lng), description = COALESCE($4, description), category = COALESCE($5, category), color = COALESCE($6, color), icon = COALESCE($7, icon), link = COALESCE($9, link), comments = COALESCE($10, comments), distance = COALESCE($11, distance), gain = COALESCE($12, gain), loss = COALESCE($13, loss), parent_track_id = COALESCE($14, parent_track_id) WHERE id = $8',
-      [title, lat, lng, description, category, color, icon, id, link, comments, distance, gain, loss, parent_track_id]
+      'UPDATE waypoints SET title = COALESCE($1, title), lat = COALESCE($2, lat), lng = COALESCE($3, lng), description = COALESCE($4, description), category = COALESCE($5, category), color = COALESCE($6, color), icon = COALESCE($7, icon), link = COALESCE($9, link), comments = COALESCE($10, comments), distance = COALESCE($11, distance), gain = COALESCE($12, gain), loss = COALESCE($13, loss), parent_track_id = COALESCE($14, parent_track_id), photo_url = COALESCE($15, photo_url), phone = COALESCE($16, phone), address = COALESCE($17, address), google_maps_url = COALESCE($18, google_maps_url) WHERE id = $8',
+      [title, lat, lng, description, category, color, icon, id, link, comments, distance, gain, loss, parent_track_id, photo_url, phone, address, google_maps_url]
     );
 
     let anchorId;
@@ -457,7 +462,11 @@ app.get('/itinerary', async (req, res) => {
                    'duration', tr.duration,
                    'gain', tr.gain,
                    'loss', tr.loss,
-                   'parent_track_id', COALESCE(w.parent_track_id, tr.parent_track_id)
+                   'parent_track_id', COALESCE(w.parent_track_id, tr.parent_track_id),
+                   'photo_url', w.photo_url,
+                   'phone', w.phone,
+                   'address', w.address,
+                   'google_maps_url', w.google_maps_url
                  )
                ) FILTER (WHERE ta.anchor_id IS NOT NULL), '[]'
              ) as geometries

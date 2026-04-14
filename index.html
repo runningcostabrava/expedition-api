@@ -1309,7 +1309,7 @@
                             east: bounds.getEast(),
                             west: bounds.getWest()
                         },
-                        fields: ['id', 'displayName', 'location', 'photos', 'rating', 'userRatingCount', 'formattedAddress', 'websiteURI'],
+                        fields: ['id', 'displayName', 'location', 'photos', 'rating', 'userRatingCount', 'formattedAddress', 'websiteURI', 'googleMapsURI', 'nationalPhoneNumber'],
                         maxResultCount: 10
                     };
 
@@ -1414,7 +1414,9 @@
                     e.stopPropagation();
                     draw.deleteAll();
                     draw.add({ type: 'Feature', geometry: { type: 'Point', coordinates: coords }, properties: { photo: photoUrl } });
-                    showGeometryContextPopup(coords, { type: 'Point', coordinates: coords }, place.displayName, `⭐ ${place.rating || 'N/A'} | ${place.formattedAddress || ''}`, null, '🍽️', '#e74c3c', place.websiteURI || '');
+                    
+                    const googleData = { photoUrl: photoUrl, phone: place.nationalPhoneNumber || '', address: place.formattedAddress || '', googleMapsUri: place.googleMapsURI || '' };
+                    showGeometryContextPopup(coords, { type: 'Point', coordinates: coords }, place.displayName, `⭐ ${place.rating || 'N/A'} | ${place.formattedAddress || ''}`, null, '🍽️', '#e74c3c', place.websiteURI || '', googleData);
                 };
 
                 // Button 2: View Full Profile (Fetches reviews/hours dynamically)
@@ -1444,8 +1446,15 @@
                 const container = document.getElementById('asana-container');
                 const photoUrl = place.photos && place.photos.length > 0 ? place.photos[0].getURI({maxWidth: 600}) : 'https://via.placeholder.com/600x300?text=No+Photo';
                 const title = place.displayName || 'Unknown Place';
-                // NEW API FIX: isOpen() is called directly on the 'place' object
-                const isOpen = place.regularOpeningHours ? (place.isOpen() ? '<span style="color:#27ae60; font-weight:bold;">🟢 Open Now</span>' : '<span style="color:#e74c3c; font-weight:bold;">🔴 Closed</span>') : '';
+                    // NEW API FIX: isOpen() is called directly on the 'place' object
+                    const isOpen = place.regularOpeningHours ? (place.isOpen() ? '<span style="color:#27ae60; font-weight:bold;">🟢 Open Now</span>' : '<span style="color:#e74c3c; font-weight:bold;">🔴 Closed</span>') : '';
+
+                    const googleData = {
+                        photoUrl: photoUrl,
+                        phone: place.nationalPhoneNumber || '',
+                        address: place.formattedAddress || '',
+                        googleMapsUri: place.googleMapsURI || ''
+                    };
 
                 let reviewsHtml = '';
                 if (place.reviews && place.reviews.length > 0) {
@@ -1484,7 +1493,7 @@
                 draw.add({ type: 'Feature', geometry: { type: 'Point', coordinates: coords }, properties: { photo: photoUrl } });
 
                 document.getElementById('embed-save-btn').onclick = () => {
-                    showGeometryContextPopup(coords, { type: 'Point', coordinates: coords }, title, `⭐ ${place.rating || 'N/A'} | ${place.formattedAddress || ''}`, null, '🍽️', '#e74c3c', place.websiteURI || '');
+                    showGeometryContextPopup(coords, { type: 'Point', coordinates: coords }, title, `⭐ ${place.rating || 'N/A'} | ${place.formattedAddress || ''}`, null, '🍽️', '#e74c3c', place.websiteURI || '', googleData);
                 };
             }
 
@@ -1545,16 +1554,26 @@
                         // focusAfterOpen: false prevents the ARIA warning
                         const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
                             .setLngLat([geom.lng, geom.lat])
-                            .setPopup(new mapboxgl.Popup({ offset: 25, focusAfterOpen: false, className: 'custom-popup' }).setHTML(`
-                                <div style="padding-right: 5px;">
-                                    <h4 style="margin-top:0; font-size:1.1em; color:#2c3e50;">${renderIcon} ${geom.title}</h4>
-                                    <p style="margin: 0; font-size: 0.9em; color: #7f8c8d;">Task: ${task.task_name || 'Unnamed Task'}</p>
-                                    <div style="margin-top: 12px; display: flex; gap: 8px;">
-                                        <button class="popup-btn edit" onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})">Edit</button>
-                                        <button class="popup-btn delete" onclick="deleteGeometry('point', ${geom.waypoint_id || geom.anchor_id})">Delete</button>
-                                    </div>
+                        .setPopup(new mapboxgl.Popup({ offset: 25, focusAfterOpen: false, className: 'custom-popup', maxWidth: '280px' }).setHTML(`
+                            <div style="padding: 5px;">
+                                ${geom.photo_url ? `<img src="${geom.photo_url}" style="width:100%; height:120px; object-fit:cover; border-radius:6px; margin-bottom:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1);">` : ''}
+                                <h4 style="margin-top:0; font-size:1.1em; color:#2c3e50; margin-bottom:5px;">${renderIcon} ${geom.title}</h4>
+                                <p style="margin: 0 0 8px 0; font-size: 0.85em; color: #7f8c8d;">Task: ${task.task_name || 'Unnamed Task'}</p>
+                                
+                                ${geom.address ? `<div style="font-size:0.8em; margin-bottom:4px; color:#34495e;">📍 ${geom.address}</div>` : ''}
+                                ${geom.phone ? `<div style="font-size:0.8em; margin-bottom:10px; color:#34495e;">📞 ${geom.phone}</div>` : ''}
+                                
+                                <div style="display:flex; gap:8px; font-size:0.85em; margin-bottom:12px; border-bottom:1px solid #eee; padding-bottom:10px;">
+                                    ${geom.link ? `<a href="${geom.link.startsWith('http') ? geom.link : 'https://' + geom.link}" target="_blank" style="color:#3498db; text-decoration:none; font-weight:bold;">🌐 Website</a>` : ''}
+                                    ${geom.google_maps_url ? `<a href="${geom.google_maps_url}" target="_blank" style="color:#27ae60; text-decoration:none; font-weight:bold;">🗺️ Maps</a>` : ''}
                                 </div>
-                            `))
+
+                                <div style="display: flex; gap: 8px;">
+                                    <button class="popup-btn edit" onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="flex:1;">Edit</button>
+                                    <button class="popup-btn delete" onclick="deleteGeometry('point', ${geom.waypoint_id || geom.anchor_id})" style="flex:1;">Delete</button>
+                                </div>
+                            </div>
+                        `))
                             .addTo(map);
                         activeMarkers.push(marker);
                     } else if (geom.geojson) {
@@ -1859,10 +1878,15 @@
 
         let activeContextPopup = null;
 
-        function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, editConfig = null, existingIcon = '📍', existingColor = '#3498db', existingLink = '') {
+        function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, editConfig = null, existingIcon = '📍', existingColor = '#3498db', existingLink = '', googleData = null) {
             if (activeContextPopup) activeContextPopup.remove();
 
-            const taskWarning = activeTaskId ? `<div style="color:#27ae60; font-size:0.8em; margin-bottom:10px;">✅ Attaching to highlighted task</div>` : `<div style="color:#e74c3c; font-size:0.8em; margin-bottom:10px;">⚠️ No Task Selected (Will save unassigned)</div>`;
+            const taskWarning = activeTaskId 
+                ? `<div style="color:#27ae60; font-size:0.8em; margin-bottom:10px; font-weight:bold;">✅ Attached to active task</div>` 
+                : `<div style="background:#fff3cd; color:#856404; padding:8px; border-radius:4px; font-size:0.8em; margin-bottom:10px; border:1px solid #ffeeba;">
+                     ⚠️ <strong>No Task Selected!</strong><br>
+                     <button onclick="activeContextPopup.remove(); document.getElementById('left-panel').classList.remove('hidden');" style="margin-top:8px; padding:6px 10px; background:#e67e22; color:white; border:none; border-radius:4px; cursor:pointer; width:100%; font-weight:bold;">← Go to Sidebar & Select Task</button>
+                   </div>`;
 
             const popupContent = document.createElement('div');
             popupContent.style.padding = '5px';
@@ -1933,7 +1957,18 @@
                         // CREATE New Shape (POST)
                         if (geometry.type === 'Point') {
                             await fetch(`${API_URL}/waypoints`, {
-                                method: 'POST', headers, body: JSON.stringify({ title, color, icon, link, existing_task_id: activeTaskId, parent_track_id: segmentTrackId, lat: geometry.coordinates[1], lng: geometry.coordinates[0], description: finalDesc })
+                                method: 'POST', headers, body: JSON.stringify({ 
+                                    title, color, icon, link, 
+                                    existing_task_id: activeTaskId, 
+                                    parent_track_id: segmentTrackId, 
+                                    lat: geometry.coordinates[1], 
+                                    lng: geometry.coordinates[0], 
+                                    description: finalDesc,
+                                    photo_url: googleData ? googleData.photoUrl : null,
+                                    phone: googleData ? googleData.phone : null,
+                                    address: googleData ? googleData.address : null,
+                                    google_maps_url: googleData ? googleData.googleMapsUri : null
+                                })
                             });
                         } else {
                             await fetch(`${API_URL}/tracks`, {
