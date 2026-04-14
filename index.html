@@ -9,7 +9,7 @@
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.0/mapbox-gl-draw.css"
         type="text/css">
-    src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
+    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
     <link rel="stylesheet"
         href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css"
         type="text/css">
@@ -1107,15 +1107,11 @@
 
             // --- DYNAMICALLY LOAD GOOGLE PLACES SCRIPT ---
             const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${config.GOOGLE_PLACES_API_KEY}&libraries=places`;
+            // ADDED &loading=async and &callback=initGoogleSearch
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${config.GOOGLE_PLACES_API_KEY}&libraries=places&loading=async&callback=initGoogleSearch`;
             script.async = true;
             script.defer = true;
             document.head.appendChild(script);
-
-            script.onload = () => {
-                // Initialize your Google Search logic once the script is ready
-                initGoogleSearch();
-            };
 
             map = new mapboxgl.Map({
                 container: 'map',
@@ -1285,66 +1281,63 @@
 
         let googlePlacesService;
 
-        function initGoogleSearch() {
-            const searchInput = document.createElement('input');
-            searchInput.id = 'google-search-input';
-            searchInput.placeholder = '🔍 Search Google Places...';
-            searchInput.style = 'position:absolute; top:15px; right:60px; z-index:100; width:300px; padding:10px; border-radius:8px; border:1px solid #ccc; box-shadow:0 2px 10px rgba(0,0,0,0.2); outline:none;';
-            document.getElementById('map-wrapper').appendChild(searchInput);
+        // Attach to window so the callback from the script tag can find it
+        window.initGoogleSearch = async () => {
+            // Import the NEW 2025 Places API library
+            const { PlaceAutocompleteElement } = await google.maps.importLibrary("places");
 
-            // Initialize the Places Service to get rich details later
-            googlePlacesService = new google.maps.places.PlacesService(map.getCanvas());
+            // Create the new Web Component search box
+            const autocomplete = new PlaceAutocompleteElement();
+            autocomplete.id = 'google-search-input';
+            autocomplete.style = 'position:absolute; top:15px; right:60px; z-index:100; width:300px; background:white; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.2);';
+            document.getElementById('map-wrapper').appendChild(autocomplete);
 
-            const autocomplete = new google.maps.places.Autocomplete(searchInput, {
-                // We only ask for the ID and basics first to save money
-                fields: ["place_id", "geometry", "name", "formatted_address"],
-                types: ["establishment", "geocode"]
-            });
-
+            // Bias to current map view
             map.on('moveend', () => {
                 const bounds = map.getBounds();
-                autocomplete.setBounds(new google.maps.LatLngBounds(
-                    { lat: bounds.getSouth(), lng: bounds.getWest() },
-                    { lat: bounds.getNorth(), lng: bounds.getEast() }
-                ));
+                autocomplete.locationBias = {
+                    north: bounds.getNorth(),
+                    south: bounds.getSouth(),
+                    east: bounds.getEast(),
+                    west: bounds.getWest()
+                };
             });
 
-            autocomplete.addListener("place_changed", () => {
-                const basicPlace = autocomplete.getPlace();
-                if (!basicPlace.geometry) return;
+            // Listen for place selection using the new 'gmp-placeselect' event
+            autocomplete.addEventListener("gmp-placeselect", async (e) => {
+                const place = e.place;
+                if (!place) return;
 
-                // Fly to location
-                const coords = [basicPlace.geometry.location.lng(), basicPlace.geometry.location.lat()];
+                // Fetch all the rich data we need using the New API
+                await place.fetchFields({
+                    fields: ['displayName', 'formattedAddress', 'location', 'photos', 'reviews', 'rating', 'userRatingCount', 'regularOpeningHours', 'nationalPhoneNumber', 'websiteURI']
+                });
+
+                const coords = [place.location.lng(), place.location.lat()];
                 map.flyTo({ center: coords, zoom: 17 });
 
-                // Now, fetch the HEAVY details (Reviews, Hours, Photos)
-                const request = {
-                    placeId: basicPlace.place_id,
-                    fields: ['name', 'rating', 'user_ratings_total', 'formatted_phone_number', 'opening_hours', 'website', 'photos', 'reviews']
-                };
-
-                googlePlacesService.getDetails(request, (fullPlace, status) => {
-                    if (status === google.maps.places.PlacesServiceStatus.OK) {
-                        renderRichPlaceProfile(basicPlace, fullPlace, coords);
-                    }
-                });
+                // Pass the single new 'place' object to our renderer
+                renderRichPlaceProfile(place, coords);
             });
-        }
+        };
 
-        function renderRichPlaceProfile(basicPlace, fullPlace, coords) {
+        function renderRichPlaceProfile(place, coords) {
             const container = document.getElementById('asana-container');
-            const photoUrl = fullPlace.photos ? fullPlace.photos[0].getUrl({maxWidth: 600}) : 'https://via.placeholder.com/600x300?text=No+Photo';
             
-            // Check if open now
-            const isOpen = fullPlace.opening_hours ? (fullPlace.opening_hours.isOpen() ? '<span style="color:#27ae60; font-weight:bold;">🟢 Open Now</span>' : '<span style="color:#e74c3c; font-weight:bold;">🔴 Closed</span>') : '';
+            // NEW API: place.photos[0].getURI()
+            const photoUrl = place.photos && place.photos.length > 0 ? place.photos[0].getURI({maxWidth: 600}) : 'https://via.placeholder.com/600x300?text=No+Photo';
+            const title = place.displayName || 'Unknown Place';
 
-            // Render top 2 reviews
+            // Check if open now (New API)
+            const isOpen = place.regularOpeningHours ? (place.regularOpeningHours.isOpen() ? '<span style="color:#27ae60; font-weight:bold;">🟢 Open Now</span>' : '<span style="color:#e74c3c; font-weight:bold;">🔴 Closed</span>') : '';
+
+            // Render top 2 reviews (New API)
             let reviewsHtml = '';
-            if (fullPlace.reviews && fullPlace.reviews.length > 0) {
-                reviewsHtml = fullPlace.reviews.slice(0, 2).map(r => `
+            if (place.reviews && place.reviews.length > 0) {
+                reviewsHtml = place.reviews.slice(0, 2).map(r => `
                     <div style="font-size:0.85em; background:#f8f9fa; padding:10px; border-radius:6px; margin-bottom:8px;">
-                        <strong>${r.author_name}</strong> (⭐ ${r.rating})<br>
-                        <i style="color:#555;">"${r.text.substring(0, 100)}..."</i>
+                        <strong>${r.authorAttribution ? r.authorAttribution.displayName : 'Guest'}</strong> (⭐ ${r.rating})<br>
+                        <i style="color:#555;">"${(r.text || '').substring(0, 100)}..."</i>
                     </div>
                 `).join('');
             }
@@ -1355,14 +1348,14 @@
                     
                     <img src="${photoUrl}" style="width:100%; height:200px; object-fit:cover; border-radius:8px; margin-bottom:15px; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
                     
-                    <h2 style="margin:0 0 5px 0;">${basicPlace.name}</h2>
-                    <div style="font-size:1.1em; margin-bottom:10px;">⭐ ${fullPlace.rating || 'New'} <span style="color:#7f8c8d; font-size:0.85em;">(${fullPlace.user_ratings_total || 0} reviews)</span></div>
+                    <h2 style="margin:0 0 5px 0;">${title}</h2>
+                    <div style="font-size:1.1em; margin-bottom:10px;">⭐ ${place.rating || 'New'} <span style="color:#7f8c8d; font-size:0.85em;">(${place.userRatingCount || 0} reviews)</span></div>
                     
                     <div style="font-size:0.9em; line-height:1.6; margin-bottom:20px; color:#2c3e50;">
-                        <div>📍 ${basicPlace.formatted_address}</div>
+                        <div>📍 ${place.formattedAddress || ''}</div>
                         <div>${isOpen}</div>
-                        ${fullPlace.formatted_phone_number ? `<div>📞 ${fullPlace.formatted_phone_number}</div>` : ''}
-                        ${fullPlace.website ? `<div>🌐 <a href="${fullPlace.website}" target="_blank" style="color:#3498db;">Website</a></div>` : ''}
+                        ${place.nationalPhoneNumber ? `<div>📞 ${place.nationalPhoneNumber}</div>` : ''}
+                        ${place.websiteURI ? `<div>🌐 <a href="${place.websiteURI}" target="_blank" style="color:#3498db;">Website</a></div>` : ''}
                     </div>
 
                     ${reviewsHtml ? `<h4 style="margin:0 0 10px 0; border-bottom:1px solid #eee; padding-bottom:5px;">Recent Reviews</h4>${reviewsHtml}` : ''}
@@ -1382,12 +1375,12 @@
                 showGeometryContextPopup(
                     coords, 
                     { type: 'Point', coordinates: coords }, 
-                    basicPlace.name, 
-                    `⭐ ${fullPlace.rating || 'N/A'} | ${basicPlace.formatted_address}`, 
+                    title, 
+                    `⭐ ${place.rating || 'N/A'} | ${place.formattedAddress || ''}`, 
                     null, 
                     '🍽️', 
                     '#e74c3c', 
-                    fullPlace.website || ''
+                    place.websiteURI || ''
                 );
             };
         }
