@@ -2114,6 +2114,25 @@
             };
         }
 
+        // NEW: Renders the dynamic day-navigation buttons in the Command Bar
+        function renderSectionPills() {
+            const container = document.getElementById('section-pills');
+            if (!container) return;
+
+            const sections = AppStore.get('sections') || [];
+
+            container.innerHTML = sections.map(s => {
+                const title = s.title || 'Unscheduled';
+                return `
+                <button onclick="flyToSection('${title.replace(/'/g, "\\'")}')" 
+                        style="padding: 6px 14px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 20px; color: white; font-size: 0.85em; font-weight: 600; cursor: pointer; white-space: nowrap; transition: 0.2s;"
+                        onmouseover="this.style.background='rgba(255, 255, 255, 0.2)'"
+                        onmouseout="this.style.background='rgba(255, 255, 255, 0.1)'">
+                    ${title}
+                </button>
+            `}).join('');
+        }
+
         async function refreshData() {
             const previousActiveId = AppStore.get('activeTaskId');
             try {
