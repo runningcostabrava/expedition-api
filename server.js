@@ -539,7 +539,7 @@ app.get('/itinerary', async (req, res) => {
       LEFT JOIN spatial_anchors sa ON ta.anchor_id = sa.id
       LEFT JOIN waypoints w ON sa.waypoint_id = w.id
       LEFT JOIN tracks tr ON sa.track_id = tr.id
-      GROUP BY t.id, s.section_date, c.color, c.icon, c.line_type, c.marker_size -- Group by section_date and category fields
+      GROUP BY t.id, s.section_date, c.color, c.icon, c.line_type, c.marker_size, tt.name, tt.icon
       ORDER BY s.section_date ASC NULLS FIRST, t.sort_order ASC, t.starts_at ASC; -- This handles the "Auto Arrange"
     `;
     const result = await pool.query(query);
