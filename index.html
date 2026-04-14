@@ -819,7 +819,13 @@
     </div>
 
     <div id="map-wrapper">
+        <div id="loading-overlay"
+            style="position:absolute; inset:0; background:rgba(255,255,255,0.8); z-index:9999; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#1e293b;">
+            🛰️ Waking up ecosystem...
+        </div>
+
         <div id="map"></div>
+
         <div id="elevation-panel">
             <span id="close-elevation" onclick="document.getElementById('elevation-panel').style.display='none'">❌</span>
             <div id="elevation-stats-header"></div>
