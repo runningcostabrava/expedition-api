@@ -858,10 +858,6 @@
                         Filter</label>
                     <select id="type-filter" onchange="renderProjectView()" style="padding: 6px;">
                         <option value="">All Types</option>
-                        <option value="Transport">🚗 Transport</option>
-                        <option value="Route">🗺️ Route</option>
-                        <option value="Accommodation">🏨 Accommodation</option>
-                        <option value="Activity">🧗 Activity</option>
                     </select>
                 </div>
             </div>
@@ -963,6 +959,16 @@
                 </div>
 
                 <div class="form-group">
+                    <label style="display: flex; justify-content: space-between; align-items: center;">
+                        Task Type
+                        <span onclick="openModal('type-modal')" style="cursor:pointer; font-size: 12px; color: #3498db; text-decoration: underline;">Manage ⚙️</span>
+                    </label>
+                    <select id="task-type-id">
+                        <option value="">No Type</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
                     <label>Section (Day)</label>
                     <select id="task-section-id">
                         <option value="">Unscheduled</option>
@@ -1059,12 +1065,30 @@
         </div>
     </div>
 
+    <div id="type-modal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <span class="close" onclick="closeModal('type-modal')">&times;</span>
+            <h3>⚙️ Manage Task Types</h3>
+            <div id="type-list" style="margin-bottom: 20px; max-height: 200px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 8px;"></div>
+            <hr>
+            <h4 style="margin-top:15px;">Add New Type</h4>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <input type="text" id="new-type-name" placeholder="Name (e.g. Logistics)">
+                <div style="display: flex; gap: 10px;">
+                    <input type="color" id="new-type-color" value="#95a5a6" style="width: 50px; height: 38px; border: none; padding: 0; cursor:pointer;">
+                    <input type="text" id="new-type-icon" placeholder="Emoji 🚗" style="flex: 1;">
+                </div>
+                <button onclick="saveTaskType()" style="background: #27ae60; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer;">Create Type</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let activeCategoryIdForEdit = null;
         const API_URL = 'https://mapbox-api-uz9a.onrender.com';
         let map, draw;
         let activeMarkers = [];
-        let allTracks = [], allItinerary = [], allSections = [], allCategories = [];
+        let allTracks = [], allItinerary = [], allSections = [], allCategories = [], allTaskTypes = [];
         let mapFilters = { point: true, line: true, smart: true, polygon: true };
 
         function updateFilters() {
@@ -1900,6 +1924,17 @@
         function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, editConfig = null, existingIcon = '📍', existingColor = '#3498db', existingLink = '', googleData = null) {
             if (activeContextPopup) activeContextPopup.remove();
 
+            let activeTaskSection = '';
+            if (activeTaskId) {
+                const t = allItinerary.find(x => x.task_id === activeTaskId);
+                if (t && t.section_id) activeTaskSection = t.section_id;
+            }
+
+            const sectionOptions = allSections.map(s => {
+                const dateStr = s.section_date ? new Date(s.section_date).toISOString().split('T')[0] : '';
+                return `<option value="${s.id}" ${activeTaskSection == s.id ? 'selected' : ''}>${dateStr} ${s.title || ''}</option>`;
+            }).join('');
+
             const taskWarning = activeTaskId 
                 ? `<div style="color:#27ae60; font-size:0.8em; margin-bottom:10px; font-weight:bold;">✅ Attached to active task</div>` 
                 : `<div style="background:#fff3cd; color:#856404; padding:8px; border-radius:4px; font-size:0.8em; margin-bottom:10px; border:1px solid #ffeeba;">
@@ -1915,6 +1950,10 @@
         ${taskWarning}
         <input type="text" id="ctx-title" value="${defaultTitle}" placeholder="Title" style="width: 100%; margin-bottom: 5px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing:border-box;">
         <input type="url" id="ctx-link" value="${existingLink || ''}" placeholder="https:// link (optional)" style="width: 100%; margin-bottom: 8px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing:border-box; font-size:0.85em;">
+        <select id="ctx-section" style="width: 100%; margin-bottom: 8px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing:border-box; font-size:0.85em;">
+            <option value="">-- No Section (Global) --</option>
+            ${sectionOptions}
+        </select>
         <div style="display: flex; gap: 5px; margin-bottom: 10px; align-items: center;">
             <label style="font-size: 0.8em; margin:0;">Color:</label>
             <input type="color" id="ctx-color" value="${existingColor || '#3498db'}" style="width: 40px; height: 25px; padding: 0; cursor: pointer; border: none;">
@@ -1948,6 +1987,7 @@
                 const link = document.getElementById('ctx-link').value;
                 const color = document.getElementById('ctx-color').value;
                 const icon = document.getElementById('ctx-icon') ? document.getElementById('ctx-icon').value : '📍';
+                const section_id = document.getElementById('ctx-section').value || null;
                 document.getElementById('ctx-save').innerText = 'Saving...';
 
                 // Append the link to the description text if it exists
@@ -1965,11 +2005,11 @@
                         // UPDATE Existing Shape (PUT)
                         if (editConfig.kind === 'point') {
                             await fetch(`${API_URL}/waypoints/${editConfig.id}`, {
-                                method: 'PUT', headers, body: JSON.stringify({ title, color, icon, link, lat: geometry.coordinates[1], lng: geometry.coordinates[0], description: finalDesc })
+                                method: 'PUT', headers, body: JSON.stringify({ title, color, icon, link, section_id: section_id, lat: geometry.coordinates[1], lng: geometry.coordinates[0], description: finalDesc })
                             });
                         } else {
                             await fetch(`${API_URL}/tracks/${editConfig.id}`, {
-                                method: 'PUT', headers, body: JSON.stringify({ title, color, link, geojson_data: { type: 'FeatureCollection', features: [featureToSave] }, comments: finalDesc, distance: props.distance, duration: props.duration })
+                                method: 'PUT', headers, body: JSON.stringify({ title, color, link, section_id: section_id, geojson_data: { type: 'FeatureCollection', features: [featureToSave] }, comments: finalDesc, distance: props.distance, duration: props.duration })
                             });
                         }
                     } else {
@@ -1977,7 +2017,7 @@
                         if (geometry.type === 'Point') {
                             await fetch(`${API_URL}/waypoints`, {
                                 method: 'POST', headers, body: JSON.stringify({ 
-                                    title, color, icon, link, 
+                                    title, color, icon, link, section_id: section_id,
                                     existing_task_id: activeTaskId, 
                                     parent_track_id: segmentTrackId, 
                                     lat: geometry.coordinates[1], 
@@ -1991,7 +2031,7 @@
                             });
                         } else {
                             await fetch(`${API_URL}/tracks`, {
-                                method: 'POST', headers, body: JSON.stringify({ title, color, link, existing_task_id: activeTaskId, parent_track_id: segmentTrackId, geojson_data: { type: 'FeatureCollection', features: [featureToSave] }, comments: finalDesc, distance: props.distance, duration: props.duration })
+                                method: 'POST', headers, body: JSON.stringify({ title, color, link, section_id: section_id, existing_task_id: activeTaskId, parent_track_id: segmentTrackId, geojson_data: { type: 'FeatureCollection', features: [featureToSave] }, comments: finalDesc, distance: props.distance, duration: props.duration })
                             });
                         }
                     }
@@ -2008,20 +2048,24 @@
             const previousActiveId = activeTaskId;
             try {
                 // Fetch Sections, Categories, and Itinerary simultaneously
-                const [itRes, secRes, catRes] = await Promise.all([
+                const [itRes, secRes, catRes, typeRes] = await Promise.all([
                     fetch(`${API_URL}/itinerary`),
                     fetch(`${API_URL}/sections`),
-                    fetch(`${API_URL}/categories`)
+                    fetch(`${API_URL}/categories`),
+                    fetch(`${API_URL}/task_types`)
                 ]);
 
                 allItinerary = await itRes.json();
                 allSections = await secRes.json();
                 allCategories = await catRes.json();
+                allTaskTypes = await typeRes.json();
 
                 // Update UI components
                 updateCategoryDropdowns();
                 updateSectionDropdowns();
+                updateTaskTypeDropdowns();
                 renderCategoryList();
+                renderTaskTypeList();
                 if (previousActiveId) activeTaskId = previousActiveId;
 
                 const dropdown = document.getElementById('existing-task');
@@ -2300,6 +2344,7 @@
                 ...baseTask,
                 task_name: document.getElementById('wp-title').value,
                 category_id: document.getElementById('task-category-id').value || null,
+                task_type_id: document.getElementById('task-type-id').value || null,
                 section_id: document.getElementById('task-section-id').value || null,
                 starts_at: document.getElementById('starts-at').value || null,
                 responsible: document.getElementById('responsible').value,
@@ -2476,6 +2521,7 @@
             activeTaskId = taskId;
             document.getElementById('wp-title').value = task.task_name || task.task || '';
             document.getElementById('task-section-id').value = task.section_id || '';
+            document.getElementById('task-type-id').value = task.task_type_id || '';
             document.getElementById('starts-at').value = task.starts_at ? task.starts_at.substring(0, 16) : '';
             document.getElementById('responsible').value = task.responsible || '';
             document.getElementById('is-completed').checked = task.is_completed;
@@ -2541,7 +2587,7 @@
                 const name = t.task_name || t.task || "";
                 const matchSearch = name.toLowerCase().includes(searchTerm);
                 const matchGroup = !groupFilter || t.target_group === groupFilter;
-                const matchType = !typeFilter || t.task_type === typeFilter;
+                const matchType = !typeFilter || t.task_type_id == typeFilter;
                 return matchSearch && matchGroup && matchType;
             });
 
@@ -3042,6 +3088,85 @@
         });
 
 
+
+        let activeTypeIdForEdit = null;
+        function updateTaskTypeDropdowns() {
+            const typeSelect = document.getElementById('task-type-id');
+            const filterSelect = document.getElementById('type-filter');
+            if (!typeSelect || !filterSelect) return;
+            
+            const currentVal = typeSelect.value;
+            const currentFilterVal = filterSelect.value;
+            
+            typeSelect.innerHTML = '<option value="">No Type</option>';
+            filterSelect.innerHTML = '<option value="">All Types</option>';
+            
+            allTaskTypes.forEach(t => {
+                const opt = `<option value="${t.id}">${t.icon || '🏷️'} ${t.name}</option>`;
+                typeSelect.insertAdjacentHTML('beforeend', opt);
+                filterSelect.insertAdjacentHTML('beforeend', opt);
+            });
+            
+            typeSelect.value = currentVal;
+            filterSelect.value = currentFilterVal;
+        }
+
+        function renderTaskTypeList() {
+            const list = document.getElementById('type-list');
+            if (!list) return;
+            list.innerHTML = allTaskTypes.map(t => `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #eee;">
+                    <span>${t.icon} <strong style="color:${t.color}">${t.name}</strong></span>
+                    <div style="display:flex; gap:5px;">
+                        <button onclick="startEditTaskType(${t.id})" style="width:auto; padding:4px 8px; background:#3498db; font-size:12px;">Edit</button>
+                        <button onclick="deleteTaskType(${t.id})" style="width:auto; padding:4px 8px; background:#e74c3c; font-size:12px;">Delete</button>
+                    </div>
+                </div>
+            `).join('') || '<p style="font-size:12px; color:#95a5a6;">No types created yet.</p>';
+        }
+
+        function startEditTaskType(id) {
+            const t = allTaskTypes.find(x => x.id === id);
+            if (!t) return;
+            activeTypeIdForEdit = id;
+            document.getElementById('new-type-name').value = t.name;
+            document.getElementById('new-type-color').value = t.color || '#95a5a6';
+            document.getElementById('new-type-icon').value = t.icon || '';
+            const btn = document.querySelector('#type-modal button[onclick="saveTaskType()"]');
+            btn.innerText = "Update Type";
+            btn.style.background = "#f39c12";
+        }
+
+        async function deleteTaskType(id) {
+            if (!confirm("Delete this task type?")) return;
+            await fetch(`${API_URL}/task_types/${id}`, { method: 'DELETE', headers: { 'x-api-key': ADMIN_KEY } });
+            refreshData();
+        }
+
+        async function saveTaskType() {
+            const name = document.getElementById('new-type-name').value;
+            const color = document.getElementById('new-type-color').value;
+            const icon = document.getElementById('new-type-icon').value;
+            if (!name) return alert("Name is required");
+
+            const method = activeTypeIdForEdit ? 'PUT' : 'POST';
+            const url = activeTypeIdForEdit ? `${API_URL}/task_types/${activeTypeIdForEdit}` : `${API_URL}/task_types`;
+
+            await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY },
+                body: JSON.stringify({ name, color, icon })
+            });
+
+            activeTypeIdForEdit = null;
+            document.getElementById('new-type-name').value = '';
+            document.getElementById('new-type-color').value = '#95a5a6';
+            document.getElementById('new-type-icon').value = '';
+            const btn = document.querySelector('#type-modal button[onclick="saveTaskType()"]');
+            btn.innerText = "Create Type";
+            btn.style.background = "#27ae60";
+            refreshData();
+        }
 
         initializeApp();
     </script>

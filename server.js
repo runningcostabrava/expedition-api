@@ -81,7 +81,13 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_milestone BOOLEAN DEFAULT false",
       "ALTER TABLE categories ADD COLUMN IF NOT EXISTS marker_size INTEGER DEFAULT 28",
       "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0",
-      "CREATE TABLE IF NOT EXISTS team_members (id SERIAL PRIMARY KEY, name TEXT UNIQUE)"
+      "CREATE TABLE IF NOT EXISTS team_members (id SERIAL PRIMARY KEY, name TEXT UNIQUE)",
+      "CREATE TABLE IF NOT EXISTS task_types (id SERIAL PRIMARY KEY, name TEXT UNIQUE, color TEXT, icon TEXT)",
+      "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS task_type_id INTEGER REFERENCES task_types(id) ON DELETE SET NULL",
+      "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS section_id INTEGER REFERENCES sections(id) ON DELETE SET NULL",
+      "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS section_id INTEGER REFERENCES sections(id) ON DELETE SET NULL",
+      "DO $$ BEGIN ALTER TABLE waypoints ADD CONSTRAINT fk_parent_track FOREIGN KEY (parent_track_id) REFERENCES tracks(id) ON DELETE SET NULL; EXCEPTION WHEN duplicate_object THEN null; END $$;",
+      "DO $$ BEGIN ALTER TABLE tracks ADD CONSTRAINT fk_parent_track_self FOREIGN KEY (parent_track_id) REFERENCES tracks(id) ON DELETE SET NULL; EXCEPTION WHEN duplicate_object THEN null; END $$;"
     ];
 
     // Execute safely one by one
@@ -112,27 +118,23 @@ app.get('/setup-db', adminAuth, async (req, res) => {
 
 // 2. TRACKS: GPX Upload & Management
 app.post('/tasks', adminAuth, async (req, res) => {
-  console.log("DEBUG POST /tasks payload:", req.body); // <-- Debugging added
-  const { task_name, responsible, target_group, task_type, starts_at, ends_at, is_completed, comments, parent_id, is_milestone, section_id, category_id } = req.body;
+  const { task_name, responsible, target_group, task_type_id, starts_at, ends_at, is_completed, comments, parent_id, is_milestone, section_id, category_id } = req.body;
   try {
     const result = await pool.query(
-      'INSERT INTO tasks (task_name, responsible, target_group, task_type, starts_at, ends_at, is_completed, comments, parent_id, is_milestone, section_id, category_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
-      [task_name, responsible, target_group, task_type, starts_at, ends_at, is_completed || false, comments, parent_id, is_milestone || false, section_id, category_id]
+      'INSERT INTO tasks (task_name, responsible, target_group, task_type_id, starts_at, ends_at, is_completed, comments, parent_id, is_milestone, section_id, category_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *',
+      [task_name, responsible, target_group, task_type_id, starts_at, ends_at, is_completed || false, comments, parent_id, is_milestone || false, section_id, category_id]
     );
     res.json(result.rows[0]);
-  } catch (err) { 
-    console.error("DEBUG POST /tasks error:", err); // <-- Debugging added
-    res.status(500).json({ error: err.message }); 
-  }
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/tasks/:id', adminAuth, async (req, res) => {
   const { id } = req.params;
-  const { task_name, responsible, target_group, task_type, starts_at, ends_at, is_completed, comments, parent_id, category_id, is_milestone, section_id, characteristics } = req.body;
+  const { task_name, responsible, target_group, task_type_id, starts_at, ends_at, is_completed, comments, parent_id, category_id, is_milestone, section_id, characteristics } = req.body;
   try {
     const result = await pool.query(
-      'UPDATE tasks SET task_name=$1, responsible=$2, target_group=$3, task_type=$4, starts_at=$5, ends_at=$6, is_completed=$7, comments=$8, parent_id=$9, category_id=$10, is_milestone=$11, section_id=$13, characteristics=$14 WHERE id=$12 RETURNING *',
-      [task_name, responsible, target_group, task_type, starts_at, ends_at, is_completed, comments, parent_id, category_id, is_milestone, id, section_id, characteristics]
+      'UPDATE tasks SET task_name=$1, responsible=$2, target_group=$3, task_type_id=$4, starts_at=$5, ends_at=$6, is_completed=$7, comments=$8, parent_id=$9, category_id=$10, is_milestone=$11, section_id=$13, characteristics=$14 WHERE id=$12 RETURNING *',
+      [task_name, responsible, target_group, task_type_id, starts_at, ends_at, is_completed, comments, parent_id, category_id, is_milestone, id, section_id, characteristics]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -145,12 +147,20 @@ app.get('/tracks', async (req, res) => {
   } catch (err) { res.status(500).send({ error: err.message }); }
 });
 
+// Get all child waypoints associated with a specific parent track
+app.get('/tracks/:id/waypoints', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM waypoints WHERE parent_track_id = $1 ORDER BY id ASC', [req.params.id]);
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/tracks', adminAuth, async (req, res) => {
   console.log("DEBUG POST /tracks payload:", req.body);
-  const { title, geojson_data, color, target_group, tasks, existing_task_id, distance, duration, comments, link, parent_track_id } = req.body;
+  const { title, geojson_data, color, target_group, tasks, existing_task_id, distance, duration, comments, link, parent_track_id, section_id } = req.body;
   try {
-    const result = await pool.query('INSERT INTO tracks (title, geojson_data, color, target_group, distance, duration, comments, link, parent_track_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id',
-      [title, geojson_data, color || '#3498db', target_group, distance, duration, comments, link, parent_track_id]);
+    const result = await pool.query('INSERT INTO tracks (title, geojson_data, color, target_group, distance, duration, comments, link, parent_track_id, section_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id',
+      [title, geojson_data, color || '#3498db', target_group, distance, duration, comments, link, parent_track_id, section_id]);
     const trackId = result.rows[0].id;
 
     const geometryType = geojson_data.features[0].geometry.type;
@@ -178,11 +188,11 @@ app.post('/tracks', adminAuth, async (req, res) => {
 
 app.put('/tracks/:id', adminAuth, async (req, res) => {
   const { id } = req.params;
-  const { geojson_data, title, color, target_group, tasks, existing_task_id, link, comments, distance, duration, gain, loss, parent_track_id } = req.body;
+  const { geojson_data, title, color, target_group, tasks, existing_task_id, link, comments, distance, duration, gain, loss, parent_track_id, section_id } = req.body;
   try {
     await pool.query(
-      'UPDATE tracks SET geojson_data = COALESCE($1, geojson_data), title = COALESCE($2, title), color = COALESCE($3, color), target_group = COALESCE($4, target_group), link = COALESCE($6, link), comments = COALESCE($7, comments), distance = COALESCE($8, distance), gain = COALESCE($9, gain), loss = COALESCE($10, loss), parent_track_id = COALESCE($11, parent_track_id), duration = COALESCE($12, duration) WHERE id = $5',
-      [geojson_data, title, color, target_group, id, link, comments, distance, gain, loss, parent_track_id, duration]
+      'UPDATE tracks SET geojson_data = COALESCE($1, geojson_data), title = COALESCE($2, title), color = COALESCE($3, color), target_group = COALESCE($4, target_group), link = COALESCE($6, link), comments = COALESCE($7, comments), distance = COALESCE($8, distance), gain = COALESCE($9, gain), loss = COALESCE($10, loss), parent_track_id = COALESCE($11, parent_track_id), duration = COALESCE($12, duration), section_id = COALESCE($13, section_id) WHERE id = $5',
+      [geojson_data, title, color, target_group, id, link, comments, distance, gain, loss, parent_track_id, duration, section_id]
     );
 
     let anchorId;
@@ -233,11 +243,11 @@ app.get('/waypoints', async (req, res) => {
 });
 
 app.post('/waypoints', adminAuth, async (req, res) => {
-  const { title, lat, lng, description, category, tasks, existing_task_id, color, icon, parent_track_id, photo_url, phone, address, google_maps_url } = req.body;
+  const { title, lat, lng, description, category, tasks, existing_task_id, color, icon, parent_track_id, photo_url, phone, address, google_maps_url, section_id } = req.body;
   try {
     const wp = await pool.query(
-      'INSERT INTO waypoints (title, lat, lng, description, category, color, icon, parent_track_id, photo_url, phone, address, google_maps_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id',
-      [title, lat, lng, description, category, color || '#e74c3c', icon || 'marker', parent_track_id, photo_url, phone, address, google_maps_url]
+      'INSERT INTO waypoints (title, lat, lng, description, category, color, icon, parent_track_id, photo_url, phone, address, google_maps_url, section_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id',
+      [title, lat, lng, description, category, color || '#e74c3c', icon || 'marker', parent_track_id, photo_url, phone, address, google_maps_url, section_id]
     );
     const wpId = wp.rows[0].id;
 
@@ -263,11 +273,11 @@ app.post('/waypoints', adminAuth, async (req, res) => {
 
 app.put('/waypoints/:id', adminAuth, async (req, res) => {
   const { id } = req.params;
-  const { title, lat, lng, description, category, tasks, color, icon, existing_task_id, link, comments, distance, gain, loss, parent_track_id, photo_url, phone, address, google_maps_url } = req.body;
+  const { title, lat, lng, description, category, tasks, color, icon, existing_task_id, link, comments, distance, gain, loss, parent_track_id, photo_url, phone, address, google_maps_url, section_id } = req.body;
   try {
     await pool.query(
-      'UPDATE waypoints SET title = COALESCE($1, title), lat = COALESCE($2, lat), lng = COALESCE($3, lng), description = COALESCE($4, description), category = COALESCE($5, category), color = COALESCE($6, color), icon = COALESCE($7, icon), link = COALESCE($9, link), comments = COALESCE($10, comments), distance = COALESCE($11, distance), gain = COALESCE($12, gain), loss = COALESCE($13, loss), parent_track_id = COALESCE($14, parent_track_id), photo_url = COALESCE($15, photo_url), phone = COALESCE($16, phone), address = COALESCE($17, address), google_maps_url = COALESCE($18, google_maps_url) WHERE id = $8',
-      [title, lat, lng, description, category, color, icon, id, link, comments, distance, gain, loss, parent_track_id, photo_url, phone, address, google_maps_url]
+      'UPDATE waypoints SET title = COALESCE($1, title), lat = COALESCE($2, lat), lng = COALESCE($3, lng), description = COALESCE($4, description), category = COALESCE($5, category), color = COALESCE($6, color), icon = COALESCE($7, icon), link = COALESCE($9, link), comments = COALESCE($10, comments), distance = COALESCE($11, distance), gain = COALESCE($12, gain), loss = COALESCE($13, loss), parent_track_id = COALESCE($14, parent_track_id), photo_url = COALESCE($15, photo_url), phone = COALESCE($16, phone), address = COALESCE($17, address), google_maps_url = COALESCE($18, google_maps_url), section_id = COALESCE($19, section_id) WHERE id = $8',
+      [title, lat, lng, description, category, color, icon, id, link, comments, distance, gain, loss, parent_track_id, photo_url, phone, address, google_maps_url, section_id]
     );
 
     let anchorId;
@@ -433,6 +443,37 @@ app.delete('/categories/:id', adminAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// --- TASK TYPES MANAGEMENT ---
+app.get('/task_types', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM task_types ORDER BY name ASC');
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/task_types', adminAuth, async (req, res) => {
+  const { name, color, icon } = req.body;
+  try {
+    const result = await pool.query('INSERT INTO task_types (name, color, icon) VALUES ($1, $2, $3) RETURNING *', [name, color || '#95a5a6', icon || '🏷️']);
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/task_types/:id', adminAuth, async (req, res) => {
+  const { name, color, icon } = req.body;
+  try {
+    const result = await pool.query('UPDATE task_types SET name=$1, color=$2, icon=$3 WHERE id=$4 RETURNING *', [name, color, icon, req.params.id]);
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/task_types/:id', adminAuth, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM task_types WHERE id=$1', [req.params.id]);
+    res.json({ message: 'Task type deleted' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // --- TEAM MANAGEMENT ---
 app.get('/team_members', async (req, res) => {
   try {
@@ -460,11 +501,9 @@ app.delete('/team_members/:id', adminAuth, async (req, res) => {
 app.get('/itinerary', async (req, res) => {
   try {
     const query = `
-  SELECT t.*, t.id AS task_id, s.section_date, -- Include section_date for sorting
-         c.color AS category_color,
-         c.icon AS category_icon,
-         c.line_type AS category_line_type,
-         c.marker_size AS category_marker_size, -- Add this line
+  SELECT t.*, t.id AS task_id, s.section_date, 
+         c.color AS category_color, c.icon AS category_icon, c.line_type AS category_line_type, c.marker_size AS category_marker_size,
+         tt.name AS task_type_name, tt.icon AS task_type_icon,
          COALESCE(
                json_agg(
                  json_build_object(
@@ -495,6 +534,7 @@ app.get('/itinerary', async (req, res) => {
       FROM tasks t
       LEFT JOIN sections s ON t.section_id = s.id -- Join with sections
       LEFT JOIN categories c ON t.category_id = c.id -- Join the categories table
+      LEFT JOIN task_types tt ON t.task_type_id = tt.id
       LEFT JOIN task_anchors ta ON t.id = ta.task_id
       LEFT JOIN spatial_anchors sa ON ta.anchor_id = sa.id
       LEFT JOIN waypoints w ON sa.waypoint_id = w.id
