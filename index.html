@@ -212,7 +212,7 @@
 
         .task-title-large {
             font-weight: 700;
-            font-size: 0.95em;
+            font-size: 0.8em; /* Shrunk font size for better fit */
             color: #1a202c;
             line-height: 1.3;
             margin-bottom: 4px;
@@ -220,11 +220,9 @@
         }
 
         .task-meta-aside {
-            width: 160px;
-            /* Fixed width for the sub-rows section */
+            width: 135px; /* Shrunk column to give title more room */
             display: grid;
             grid-template-rows: 1fr 1fr;
-            /* Two sub-rows */
             border-left: 1px solid #edf2f7;
             background: #fcfcfc;
         }
@@ -2286,7 +2284,8 @@
                 responsible: document.getElementById('responsible').value,
                 is_completed: document.getElementById('is-completed').checked,
                 is_milestone: document.getElementById('is-milestone') ? document.getElementById('is-milestone').checked : false,
-                comments: document.getElementById('task-comments').value
+                comments: document.getElementById('task-comments').value,
+                characteristics: document.getElementById('wp-description').value // <-- FIX: Captures description!
             };
             
             const geomColor = document.getElementById('geom-color').value;
@@ -2294,59 +2293,49 @@
             const headers = { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY };
 
             try {
-                let res;
-                if (isEditingGeometry) {
-                    // Flow A: Updating an existing shape
-                    if (activeWaypointId) {
-                        res = await fetch(`${API_URL}/waypoints/${activeWaypointId}`, {
-                            method: 'PUT', headers,
-                            body: JSON.stringify({
-                                title: taskData.task_name, color: geomColor, existing_task_id: existingTaskId,
-                                lat: features.length > 0 ? features[0].geometry.coordinates[1] : undefined,
-                                lng: features.length > 0 ? features[0].geometry.coordinates[0] : undefined
-                            })
-                        });
-                    } else if (activeTrackId) {
-                        res = await fetch(`${API_URL}/tracks/${activeTrackId}`, {
-                            method: 'PUT', headers,
-                            body: JSON.stringify({
-                                title: taskData.task_name, color: geomColor, existing_task_id: existingTaskId,
-                                geojson_data: features.length > 0 ? { type: 'FeatureCollection', features } : undefined
-                            })
-                        });
-                    }
-                } else if (features.length > 0) {
-                    // Flow B: Creating a NEW shape
-                    const feat = features[0];
-                    const tasksArr = existingTaskId ? undefined : [{ name: taskData.task_name, ...taskData }];
-
-                    if (feat.geometry.type === 'Point') {
-                        res = await fetch(`${API_URL}/waypoints`, {
-                            method: 'POST', headers,
-                            body: JSON.stringify({
-                                title: taskData.task_name, color: geomColor, existing_task_id: existingTaskId,
-                                lat: feat.geometry.coordinates[1], lng: feat.geometry.coordinates[0], tasks: tasksArr
-                            })
-                        });
-                    } else {
-                        res = await fetch(`${API_URL}/tracks`, {
-                            method: 'POST', headers,
-                            body: JSON.stringify({
-                                title: taskData.task_name, color: geomColor, existing_task_id: existingTaskId,
-                                geojson_data: { type: 'FeatureCollection', features }, tasks: tasksArr
-                            })
-                        });
+                // 1. ALWAYS Save/Update the Task FIRST
+                let finalTaskId = existingTaskId;
+                
+                if (!existingTaskId) {
+                    // Create a new task
+                    const taskRes = await fetch(`${API_URL}/tasks`, { method: 'POST', headers, body: JSON.stringify(taskData) });
+                    if(taskRes.ok) {
+                        const newTask = await taskRes.json();
+                        finalTaskId = newTask.id;
                     }
                 } else {
-                    // Flow C: Saving ONLY a Task (No map shape)
-                    if (existingTaskId) {
-                        const res = await fetch(`${API_URL}/tasks/${existingTaskId}`, { method: 'PUT', headers, body: JSON.stringify(taskData) });
-                        if (!res.ok) throw new Error(await res.text());
+                    // Strictly update existing task to prevent data loss
+                    await fetch(`${API_URL}/tasks/${existingTaskId}`, { method: 'PUT', headers, body: JSON.stringify(taskData) });
+                }
+
+                // 2. Save/Update Geometry SECOND (if drawn)
+                if (features.length > 0) {
+                    const feat = features[0];
+                    if (isEditingGeometry) {
+                        // Update existing shape and ensure it links to the task
+                        if (activeWaypointId) {
+                            await fetch(`${API_URL}/waypoints/${activeWaypointId}`, {
+                                method: 'PUT', headers, body: JSON.stringify({ title: taskData.task_name, color: geomColor, existing_task_id: finalTaskId, lat: feat.geometry.coordinates[1], lng: feat.geometry.coordinates[0] })
+                            });
+                        } else if (activeTrackId) {
+                            await fetch(`${API_URL}/tracks/${activeTrackId}`, {
+                                method: 'PUT', headers, body: JSON.stringify({ title: taskData.task_name, color: geomColor, existing_task_id: finalTaskId, geojson_data: { type: 'FeatureCollection', features } })
+                            });
+                        }
                     } else {
-                        const res = await fetch(`${API_URL}/tasks`, { method: 'POST', headers, body: JSON.stringify(taskData) });
-                        if (!res.ok) throw new Error(await res.text());
+                        // Create new shape and link it
+                        if (feat.geometry.type === 'Point') {
+                            await fetch(`${API_URL}/waypoints`, {
+                                method: 'POST', headers, body: JSON.stringify({ title: taskData.task_name, color: geomColor, existing_task_id: finalTaskId, lat: feat.geometry.coordinates[1], lng: feat.geometry.coordinates[0] })
+                            });
+                        } else {
+                            await fetch(`${API_URL}/tracks`, {
+                                method: 'POST', headers, body: JSON.stringify({ title: taskData.task_name, color: geomColor, existing_task_id: finalTaskId, geojson_data: { type: 'FeatureCollection', features } })
+                            });
+                        }
                     }
                 }
+
                 closeModal();
                 refreshData();
             } catch (err) {
@@ -2471,6 +2460,7 @@
             document.getElementById('is-completed').checked = task.is_completed;
             if (document.getElementById('is-milestone')) document.getElementById('is-milestone').checked = !!task.is_milestone;
             document.getElementById('task-comments').value = task.comments || '';
+            document.getElementById('wp-description').value = task.characteristics || ''; // <-- FIX: Loads description!
             document.getElementById('existing-task').value = taskId;
             document.getElementById('color-picker-group').style.display = 'none';
             openModal();
@@ -2678,6 +2668,13 @@
                 const catName = cat ? cat.name : 'No Category';
                 const catIcon = cat ? cat.icon : '🏷️';
 
+                // Build the Category Dropdown options dynamically
+                let catOptions = `<option value="">🏷️ No Cat</option>`;
+                allCategories.forEach(c => {
+                    const sel = (c.id === task.category_id) ? 'selected' : '';
+                    catOptions += `<option value="${c.id}" ${sel}>${c.icon} ${c.name}</option>`;
+                });
+
                 taskEl.innerHTML = `
                     <div class="task-main-content">
                         <div class="task-title-large" style="display: flex; align-items: flex-start;">
@@ -2687,15 +2684,18 @@
                                   onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())" 
                                   onclick="event.stopPropagation()">${task.task_name || 'Unnamed Task'}</span>
                         </div>
-                        ${task.responsible ? `<div style="font-size:0.75em; color:#a0aec0;">👤 ${task.responsible}</div>` : ''}
+                        ${task.responsible ? `<div style="font-size:0.8em; color:#a0aec0; margin-top:4px;">👤 ${task.responsible}</div>` : ''}
                     </div>
 
                     <div class="task-meta-aside">
                         <div class="meta-sub-row" title="Time & Category">
-                            <span style="font-weight:bold; color:#2d3748;">🕒 ${timeOnly}</span>
-                            <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${catIcon} ${catName}</span>
+                            <input type="time" class="inline-edit-input" value="${timeOnly}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()" style="font-weight:bold; color:#2d3748; width:75px; padding:2px; font-size:1em; cursor:pointer;">
+                            
+                            <select class="inline-edit-input" onchange="updateTaskInline(${task.task_id}, 'category_id', this.value)" onclick="event.stopPropagation()" style="width:85px; padding:2px; font-size:0.85em; cursor:pointer; text-overflow: ellipsis;">
+                                ${catOptions}
+                            </select>
                         </div>
-                        <div class="meta-sub-row task-actions-inline">
+                        <div class="meta-sub-row task-actions-inline" style="justify-content:flex-end;">
                             <button class="edit-btn" title="Add Subtask" onclick="event.stopPropagation(); createSubtask(${task.task_id}, '${task.day_label || ''}')">➕</button>
                             <button class="edit-btn" title="Edit Task" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
                             <button class="delete-btn" title="Delete Task" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>

@@ -127,11 +127,11 @@ app.post('/tasks', adminAuth, async (req, res) => {
 
 app.put('/tasks/:id', adminAuth, async (req, res) => {
   const { id } = req.params;
-  const { task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id, category_id, is_milestone, section_id } = req.body;
+  const { task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id, category_id, is_milestone, section_id, characteristics } = req.body;
   try {
     const result = await pool.query(
-      'UPDATE tasks SET task_name=$1, responsible=$2, target_group=$3, task_type=$4, day_label=$5, starts_at=$6, ends_at=$7, is_completed=$8, comments=$9, parent_id=$10, category_id=$11, is_milestone=$12, section_id=$14 WHERE id=$13 RETURNING *',
-      [task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id, category_id, is_milestone, id, section_id]
+      'UPDATE tasks SET task_name=$1, responsible=$2, target_group=$3, task_type=$4, day_label=$5, starts_at=$6, ends_at=$7, is_completed=$8, comments=$9, parent_id=$10, category_id=$11, is_milestone=$12, section_id=$14, characteristics=$15 WHERE id=$13 RETURNING *',
+      [task_name, responsible, target_group, task_type, day_label, starts_at, ends_at, is_completed, comments, parent_id, category_id, is_milestone, id, section_id, characteristics]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
