@@ -1302,21 +1302,21 @@
                     const bounds = map.getBounds();
                     const request = {
                         textQuery: query,
-                        locationBias: {
+                        // STRICT BOUNDARY
+                        locationRestriction: {
                             north: bounds.getNorth(),
                             south: bounds.getSouth(),
                             east: bounds.getEast(),
                             west: bounds.getWest()
                         },
                         fields: ['id', 'displayName', 'location', 'photos', 'rating', 'userRatingCount', 'formattedAddress', 'websiteURI'],
-                        maxResultCount: 10 // Show exactly 10 results
+                        maxResultCount: 10
                     };
 
                     try {
-                        // Fetch the list of places
                         const { places } = await Place.searchByText(request);
-                        
                         if (places && places.length > 0) {
+                            window.lastSearchResults = places; // Save for the "Back" button
                             renderDiscoverySidebar(places);
                         } else {
                             alert("No results found in this area. Try zooming out or moving the map.");
