@@ -786,8 +786,22 @@
 <body>
     <div id="command-bar">
         <div style="font-weight: 900; color: #0f172a; margin-right: 10px;">EXPEDITION v2</div>
-        <div id="section-pills" style="display:flex; gap:8px; flex:1;"></div>
+
+        <div style="position: relative; flex: 1; max-width: 300px;">
+            <input type="text" id="internal-map-search" placeholder="🔍 Search saved locations..."
+                style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ddd; outline: none;">
+            <div id="internal-search-results"
+                style="display:none; position:absolute; top:45px; left:0; right:0; background:white; border-radius:8px; box-shadow:var(--card-shadow); max-height:300px; overflow-y:auto; z-index:1000;">
+            </div>
+        </div>
+
+        <div id="section-pills" style="display:flex; gap:8px; flex: 1; margin-left: 10px;"></div>
+
         <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="file" id="gpx-file" accept=".gpx" style="display: none;">
+            <button onclick="document.getElementById('gpx-file').click()" class="action-btn-modern"
+                title="Upload GPX">📤</button>
+
             <button onclick="cycleSidebar()" class="action-btn-modern">📅</button>
             <button onclick="openModal()" class="add-task-btn" style="width: auto; padding: 8px 15px; margin: 0;">+
                 Task</button>
