@@ -21,50 +21,92 @@
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: sans-serif;
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-        }
+/* 1. Global Layout: Map is the 100% background */
+body {
+    margin: 0; padding: 0;
+    font-family: 'Inter', sans-serif;
+    height: 100vh; width: 100vw;
+    overflow: hidden;
+    background: #0f172a;
+}
 
-        #left-panel {
-            width: 30vw;
-            /* Default stage */
-            min-width: 0;
-            overflow-x: hidden;
-            display: flex;
-            flex-direction: column;
-            border-right: 2px solid #ccc;
-            background: #f8f9fa;
-            transition: width 0.3s ease;
+/* 2. Command Bar: Top Floating Navigation */
+#command-bar {
+    position: absolute;
+    top: 15px; left: 15px; right: 15px;
+    height: 55px;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    padding: 0 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    gap: 15px;
+}
+
+#section-pills {
+    display: flex; gap: 8px; flex: 1; overflow-x: auto;
+}
+
+.section-pill {
+    padding: 6px 14px; background: white; border: 1px solid #e2e8f0;
+    border-radius: 20px; font-size: 0.85em; font-weight: 600;
+    cursor: pointer; white-space: nowrap; transition: 0.2s;
+}
+
+/* 3. Left Panel: Translucent Overlay Drawer */
+#left-panel {
+    position: absolute;
+    top: 85px; left: 15px; bottom: 15px;
+    width: 380px;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    z-index: 90;
+    display: flex; flex-direction: column;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
+    overflow: hidden;
+}
+
+#left-panel.hidden {
+    transform: translateX(-410px);
+    opacity: 0;
+}
++++++++ SEARCH
+        #map-wrapper {
+            flex: 1;
             position: relative;
         }
-
-        #left-panel.hidden {
-            width: 0;
-            border: none;
-        }
-
-        #left-panel.wide {
-            width: 60vw;
-        }
-
-        #left-panel.hidden>* {
+#map-wrapper { position: absolute; inset: 0; z-index: 1; }
++++++++ SEARCH
+        /* Elevation Panel */
+        #elevation-panel {
             display: none;
+            position: absolute;
+            bottom: 0;
+            left: 450px;
+            right: 0;
+            height: 200px;
+            background: white;
+            z-index: 1000;
+            border-top: 2px solid #ccc;
+            padding: 10px;
+            box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.1);
         }
-
-        #left-panel.collapsed {
-            width: 0 !important;
-            min-width: 0 !important;
-            border: none !important;
-        }
-
-        #left-panel.collapsed>* {
-            display: none;
-        }
+#elevation-panel {
+    display: none;
+    position: absolute;
+    bottom: 25px; left: 410px; right: 20px;
+    height: 220px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    z-index: 80; padding: 15px;
+}
 
         #panel-header {
             padding: 15px 20px;
@@ -836,114 +878,36 @@
 </head>
 
 <body>
+    <div id="command-bar">
+        <div style="font-weight: 900; color: #0f172a; margin-right: 10px;">EXPEDITION v2</div>
+        <div id="section-pills"></div> 
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <button onclick="cycleSidebar()" class="action-btn-modern">📅</button>
+            <button onclick="openModal()" class="add-task-btn" style="width: auto; padding: 8px 15px; margin: 0;">+ Task</button>
+        </div>
+    </div>
 
     <div id="left-panel">
         <div id="panel-header">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <button class="add-task-btn" onclick="openModal()" style="width: auto; margin: 0; padding: 10px 20px;">+
-                    New Task</button>
-                <button onclick="document.getElementById('filter-drawer').classList.toggle('open')"
-                    style="width: auto; background: none; color: #7f8c8d; border: 1px solid #ddd; padding: 8px 12px; border-radius: 6px; cursor: pointer;">⚙️
-                    Filters</button>
+                <button onclick="document.getElementById('filter-drawer').classList.toggle('open')" style="width: auto; background: none; color: #7f8c8d; border: 1px solid #ddd; padding: 8px 12px; border-radius: 6px; cursor: pointer;">⚙️ Filters</button>
             </div>
             <div class="search-container">
                 <span>🔍</span>
-                <input type="text" id="search-filter" placeholder="Search tasks, descriptions, assignee..."
-                    oninput="renderProjectView()">
+                <input type="text" id="search-filter" placeholder="Search tasks..." oninput="renderProjectView()">
             </div>
         </div>
         <div id="filter-drawer" class="filter-drawer">
-            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                <div style="flex:1;">
-                    <label style="font-weight: bold; font-size: 0.85em; display:block; margin-bottom: 5px;">Group
-                        Filter</label>
-                    <select id="group-filter" onchange="renderProjectView()" style="padding: 6px;">
-                        <option value="">All Groups</option>
-                        <option value="Hikers">Hikers</option>
-                        <option value="Runners">Runners</option>
-                        <option value="Staff">Staff</option>
-                        <option value="Transport">Transport</option>
-                    </select>
-                </div>
-                <div style="flex:1;">
-                    <label style="font-weight: bold; font-size: 0.85em; display:block; margin-bottom: 5px;">Type
-                        Filter</label>
-                    <select id="type-filter" onchange="renderProjectView()" style="padding: 6px;">
-                        <option value="">All Types</option>
-                    </select>
-                </div>
             </div>
-            <div style="font-size: 0.85em; margin-bottom: 10px;">
-                <strong>Show Columns:</strong><br>
-                <label style="margin-right:10px;"><input type="checkbox" id="col-category" checked
-                        onchange="renderProjectView()"> Category</label>
-                <label style="margin-right:10px;"><input type="checkbox" id="col-assignee" checked
-                        onchange="renderProjectView()"> Assignee</label>
-                <label style="margin-right:10px;"><input type="checkbox" id="col-time" checked
-                        onchange="renderProjectView()"> Time</label>
-                <label><input type="checkbox" id="col-group" onchange="renderProjectView()"> Group</label>
-            </div>
-            <div style="font-size: 0.85em;">
-                <strong>Show on Map:</strong><br>
-                <label style="margin-right:10px;"><input type="checkbox" id="filter-points" checked
-                        onchange="updateFilters()"> 📍 Points</label>
-                <label style="margin-right:10px;"><input type="checkbox" id="filter-lines" checked
-                        onchange="updateFilters()"> 📈 Tracks</label>
-                <label style="margin-right:10px;"><input type="checkbox" id="filter-smart" checked
-                        onchange="updateFilters()"> 🚗 Smart Routes</label>
-                <label><input type="checkbox" id="filter-polygons" checked onchange="updateFilters()"> 🛑 Zones</label>
-            </div>
-        </div>
         <div id="asana-container"></div>
     </div>
 
-    <div id="map-wrapper" style="flex: 1; position: relative;">
-        <div id="loading-overlay"
-            style="position:absolute; inset:0; background:rgba(255,255,255,0.8); z-index:9999; display:flex; justify-content:center; align-items:center; font-size:20px; font-weight:bold; color:#333;">
-            Waking up server (This takes ~50 seconds)...</div>
-        <div style="position:absolute; top:90px; left:15px; z-index:100; width:350px;">
-            <input type="text" id="internal-map-search" placeholder="🔍 Search existing locations/tracks on map..."
-                style="width:100%; padding:10px 15px; border-radius:8px; border:1px solid #ccc; box-shadow:0 2px 10px rgba(0,0,0,0.2); outline:none; font-family:sans-serif;">
-            <div id="internal-search-results"
-                style="display:none; background:white; width:100%; max-height:350px; overflow-y:auto; border-radius:8px; margin-top:5px; box-shadow:0 4px 15px rgba(0,0,0,0.2);">
-            </div>
-        </div>
-        <div id="map" style="position: absolute; top: 0; bottom: 0; width: 100%;"></div>
-        <div class="floating-tools">
-            <button onclick="cycleSidebar()" title="Toggle Sidebar"
-                style="font-weight: bold; font-size: 1.2em; padding: 5px 12px;">☰</button>
-            <button onclick="draw.changeMode('draw_point')">📍 Add Waypoint</button>
-            <button onclick="draw.changeMode('draw_line_string')">📈 Add Track</button>
-            <button onclick="draw.changeMode('draw_polygon')">🛑 Add Zone</button>
-            <label
-                style="cursor: pointer; padding: 8px 15px; background: #fff; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;">
-                📁 Upload GPX
-                <input type="file" id="gpx-file" accept=".gpx" style="display: none;">
-            </label>
-
-            <select id="route-profile" style="width: auto; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-                <option value="driving">🚗 Drive</option>
-                <option value="walking">🚶 Walk</option>
-                <option value="cycling">🚲 Cycle</option>
-            </select>
-            <button id="smart-route-btn" onclick="startSmartRoute()">🛣️ Smart Route</button>
-        </div>
-
-        <div id="style-switcher">
-            <select id="map-style-select" onchange="changeMapStyle(this.value)"
-                style="padding: 5px; border: none; outline: none;">
-                <option value="mapbox://styles/mapbox/outdoors-v12">🏔️ Outdoors (Topo)</option>
-                <option value="mapbox://styles/mapbox/satellite-streets-v12">🛰️ Satellite</option>
-                <option value="mapbox://styles/mapbox/streets-v12">🗺️ Streets</option>
-            </select>
-        </div>
-
+    <div id="map-wrapper">
+        <div id="loading-overlay" style="position:absolute; inset:0; background:rgba(255,255,255,0.8); z-index:9999; display:none;">Waking up server...</div>
+        <div id="map" style="position: absolute; inset: 0;"></div>
         <div id="elevation-panel">
-            <span id="close-elevation"
-                onclick="document.getElementById('elevation-panel').style.display='none'">❌</span>
-            <div id="elevation-stats-header"
-                style="display:flex; gap:20px; padding:8px 15px; background:#f8f9fa; border-bottom:1px solid #ddd; font-size:0.9em; font-weight:bold; color:#2c3e50;">
-            </div>
+            <span id="close-elevation" onclick="document.getElementById('elevation-panel').style.display='none'">❌</span>
+            <div id="elevation-stats-header"></div>
             <canvas id="elevation-chart"></canvas>
         </div>
     </div>
@@ -1871,18 +1835,38 @@
             }
         }
 
-        function cycleSidebar() {
-            const panel = document.getElementById('left-panel');
-            if (panel.classList.contains('hidden')) {
-                panel.classList.remove('hidden');
-            } else if (!panel.classList.contains('wide')) {
-                panel.classList.add('wide');
-            } else {
-                panel.classList.add('hidden');
-                panel.classList.remove('wide');
-            }
-            setTimeout(() => map.resize(), 350);
-        }
+function cycleSidebar() {
+    const panel = document.getElementById('left-panel');
+    const elev = document.getElementById('elevation-panel');
+    panel.classList.toggle('hidden');
+    if (panel.classList.contains('hidden')) {
+        elev.style.left = '20px';
+    } else {
+        elev.style.left = '410px';
+    }
+    setTimeout(() => map.resize(), 300);
+}
+
+function renderSectionPills() {
+    const container = document.getElementById('section-pills');
+    container.innerHTML = allSections.map(s => `
+        <button class="section-pill" onclick="flyToSection('${s.title}')">
+            ${s.title}
+        </button>
+    `).join('');
+}
+>>>>>>> SEARCH
+                allSections = await secRes.json();
+                allCategories = await catRes.json();
+                allTaskTypes = await typeRes.json();
+
+                // Update UI components
+                allSections = await secRes.json();
+                allCategories = await catRes.json();
+                allTaskTypes = await typeRes.json();
+                renderSectionPills();
+
+                // Update UI components
 
         function focusTaskInSidebar(taskId) {
             const row = document.getElementById(`task-row-${taskId}`);
