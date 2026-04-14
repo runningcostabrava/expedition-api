@@ -1687,10 +1687,13 @@
                                     ${geom.google_maps_url ? `<a href="${geom.google_maps_url}" target="_blank" style="color:#27ae60; text-decoration:none; font-weight:bold;">🗺️ Maps</a>` : ''}
                                 </div>
 
-                                <div style="display: flex; gap: 8px;">
+                                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
                                     <button class="popup-btn edit" onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="flex:1;">Edit</button>
                                     <button class="popup-btn delete" onclick="deleteGeometry('point', ${geom.waypoint_id || geom.anchor_id})" style="flex:1;">Delete</button>
                                 </div>
+                                <button class="popup-btn" style="width: 100%; background: #f39c12; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-weight: bold;" onclick="openStreetView(${geom.lat}, ${geom.lng})">
+                                    🚶‍♂️ Open Street View
+                                </button>
                             </div>
                         `))
                             .addTo(map);
@@ -3036,13 +3039,22 @@
             }
         }
 
+        function openStreetView(lat, lng) {
+            // Official Google Maps Universal URL intent for Street View
+            const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+            window.open(svUrl, '_blank');
+        }
+
         function startEditGeometry(taskId, anchorId) {
             const task = allItinerary.find(t => t.task_id === taskId);
             const geom = task?.geometries.find(g => g.anchor_id === anchorId);
-            if (!geom) { alert("Geometry not found!"); return; }
+            if (!geom) {
+                alert("Geometry not found!");
+                return;
+            }
 
             // Clear any lingering mapbox popups
-            const popups = document.getElementsByClassName('mapboxgl-popup');
+            const popups = document.getElementsByClassName("mapboxgl-popup");
             while (popups.length > 0) {
                 popups[0].remove();
             }
@@ -3064,10 +3076,19 @@
                 centerPoint = [geom.lng, geom.lat];
                 showGeometryContextPopup(centerPoint, feature.geometry, geom.title, '', editConfig, geom.icon, geom.color, geom.link);
             } else if (geom.geojson) {
-                draw.add(geom.geojson);
                 const feature = geom.geojson.features[0];
-                centerPoint = feature.geometry.type === 'Polygon' ? feature.geometry.coordinates[0][0] : feature.geometry.coordinates[Math.floor(feature.geometry.coordinates.length / 2)];
-                showGeometryContextPopup(centerPoint, feature.geometry, geom.title, '', editConfig, '📈', geom.color, geom.link);
+
+                // 1. MapboxDraw requires an explicit string/number ID to use direct_select
+                feature.id = feature.id || "edit-track";
+
+                // 2. Add the track to the drawing layer
+                draw.add(feature);
+
+                // 3. Activate Komoot-style vertex editing
+                draw.changeMode("direct_select", { featureId: feature.id });
+
+                centerPoint = feature.geometry.type === "Polygon" ? feature.geometry.coordinates[0][0] : feature.geometry.coordinates[Math.floor(feature.geometry.coordinates.length / 2)];
+                showGeometryContextPopup(centerPoint, feature.geometry, geom.title, "", editConfig, "📈", geom.color, geom.link);
             }
         }
 
