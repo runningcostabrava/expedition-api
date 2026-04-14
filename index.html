@@ -9,10 +9,7 @@
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.0/mapbox-gl-draw.css"
         type="text/css">
-    <script id="search-js" src="https://api.mapbox.com/search-js/v1.0.0-beta.21/web.js"></script>
-
-    <script
-        src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
+    src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
     <link rel="stylesheet"
         href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css"
         type="text/css">
@@ -318,12 +315,16 @@
             padding: 8px 10px;
             background: #f8fafc;
             border: 1px solid #e2e8f0;
-            border-left: 4px solid #94a3b8 !important; /* Thick left border to denote it's a child */
+            border-left: 4px solid #94a3b8 !important;
+            /* Thick left border to denote it's a child */
             border-radius: 0 8px 8px 0;
             box-shadow: none;
             position: relative;
         }
-        .geom-row.nested-geom:hover { background: #f1f5f9; }
+
+        .geom-row.nested-geom:hover {
+            background: #f1f5f9;
+        }
 
         .geom-row.nested-geom:last-child {
             border-bottom: none;
@@ -1099,7 +1100,7 @@
         async function initializeApp() {
             const configRes = await fetch(`${API_URL}/api/config`);
             const config = await configRes.json();
-            
+
             document.getElementById('loading-overlay').style.display = 'none';
             mapboxgl.accessToken = config.MAPBOX_TOKEN;
             ADMIN_KEY = config.ADMIN_KEY;
@@ -1113,7 +1114,7 @@
 
             script.onload = () => {
                 // Initialize your Google Search logic once the script is ready
-                initGoogleSearch(); 
+                initGoogleSearch();
             };
 
             map = new mapboxgl.Map({
@@ -1127,12 +1128,6 @@
             draw = new MapboxDraw({ displayControlsDefault: false, controls: { trash: true } });
             map.addControl(draw);
             map.addControl(new mapboxgl.NavigationControl(), 'top-right');
-
-            // Use the NEW Mapbox Search Box API (v1)
-            const searchBox = new mapboxsearch.MapboxSearchBox();
-            searchBox.accessToken = mapboxgl.accessToken;
-            searchBox.options = { language: 'it,en' };
-            map.addControl(searchBox, 'top-right');
 
             // 1. Unified Click Handler for Routing and Analysis
             map.on('click', async (e) => {
@@ -1164,23 +1159,6 @@
                     // With MapboxDirections UI, the plugin natively handles map clicks.
                     return;
                 }
-            });
-
-            // 2. Search Box API Result (New v1 API)
-            searchBox.addEventListener('retrieve', (e) => {
-                if (isRouting) return;
-
-                const feature = e.detail.features[0];
-                draw.deleteAll();
-                draw.add(feature);
-
-                // Calculate a safe center point for the popup (works for Points, Lines, and Polygons)
-                let centerPoint;
-                if (feature.geometry.type === 'Point') centerPoint = feature.geometry.coordinates;
-                else if (feature.geometry.type === 'LineString') centerPoint = feature.geometry.coordinates[Math.floor(feature.geometry.coordinates.length / 2)];
-                else centerPoint = feature.geometry.coordinates[0][0];
-
-                showGeometryContextPopup(centerPoint, feature.geometry, feature.properties.name || feature.properties.place_formatted, '');
             });
 
             // Listen for ENTER to finish Multi-stop Route
@@ -1305,20 +1283,24 @@
             });
         }
 
+        let googlePlacesService;
+
         function initGoogleSearch() {
             const searchInput = document.createElement('input');
             searchInput.id = 'google-search-input';
             searchInput.placeholder = '🔍 Search Google Places...';
-            // Styling to match your floating tools
             searchInput.style = 'position:absolute; top:15px; right:60px; z-index:100; width:300px; padding:10px; border-radius:8px; border:1px solid #ccc; box-shadow:0 2px 10px rgba(0,0,0,0.2); outline:none;';
             document.getElementById('map-wrapper').appendChild(searchInput);
 
+            // Initialize the Places Service to get rich details later
+            googlePlacesService = new google.maps.places.PlacesService(map.getCanvas());
+
             const autocomplete = new google.maps.places.Autocomplete(searchInput, {
-                fields: ["place_id", "geometry", "name", "formatted_address", "rating", "website", "photos"],
+                // We only ask for the ID and basics first to save money
+                fields: ["place_id", "geometry", "name", "formatted_address"],
                 types: ["establishment", "geocode"]
             });
 
-            // Bias to current map view
             map.on('moveend', () => {
                 const bounds = map.getBounds();
                 autocomplete.setBounds(new google.maps.LatLngBounds(
@@ -1328,34 +1310,86 @@
             });
 
             autocomplete.addListener("place_changed", () => {
-                const place = autocomplete.getPlace();
-                if (!place.geometry) return;
+                const basicPlace = autocomplete.getPlace();
+                if (!basicPlace.geometry) return;
 
-                const coords = [place.geometry.location.lng(), place.geometry.location.lat()];
-                map.flyTo({ center: coords, zoom: 16 });
+                // Fly to location
+                const coords = [basicPlace.geometry.location.lng(), basicPlace.geometry.location.lat()];
+                map.flyTo({ center: coords, zoom: 17 });
 
-                // Get the photo URL if it exists
-                const photoUrl = place.photos && place.photos.length > 0 ? place.photos[0].getUrl({ maxWidth: 400 }) : null;
-
-                draw.deleteAll();
-                const feat = { 
-                    type: 'Feature', 
-                    geometry: { type: 'Point', coordinates: coords },
-                    properties: { photo: photoUrl } // Pass photo to the popup
+                // Now, fetch the HEAVY details (Reviews, Hours, Photos)
+                const request = {
+                    placeId: basicPlace.place_id,
+                    fields: ['name', 'rating', 'user_ratings_total', 'formatted_phone_number', 'opening_hours', 'website', 'photos', 'reviews']
                 };
-                draw.add(feat);
 
+                googlePlacesService.getDetails(request, (fullPlace, status) => {
+                    if (status === google.maps.places.PlacesServiceStatus.OK) {
+                        renderRichPlaceProfile(basicPlace, fullPlace, coords);
+                    }
+                });
+            });
+        }
+
+        function renderRichPlaceProfile(basicPlace, fullPlace, coords) {
+            const container = document.getElementById('asana-container');
+            const photoUrl = fullPlace.photos ? fullPlace.photos[0].getUrl({maxWidth: 600}) : 'https://via.placeholder.com/600x300?text=No+Photo';
+            
+            // Check if open now
+            const isOpen = fullPlace.opening_hours ? (fullPlace.opening_hours.isOpen() ? '<span style="color:#27ae60; font-weight:bold;">🟢 Open Now</span>' : '<span style="color:#e74c3c; font-weight:bold;">🔴 Closed</span>') : '';
+
+            // Render top 2 reviews
+            let reviewsHtml = '';
+            if (fullPlace.reviews && fullPlace.reviews.length > 0) {
+                reviewsHtml = fullPlace.reviews.slice(0, 2).map(r => `
+                    <div style="font-size:0.85em; background:#f8f9fa; padding:10px; border-radius:6px; margin-bottom:8px;">
+                        <strong>${r.author_name}</strong> (⭐ ${r.rating})<br>
+                        <i style="color:#555;">"${r.text.substring(0, 100)}..."</i>
+                    </div>
+                `).join('');
+            }
+
+            container.innerHTML = `
+                <div style="padding-bottom: 20px;">
+                    <button onclick="refreshData()" style="background:#95a5a6; padding:5px 10px; border-radius:4px; border:none; color:white; cursor:pointer; margin-bottom:15px;">← Back to Itinerary</button>
+                    
+                    <img src="${photoUrl}" style="width:100%; height:200px; object-fit:cover; border-radius:8px; margin-bottom:15px; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+                    
+                    <h2 style="margin:0 0 5px 0;">${basicPlace.name}</h2>
+                    <div style="font-size:1.1em; margin-bottom:10px;">⭐ ${fullPlace.rating || 'New'} <span style="color:#7f8c8d; font-size:0.85em;">(${fullPlace.user_ratings_total || 0} reviews)</span></div>
+                    
+                    <div style="font-size:0.9em; line-height:1.6; margin-bottom:20px; color:#2c3e50;">
+                        <div>📍 ${basicPlace.formatted_address}</div>
+                        <div>${isOpen}</div>
+                        ${fullPlace.formatted_phone_number ? `<div>📞 ${fullPlace.formatted_phone_number}</div>` : ''}
+                        ${fullPlace.website ? `<div>🌐 <a href="${fullPlace.website}" target="_blank" style="color:#3498db;">Website</a></div>` : ''}
+                    </div>
+
+                    ${reviewsHtml ? `<h4 style="margin:0 0 10px 0; border-bottom:1px solid #eee; padding-bottom:5px;">Recent Reviews</h4>${reviewsHtml}` : ''}
+
+                    <button id="embed-save-btn" style="width:100%; padding:15px; background:#27ae60; color:white; border:none; border-radius:8px; font-weight:bold; font-size:1.1em; cursor:pointer; margin-top:20px; box-shadow:0 4px 15px rgba(39, 174, 96, 0.3);">
+                        📍 Add to Expedition
+                    </button>
+                </div>
+            `;
+
+            // 1. Drop a temporary pin on the map
+            draw.deleteAll();
+            draw.add({ type: 'Feature', geometry: { type: 'Point', coordinates: coords }, properties: { photo: photoUrl } });
+
+            // 2. Link the big green button to your existing save logic
+            document.getElementById('embed-save-btn').onclick = () => {
                 showGeometryContextPopup(
                     coords, 
-                    feat.geometry, 
-                    place.name, 
-                    `⭐ ${place.rating || 'No'} Rating | 📍 ${place.formatted_address}`,
+                    { type: 'Point', coordinates: coords }, 
+                    basicPlace.name, 
+                    `⭐ ${fullPlace.rating || 'N/A'} | ${basicPlace.formatted_address}`, 
                     null, 
                     '🍽️', 
                     '#e74c3c', 
-                    place.website || ''
+                    fullPlace.website || ''
                 );
-            });
+            };
         }
 
         function renderMapGeometries() {
@@ -1843,7 +1877,7 @@
                 });
                 renderProjectView();
                 renderMapGeometries();
-                
+
                 // Hot-reload Elevation Chart if it's currently open
                 if (document.getElementById('elevation-panel').style.display === 'block' && currentElevationTrackId) {
                     let trackGeom = null;
@@ -1861,7 +1895,7 @@
                         }, currentElevationTrackId);
                     }
                 }
-                
+
             } catch (err) {
                 console.error("Data Load Error:", err);
                 if (allItinerary.length === 0) {
