@@ -1369,6 +1369,29 @@
                 // Fly to location on map click
                 row.onclick = () => map.flyTo({ center: coords, zoom: 17 });
 
+                // --- HOVER HIGHLIGHT LOGIC ---
+                row.addEventListener('mouseenter', () => {
+                    // Remove any existing hover popup to avoid duplicates
+                    if (window.discoveryHoverPopup) window.discoveryHoverPopup.remove();
+                    
+                    window.discoveryHoverPopup = new mapboxgl.Popup({ 
+                        closeButton: false, 
+                        closeOnClick: false, 
+                        offset: 15 
+                    })
+                    .setLngLat(coords)
+                    .setHTML(`<div style="font-weight:bold; font-size:1.05em; color:#2c3e50; padding:2px;">${index + 1}. ${place.displayName}</div>`)
+                    .addTo(map);
+                });
+
+                row.addEventListener('mouseleave', () => {
+                    if (window.discoveryHoverPopup) {
+                        window.discoveryHoverPopup.remove();
+                        window.discoveryHoverPopup = null;
+                    }
+                });
+                // -----------------------------
+
                 row.innerHTML = `
                     <img src="${photoUrl}" style="width:90px; height:90px; border-radius:8px; object-fit:cover; flex-shrink:0; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
                     <div style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center;">
@@ -1387,6 +1410,7 @@
                 btnAdd.innerHTML = '📍 Add to Trip';
                 btnAdd.style.cssText = 'background:#27ae60; padding:6px 12px; font-size:0.85em; border:none; color:white; border-radius:6px; cursor:pointer; font-weight:bold;';
                 btnAdd.onclick = (e) => {
+                    if (window.discoveryHoverPopup) window.discoveryHoverPopup.remove();
                     e.stopPropagation();
                     draw.deleteAll();
                     draw.add({ type: 'Feature', geometry: { type: 'Point', coordinates: coords }, properties: { photo: photoUrl } });
@@ -1398,6 +1422,7 @@
                 btnProfile.innerHTML = '🔍 View Profile';
                 btnProfile.style.cssText = 'background:#3498db; padding:6px 12px; font-size:0.85em; border:none; color:white; border-radius:6px; cursor:pointer; font-weight:bold;';
                 btnProfile.onclick = async (e) => {
+                    if (window.discoveryHoverPopup) window.discoveryHoverPopup.remove();
                     e.stopPropagation();
                     btnProfile.innerText = 'Loading...';
                     try {
@@ -1419,7 +1444,8 @@
                 const container = document.getElementById('asana-container');
                 const photoUrl = place.photos && place.photos.length > 0 ? place.photos[0].getURI({maxWidth: 600}) : 'https://via.placeholder.com/600x300?text=No+Photo';
                 const title = place.displayName || 'Unknown Place';
-                const isOpen = place.regularOpeningHours ? (place.regularOpeningHours.isOpen() ? '<span style="color:#27ae60; font-weight:bold;">🟢 Open Now</span>' : '<span style="color:#e74c3c; font-weight:bold;">🔴 Closed</span>') : '';
+                // NEW API FIX: isOpen() is called directly on the 'place' object
+                const isOpen = place.regularOpeningHours ? (place.isOpen() ? '<span style="color:#27ae60; font-weight:bold;">🟢 Open Now</span>' : '<span style="color:#e74c3c; font-weight:bold;">🔴 Closed</span>') : '';
 
                 let reviewsHtml = '';
                 if (place.reviews && place.reviews.length > 0) {
