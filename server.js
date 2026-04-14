@@ -75,7 +75,8 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS parent_track_id INTEGER",
       "ALTER TABLE categories ADD COLUMN IF NOT EXISTS line_type TEXT DEFAULT 'solid'",
       "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_milestone BOOLEAN DEFAULT false",
-      "ALTER TABLE categories ADD COLUMN IF NOT EXISTS marker_size INTEGER DEFAULT 28"
+      "ALTER TABLE categories ADD COLUMN IF NOT EXISTS marker_size INTEGER DEFAULT 28",
+      "CREATE TABLE IF NOT EXISTS team_members (id SERIAL PRIMARY KEY, name TEXT UNIQUE)"
     ];
 
     // Execute safely one by one
@@ -402,6 +403,29 @@ app.delete('/categories/:id', adminAuth, async (req, res) => {
   try {
     await pool.query('DELETE FROM categories WHERE id=$1', [req.params.id]);
     res.json({ message: 'Category deleted' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- TEAM MANAGEMENT ---
+app.get('/team_members', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM team_members ORDER BY name ASC');
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/team_members', adminAuth, async (req, res) => {
+  const { name } = req.body;
+  try {
+    const result = await pool.query('INSERT INTO team_members (name) VALUES ($1) RETURNING *', [name]);
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/team_members/:id', adminAuth, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM team_members WHERE id=$1', [req.params.id]);
+    res.json({ message: 'Team member deleted' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

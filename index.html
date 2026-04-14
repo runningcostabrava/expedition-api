@@ -1894,7 +1894,7 @@
                 allItinerary.forEach(t => {
                     const option = document.createElement('option');
                     option.value = t.task_id;
-                    option.textContent = t.task;
+                    option.textContent = t.task_name || 'Unnamed Task';
                     dropdown.appendChild(option);
                 });
                 renderProjectView();
@@ -2154,7 +2154,15 @@
         }
 
         document.getElementById('unified-save-btn').onclick = async () => {
+            // 1. Grab the ID first so we can fetch existing data
+            const existingTaskId = document.getElementById('existing-task').value || null;
+            
+            // 2. Fetch the existing task to preserve fields not shown in the modal (like parent_id)
+            const baseTask = existingTaskId ? (allItinerary.find(t => t.task_id == existingTaskId) || {}) : {};
+
+            // 3. Merge existing data with the form inputs
             const taskData = {
+                ...baseTask,
                 task_name: document.getElementById('wp-title').value,
                 category_id: document.getElementById('task-category-id').value || null,
                 section_id: document.getElementById('task-section-id').value || null,
@@ -2164,7 +2172,7 @@
                 is_milestone: document.getElementById('is-milestone') ? document.getElementById('is-milestone').checked : false,
                 comments: document.getElementById('task-comments').value
             };
-            const existingTaskId = document.getElementById('existing-task').value || null;
+            
             const geomColor = document.getElementById('geom-color').value;
             const features = draw.getAll().features;
             const headers = { 'Content-Type': 'application/json', 'x-api-key': ADMIN_KEY };
@@ -2453,6 +2461,8 @@
                     animation: 150,
                     fallbackOnBody: true,
                     swapThreshold: 0.65,
+                    filter: '.inline-edit, .edit-btn, .delete-btn, input, select', // Tells Sortable to ignore these items
+                    preventOnFilter: false, // Allows your mouse click to pass through to the text cursor
                     onEnd: async function (evt) {
                         const itemEl = evt.item; // The dragged card
                         const toList = evt.to;   // The drop zone it landed in
@@ -2525,13 +2535,16 @@
             taskEl.id = `task-row-${task.task_id}`;
 
             if (isFite) {
-                // RENDER AS A FITE (NODE ON LINE) - Keep existing logic but clean it up
+                // RENDER AS A FITE (NODE ON LINE)
                 taskEl.className = 'fite-row';
                 taskEl.innerHTML = `
                     <div class="fite-dot" style="border-color: ${catColor}"></div>
                     <div class="fite-text" style="display: flex; align-items: center; flex: 1;">
                         <span style="color:#718096; font-size:0.8em; margin-right:8px;">${timeOnly}</span>
-                        <span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">${task.task_name || 'Milestone'}</span>
+                        <span class="inline-edit" contenteditable="true" 
+                              onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }" 
+                              onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())" 
+                              onclick="event.stopPropagation()">${task.task_name || 'Milestone'}</span>
                     </div>
                     <div class="geom-actions" style="opacity:1">
                         <button class="edit-btn" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
@@ -2539,23 +2552,24 @@
                     </div>
                 `;
             } else {
-                // RENDER AS A TASK CARD (2 COLUMNS, 2 SUB-ROWS)
+                // RENDER AS A TASK CARD
                 taskEl.className = 'task-row';
                 taskEl.style.borderLeft = `8px solid ${catColor}`;
 
                 if (task.is_completed) taskEl.style.opacity = '0.6';
 
-                // Find Category Info
                 const cat = allCategories.find(c => c.id === task.category_id);
                 const catName = cat ? cat.name : 'No Category';
                 const catIcon = cat ? cat.icon : '🏷️';
 
                 taskEl.innerHTML = `
                     <div class="task-main-content">
-                        <div class="task-title-large">
-                            <span class="inline-edit" contenteditable="true" onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText)" onclick="event.stopPropagation()">
-                                ${task.is_completed ? '✅ ' : ''}${task.task_name || 'Unnamed Task'}
-                            </span>
+                        <div class="task-title-large" style="display: flex; align-items: flex-start;">
+                            ${task.is_completed ? '<span style="margin-right:5px; user-select:none;">✅</span>' : ''}
+                            <span class="inline-edit" contenteditable="true" 
+                                  onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }" 
+                                  onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())" 
+                                  onclick="event.stopPropagation()">${task.task_name || 'Unnamed Task'}</span>
                         </div>
                         ${task.responsible ? `<div style="font-size:0.75em; color:#a0aec0;">👤 ${task.responsible}</div>` : ''}
                     </div>
