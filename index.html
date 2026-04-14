@@ -2660,16 +2660,17 @@
                 taskEl.className = 'fite-row';
                 taskEl.innerHTML = `
                     <div class="fite-dot" style="border-color: ${catColor}"></div>
-                    <div class="fite-text" style="display: flex; align-items: center; flex: 1;">
-                        <span style="color:#718096; font-size:0.8em; margin-right:8px;">${timeOnly}</span>
+                    <div class="fite-text" style="display: flex; align-items: center; flex: 1; min-width:0;">
+                        <span style="color:#64748b; font-size:0.75em; margin-right:8px; font-weight:600;">${timeOnly}</span>
                         <span class="inline-edit" contenteditable="true" 
+                              style="font-size:0.9em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
                               onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }" 
                               onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())" 
                               onclick="event.stopPropagation()">${task.task_name || 'Milestone'}</span>
                     </div>
-                    <div class="task-actions-modern" style="margin-left:auto;">
-                        <button class="action-btn-modern" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
-                        <button class="action-btn-modern del" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
+                    <div class="task-actions-modern" style="opacity:1; margin-left:auto;">
+                        <button class="action-btn-modern" title="Edit Milestone" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
+                        <button class="action-btn-modern del" title="Delete Milestone" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
                     </div>
                 `;
             } else {
