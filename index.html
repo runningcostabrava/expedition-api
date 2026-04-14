@@ -1281,108 +1281,137 @@
 
         let googlePlacesService;
 
-        // Attach to window so the callback from the script tag can find it
         window.initGoogleSearch = async () => {
-            // Import the NEW 2025 Places API library
-            const { PlaceAutocompleteElement } = await google.maps.importLibrary("places");
+            // Import the New 2025 Place library
+            const { Place } = await google.maps.importLibrary("places");
 
-            // Create the new Web Component search box
-            const autocomplete = new PlaceAutocompleteElement();
-            autocomplete.id = 'google-search-input';
-            autocomplete.style = 'position:absolute; top:15px; right:60px; z-index:100; width:300px; background:white; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.2);';
-            document.getElementById('map-wrapper').appendChild(autocomplete);
+            // Create a standard text input for Discovery Search
+            const searchInput = document.createElement('input');
+            searchInput.id = 'google-discovery-input';
+            searchInput.placeholder = '🔍 Find "restaurants", "hotels"... (Press Enter)';
+            searchInput.style = 'position:absolute; top:15px; right:60px; z-index:100; width:300px; padding:10px; border-radius:8px; border:1px solid #ccc; box-shadow:0 2px 10px rgba(0,0,0,0.2); outline:none; font-family:sans-serif;';
+            document.getElementById('map-wrapper').appendChild(searchInput);
 
-            // Bias to current map view
-            map.on('moveend', () => {
-                const bounds = map.getBounds();
-                autocomplete.locationBias = {
-                    north: bounds.getNorth(),
-                    south: bounds.getSouth(),
-                    east: bounds.getEast(),
-                    west: bounds.getWest()
-                };
-            });
+            // Listen for the "Enter" key
+            searchInput.addEventListener('keydown', async (e) => {
+                if (e.key === 'Enter') {
+                    const query = searchInput.value.trim();
+                    if (!query) return;
 
-            // Listen for place selection using the new 'gmp-placeselect' event
-            autocomplete.addEventListener("gmp-placeselect", async (e) => {
-                const place = e.place;
-                if (!place) return;
+                    // Constrain search to the area the user is currently looking at
+                    const bounds = map.getBounds();
+                    const request = {
+                        textQuery: query,
+                        locationBias: {
+                            north: bounds.getNorth(),
+                            south: bounds.getSouth(),
+                            east: bounds.getEast(),
+                            west: bounds.getWest()
+                        },
+                        fields: ['id', 'displayName', 'location', 'photos', 'rating', 'userRatingCount', 'formattedAddress', 'websiteURI'],
+                        maxResultCount: 10 // Show exactly 10 results
+                    };
 
-                // Fetch all the rich data we need using the New API
-                await place.fetchFields({
-                    fields: ['displayName', 'formattedAddress', 'location', 'photos', 'reviews', 'rating', 'userRatingCount', 'regularOpeningHours', 'nationalPhoneNumber', 'websiteURI']
-                });
-
-                const coords = [place.location.lng(), place.location.lat()];
-                map.flyTo({ center: coords, zoom: 17 });
-
-                // Pass the single new 'place' object to our renderer
-                renderRichPlaceProfile(place, coords);
+                    try {
+                        // Fetch the list of places
+                        const { places } = await Place.searchByText(request);
+                        
+                        if (places && places.length > 0) {
+                            renderDiscoverySidebar(places);
+                        } else {
+                            alert("No results found in this area. Try zooming out or moving the map.");
+                        }
+                    } catch (err) {
+                        console.error("Google Places Search Error:", err);
+                        alert("Error searching Google Places. Check console for details.");
+                    }
+                }
             });
         };
 
-        function renderRichPlaceProfile(place, coords) {
+        function renderDiscoverySidebar(places) {
             const container = document.getElementById('asana-container');
             
-            // NEW API: place.photos[0].getURI()
-            const photoUrl = place.photos && place.photos.length > 0 ? place.photos[0].getURI({maxWidth: 600}) : 'https://via.placeholder.com/600x300?text=No+Photo';
-            const title = place.displayName || 'Unknown Place';
-
-            // Check if open now (New API)
-            const isOpen = place.regularOpeningHours ? (place.regularOpeningHours.isOpen() ? '<span style="color:#27ae60; font-weight:bold;">🟢 Open Now</span>' : '<span style="color:#e74c3c; font-weight:bold;">🔴 Closed</span>') : '';
-
-            // Render top 2 reviews (New API)
-            let reviewsHtml = '';
-            if (place.reviews && place.reviews.length > 0) {
-                reviewsHtml = place.reviews.slice(0, 2).map(r => `
-                    <div style="font-size:0.85em; background:#f8f9fa; padding:10px; border-radius:6px; margin-bottom:8px;">
-                        <strong>${r.authorAttribution ? r.authorAttribution.displayName : 'Guest'}</strong> (⭐ ${r.rating})<br>
-                        <i style="color:#555;">"${(r.text || '').substring(0, 100)}..."</i>
-                    </div>
-                `).join('');
-            }
-
+            // 1. Build the Sidebar Header
             container.innerHTML = `
                 <div style="padding-bottom: 20px;">
-                    <button onclick="refreshData()" style="background:#95a5a6; padding:5px 10px; border-radius:4px; border:none; color:white; cursor:pointer; margin-bottom:15px;">← Back to Itinerary</button>
-                    
-                    <img src="${photoUrl}" style="width:100%; height:200px; object-fit:cover; border-radius:8px; margin-bottom:15px; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
-                    
-                    <h2 style="margin:0 0 5px 0;">${title}</h2>
-                    <div style="font-size:1.1em; margin-bottom:10px;">⭐ ${place.rating || 'New'} <span style="color:#7f8c8d; font-size:0.85em;">(${place.userRatingCount || 0} reviews)</span></div>
-                    
-                    <div style="font-size:0.9em; line-height:1.6; margin-bottom:20px; color:#2c3e50;">
-                        <div>📍 ${place.formattedAddress || ''}</div>
-                        <div>${isOpen}</div>
-                        ${place.nationalPhoneNumber ? `<div>📞 ${place.nationalPhoneNumber}</div>` : ''}
-                        ${place.websiteURI ? `<div>🌐 <a href="${place.websiteURI}" target="_blank" style="color:#3498db;">Website</a></div>` : ''}
-                    </div>
-
-                    ${reviewsHtml ? `<h4 style="margin:0 0 10px 0; border-bottom:1px solid #eee; padding-bottom:5px;">Recent Reviews</h4>${reviewsHtml}` : ''}
-
-                    <button id="embed-save-btn" style="width:100%; padding:15px; background:#27ae60; color:white; border:none; border-radius:8px; font-weight:bold; font-size:1.1em; cursor:pointer; margin-top:20px; box-shadow:0 4px 15px rgba(39, 174, 96, 0.3);">
-                        📍 Add to Expedition
-                    </button>
+                    <button onclick="refreshData()" style="background:#95a5a6; padding:5px 10px; border-radius:4px; border:none; color:white; cursor:pointer; margin-bottom:15px; font-weight:bold;">← Back to Itinerary</button>
+                    <h3 style="margin-top:0; border-bottom:2px solid #eee; padding-bottom:10px;">Found ${places.length} Results</h3>
+                    <div id="google-results-list"></div>
                 </div>
             `;
+            const listContainer = document.getElementById('google-results-list');
 
-            // 1. Drop a temporary pin on the map
+            // 2. Clear previous map drawings
             draw.deleteAll();
-            draw.add({ type: 'Feature', geometry: { type: 'Point', coordinates: coords }, properties: { photo: photoUrl } });
+            const mapFeatures = [];
 
-            // 2. Link the big green button to your existing save logic
-            document.getElementById('embed-save-btn').onclick = () => {
-                showGeometryContextPopup(
-                    coords, 
-                    { type: 'Point', coordinates: coords }, 
-                    title, 
-                    `⭐ ${place.rating || 'N/A'} | ${place.formattedAddress || ''}`, 
-                    null, 
-                    '🍽️', 
-                    '#e74c3c', 
-                    place.websiteURI || ''
-                );
-            };
+            // 3. Generate Sidebar Cards and Map Pins
+            places.forEach((place, index) => {
+                const coords = [place.location.lng(), place.location.lat()];
+                
+                // Add to map bounds array
+                mapFeatures.push(turf.point(coords));
+
+                // Draw temporary point on Mapbox
+                draw.add({ type: 'Feature', geometry: { type: 'Point', coordinates: coords } });
+
+                // Get Photo
+                const photoUrl = place.photos && place.photos.length > 0 
+                    ? place.photos[0].getURI({maxWidth: 300}) 
+                    : 'https://via.placeholder.com/300x300?text=No+Photo';
+
+                // Create the UI Card
+                const row = document.createElement('div');
+                row.className = 'task-row';
+                row.style.cssText = 'display:flex; padding:12px; gap:15px; border-bottom:1px solid #eee; cursor:pointer; align-items:flex-start; margin-bottom:12px; background:white;';
+                
+                // Fly to location on map click
+                row.onclick = () => map.flyTo({ center: coords, zoom: 17 });
+
+                row.innerHTML = `
+                    <img src="${photoUrl}" style="width:90px; height:90px; border-radius:8px; object-fit:cover; flex-shrink:0; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
+                    <div style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center;">
+                        <div style="font-weight:bold; font-size:1.05em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${index + 1}. ${place.displayName}</div>
+                        <div style="color:#f39c12; font-size:0.9em; margin:4px 0; font-weight:bold;">⭐ ${place.rating || 'New'} <span style="color:#7f8c8d; font-weight:normal;">(${place.userRatingCount || 0} reviews)</span></div>
+                        <div style="color:#7f8c8d; font-size:0.85em; line-height:1.4; margin-bottom:10px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${place.formattedAddress || ''}</div>
+                    </div>
+                `;
+
+                // The "Add to Trip" Button
+                const btn = document.createElement('button');
+                btn.innerHTML = '📍 Add to Trip';
+                btn.style.cssText = 'background:#27ae60; padding:8px 12px; font-size:0.85em; width:auto; border:none; color:white; border-radius:6px; cursor:pointer; font-weight:bold; align-self:flex-start;';
+                
+                btn.onclick = (e) => {
+                    e.stopPropagation(); // Prevent map from flying when button is clicked
+                    
+                    // Isolate this specific pin in the drawing tool for saving
+                    draw.deleteAll();
+                    draw.add({ type: 'Feature', geometry: { type: 'Point', coordinates: coords }, properties: { photo: photoUrl } });
+                    
+                    // Pop open the save modal!
+                    showGeometryContextPopup(
+                        coords, 
+                        { type: 'Point', coordinates: coords }, 
+                        place.displayName, 
+                        `⭐ ${place.rating || 'N/A'} | ${place.formattedAddress || ''}`, 
+                        null, 
+                        '🍽️', 
+                        '#e74c3c', 
+                        place.websiteURI || ''
+                    );
+                };
+
+                row.querySelector('div[style*="flex:1"]').appendChild(btn);
+                listContainer.appendChild(row);
+            });
+
+            // 4. Zoom map to perfectly fit all 10 results
+            if (mapFeatures.length > 0) {
+                const bbox = turf.bbox(turf.featureCollection(mapFeatures));
+                map.fitBounds(bbox, { padding: 80, maxZoom: 16 });
+            }
         }
 
         function renderMapGeometries() {
