@@ -1378,34 +1378,89 @@
                     </div>
                 `;
 
-                // The "Add to Trip" Button
-                const btn = document.createElement('button');
-                btn.innerHTML = '📍 Add to Trip';
-                btn.style.cssText = 'background:#27ae60; padding:8px 12px; font-size:0.85em; width:auto; border:none; color:white; border-radius:6px; cursor:pointer; font-weight:bold; align-self:flex-start;';
-                
-                btn.onclick = (e) => {
-                    e.stopPropagation(); // Prevent map from flying when button is clicked
-                    
-                    // Isolate this specific pin in the drawing tool for saving
+                // Container for multiple buttons
+                const btnGroup = document.createElement('div');
+                btnGroup.style.cssText = 'display:flex; gap:8px; margin-top:8px;';
+
+                // Button 1: Quick Add
+                const btnAdd = document.createElement('button');
+                btnAdd.innerHTML = '📍 Add to Trip';
+                btnAdd.style.cssText = 'background:#27ae60; padding:6px 12px; font-size:0.85em; border:none; color:white; border-radius:6px; cursor:pointer; font-weight:bold;';
+                btnAdd.onclick = (e) => {
+                    e.stopPropagation();
                     draw.deleteAll();
                     draw.add({ type: 'Feature', geometry: { type: 'Point', coordinates: coords }, properties: { photo: photoUrl } });
-                    
-                    // Pop open the save modal!
-                    showGeometryContextPopup(
-                        coords, 
-                        { type: 'Point', coordinates: coords }, 
-                        place.displayName, 
-                        `⭐ ${place.rating || 'N/A'} | ${place.formattedAddress || ''}`, 
-                        null, 
-                        '🍽️', 
-                        '#e74c3c', 
-                        place.websiteURI || ''
-                    );
+                    showGeometryContextPopup(coords, { type: 'Point', coordinates: coords }, place.displayName, `⭐ ${place.rating || 'N/A'} | ${place.formattedAddress || ''}`, null, '🍽️', '#e74c3c', place.websiteURI || '');
                 };
 
-                row.querySelector('div[style*="flex:1"]').appendChild(btn);
+                // Button 2: View Full Profile (Fetches reviews/hours dynamically)
+                const btnProfile = document.createElement('button');
+                btnProfile.innerHTML = '🔍 View Profile';
+                btnProfile.style.cssText = 'background:#3498db; padding:6px 12px; font-size:0.85em; border:none; color:white; border-radius:6px; cursor:pointer; font-weight:bold;';
+                btnProfile.onclick = async (e) => {
+                    e.stopPropagation();
+                    btnProfile.innerText = 'Loading...';
+                    try {
+                        await place.fetchFields({ fields: ['reviews', 'regularOpeningHours', 'nationalPhoneNumber'] });
+                        renderRichPlaceProfile(place, coords, true);
+                    } catch(err) {
+                        console.error(err);
+                        btnProfile.innerText = 'Error';
+                    }
+                };
+
+                btnGroup.appendChild(btnAdd);
+                btnGroup.appendChild(btnProfile);
+                row.querySelector('div[style*="flex:1"]').appendChild(btnGroup);
                 listContainer.appendChild(row);
             });
+
+            function renderRichPlaceProfile(place, coords, isFromSearchList = false) {
+                const container = document.getElementById('asana-container');
+                const photoUrl = place.photos && place.photos.length > 0 ? place.photos[0].getURI({maxWidth: 600}) : 'https://via.placeholder.com/600x300?text=No+Photo';
+                const title = place.displayName || 'Unknown Place';
+                const isOpen = place.regularOpeningHours ? (place.regularOpeningHours.isOpen() ? '<span style="color:#27ae60; font-weight:bold;">🟢 Open Now</span>' : '<span style="color:#e74c3c; font-weight:bold;">🔴 Closed</span>') : '';
+
+                let reviewsHtml = '';
+                if (place.reviews && place.reviews.length > 0) {
+                    reviewsHtml = place.reviews.slice(0, 3).map(r => `
+                        <div style="font-size:0.85em; background:#f8f9fa; padding:10px; border-radius:6px; margin-bottom:8px;">
+                            <strong>${r.authorAttribution ? r.authorAttribution.displayName : 'Guest'}</strong> (⭐ ${r.rating})<br>
+                            <i style="color:#555;">"${(r.text || '').substring(0, 150)}..."</i>
+                        </div>
+                    `).join('');
+                }
+
+                const backAction = isFromSearchList ? `renderDiscoverySidebar(window.lastSearchResults)` : `refreshData()`;
+                const backText = isFromSearchList ? `← Back to Results` : `← Back to Itinerary`;
+
+                container.innerHTML = `
+                    <div style="padding-bottom: 20px;">
+                        <button onclick="${backAction}" style="background:#95a5a6; padding:5px 10px; border-radius:4px; border:none; color:white; cursor:pointer; margin-bottom:15px; font-weight:bold;">${backText}</button>
+                        <img src="${photoUrl}" style="width:100%; height:200px; object-fit:cover; border-radius:8px; margin-bottom:15px; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+                        <h2 style="margin:0 0 5px 0;">${title}</h2>
+                        <div style="font-size:1.1em; margin-bottom:10px;">⭐ ${place.rating || 'New'} <span style="color:#7f8c8d; font-size:0.85em;">(${place.userRatingCount || 0} reviews)</span></div>
+                        <div style="font-size:0.9em; line-height:1.6; margin-bottom:20px; color:#2c3e50;">
+                            <div>📍 ${place.formattedAddress || ''}</div>
+                            <div>${isOpen}</div>
+                            ${place.nationalPhoneNumber ? `<div>📞 ${place.nationalPhoneNumber}</div>` : ''}
+                            ${place.websiteURI ? `<div>🌐 <a href="${place.websiteURI}" target="_blank" style="color:#3498db;">Website</a></div>` : ''}
+                        </div>
+                        ${reviewsHtml ? `<h4 style="margin:0 0 10px 0; border-bottom:1px solid #eee; padding-bottom:5px;">Recent Reviews</h4>${reviewsHtml}` : ''}
+                        <button id="embed-save-btn" style="width:100%; padding:15px; background:#27ae60; color:white; border:none; border-radius:8px; font-weight:bold; font-size:1.1em; cursor:pointer; margin-top:20px; box-shadow:0 4px 15px rgba(39, 174, 96, 0.3);">
+                            📍 Add to Expedition
+                        </button>
+                    </div>
+                `;
+
+                map.flyTo({ center: coords, zoom: 17 });
+                draw.deleteAll();
+                draw.add({ type: 'Feature', geometry: { type: 'Point', coordinates: coords }, properties: { photo: photoUrl } });
+
+                document.getElementById('embed-save-btn').onclick = () => {
+                    showGeometryContextPopup(coords, { type: 'Point', coordinates: coords }, title, `⭐ ${place.rating || 'N/A'} | ${place.formattedAddress || ''}`, null, '🍽️', '#e74c3c', place.websiteURI || '');
+                };
+            }
 
             // 4. Zoom map to perfectly fit all 10 results
             if (mapFeatures.length > 0) {
