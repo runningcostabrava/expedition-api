@@ -21,169 +21,75 @@
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <style>
-/* 1. Global Layout: Map is the 100% background */
-body {
-    margin: 0; padding: 0;
-    font-family: 'Inter', sans-serif;
-    height: 100vh; width: 100vw;
-    overflow: hidden;
-    background: #0f172a;
-}
-
-/* 2. Command Bar: Top Floating Navigation */
-#command-bar {
-    position: absolute;
-    top: 15px; left: 15px; right: 15px;
-    height: 55px;
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(12px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 12px;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    padding: 0 15px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-    gap: 15px;
-}
-
-#section-pills {
-    display: flex; gap: 8px; flex: 1; overflow-x: auto;
-}
-
-.section-pill {
-    padding: 6px 14px; background: white; border: 1px solid #e2e8f0;
-    border-radius: 20px; font-size: 0.85em; font-weight: 600;
-    cursor: pointer; white-space: nowrap; transition: 0.2s;
-}
-
-/* 3. Left Panel: Translucent Overlay Drawer */
-#left-panel {
-    position: absolute;
-    top: 85px; left: 15px; bottom: 15px;
-    width: 380px;
-    background: rgba(255, 255, 255, 0.92);
-    backdrop-filter: blur(10px);
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-    z-index: 90;
-    display: flex; flex-direction: column;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
-    overflow: hidden;
-}
-
-#left-panel.hidden {
-    transform: translateX(-410px);
-    opacity: 0;
-}
-+++++++ SEARCH
-        #map-wrapper {
-            flex: 1;
-            position: relative;
-        }
-#map-wrapper { position: absolute; inset: 0; z-index: 1; }
-+++++++ SEARCH
-        /* Elevation Panel */
-        #elevation-panel {
-            display: none;
-            position: absolute;
-            bottom: 0;
-            left: 450px;
-            right: 0;
-            height: 200px;
-            background: white;
-            z-index: 1000;
-            border-top: 2px solid #ccc;
-            padding: 10px;
-            box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.1);
-        }
-#elevation-panel {
-    display: none;
-    position: absolute;
-    bottom: 25px; left: 410px; right: 20px;
-    height: 220px;
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    border-radius: 12px;
-    z-index: 80; padding: 15px;
-}
-
-        #panel-header {
-            padding: 15px 20px;
-            background: white;
-            border-bottom: 1px solid #eee;
-            z-index: 2;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-        }
-
-        .filter-drawer {
-            max-height: 0;
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, sans-serif;
+            height: 100vh;
+            width: 100vw;
             overflow: hidden;
-            transition: max-height 0.3s ease;
-            background: #f8f9fa;
-            border-bottom: 1px solid #eee;
-            padding: 0 20px;
+            background: #0f172a;
         }
 
-        .filter-drawer.open {
-            max-height: 300px;
-            padding: 15px 20px;
-        }
-
-        .search-container {
-            display: flex;
-            background: #f1f3f5;
-            border-radius: 20px;
-            padding: 5px 15px;
-            align-items: center;
-            margin-top: 15px;
-        }
-
-        .search-container input {
-            border: none;
-            background: transparent;
-            padding: 8px;
-            outline: none;
-            width: 100%;
-        }
-
-        #asana-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-        }
-
-        /* Push Mapbox native top-left controls below floating tools */
-        .mapboxgl-ctrl-top-left {
-            top: 65px !important;
-            left: 10px !important;
-        }
-
-        /* Persistent Map Tools */
-        .floating-tools {
+        /* 1. Command Bar: Top Navigation */
+        #command-bar {
             position: absolute;
             top: 15px;
             left: 15px;
-            z-index: 10;
+            right: 15px;
+            height: 55px;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            z-index: 100;
             display: flex;
-            gap: 10px;
-            background: white;
-            padding: 10px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            align-items: center;
+            padding: 0 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            gap: 15px;
         }
 
-        .floating-tools button {
-            padding: 8px 15px;
-            width: auto;
-            background: #fff;
-            color: #333;
-            border: 1px solid #ccc;
-            border-radius: 4px;
+        /* 2. Left Panel: Floating Overlay Drawer */
+        #left-panel {
+            position: absolute;
+            top: 85px;
+            left: 15px;
+            bottom: 15px;
+            width: 380px;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            z-index: 90;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
         }
 
-        .floating-tools button:hover {
-            background: #f0f0f0;
+        #left-panel.hidden {
+            transform: translateX(-410px);
+            opacity: 0;
+        }
+
+        #map-wrapper {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+        }
+
+        #elevation-panel {
+            display: none;
+            position: absolute;
+            bottom: 25px;
+            left: 410px;
+            right: 20px;
+            height: 220px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            z-index: 80;
+            padding: 15px;
         }
 
         /* Asana List Styling */
@@ -880,31 +786,26 @@ body {
 <body>
     <div id="command-bar">
         <div style="font-weight: 900; color: #0f172a; margin-right: 10px;">EXPEDITION v2</div>
-        <div id="section-pills"></div> 
+        <div id="section-pills" style="display:flex; gap:8px; flex:1;"></div>
         <div style="display: flex; gap: 8px; align-items: center;">
             <button onclick="cycleSidebar()" class="action-btn-modern">📅</button>
-            <button onclick="openModal()" class="add-task-btn" style="width: auto; padding: 8px 15px; margin: 0;">+ Task</button>
+            <button onclick="openModal()" class="add-task-btn" style="width: auto; padding: 8px 15px; margin: 0;">+
+                Task</button>
         </div>
     </div>
 
     <div id="left-panel">
         <div id="panel-header">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <button onclick="document.getElementById('filter-drawer').classList.toggle('open')" style="width: auto; background: none; color: #7f8c8d; border: 1px solid #ddd; padding: 8px 12px; border-radius: 6px; cursor: pointer;">⚙️ Filters</button>
-            </div>
             <div class="search-container">
                 <span>🔍</span>
                 <input type="text" id="search-filter" placeholder="Search tasks..." oninput="renderProjectView()">
             </div>
         </div>
-        <div id="filter-drawer" class="filter-drawer">
-            </div>
         <div id="asana-container"></div>
     </div>
 
     <div id="map-wrapper">
-        <div id="loading-overlay" style="position:absolute; inset:0; background:rgba(255,255,255,0.8); z-index:9999; display:none;">Waking up server...</div>
-        <div id="map" style="position: absolute; inset: 0;"></div>
+        <div id="map"></div>
         <div id="elevation-panel">
             <span id="close-elevation" onclick="document.getElementById('elevation-panel').style.display='none'">❌</span>
             <div id="elevation-stats-header"></div>
@@ -1074,12 +975,64 @@ body {
     </div>
 
     <script>
+
         let activeCategoryIdForEdit = null;
         const API_URL = 'https://mapbox-api-uz9a.onrender.com';
         let map, draw;
         let activeMarkers = [];
-        let allTracks = [], allItinerary = [], allSections = [], allCategories = [], allTaskTypes = [];
+        let allCategories = [], allTaskTypes = [];
         let mapFilters = { point: true, line: true, smart: true, polygon: true };
+
+        // --- THE REACTIVE STORE (Step 3: Signals Pattern) ---
+        const createStore = (initialState) => {
+            let state = { ...initialState };
+            const listeners = new Map();
+            return {
+                get: (key) => state[key],
+                set: (key, value) => {
+                    state[key] = value;
+                    if (listeners.has(key)) listeners.get(key).forEach(fn => fn(value));
+                },
+                subscribe: (key, fn) => {
+                    if (!listeners.has(key)) listeners.set(key, new Set());
+                    listeners.get(key).add(fn);
+                    return () => listeners.get(key).delete(fn);
+                }
+            };
+        };
+
+        const AppStore = createStore({
+            itinerary: [],
+            sections: [],
+            activeTaskId: null
+        });
+
+        // SIGNAL: Map and Sidebar react instantly to state changes
+        AppStore.subscribe('activeTaskId', (taskId) => {
+            if (!taskId) return;
+            const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
+
+            // UI Update: Highlight sidebar row
+            document.querySelectorAll('.task-row, .fite-row').forEach(row => row.classList.remove('active-task'));
+            const row = document.getElementById(`task-row-${taskId}`);
+            if (row) {
+                row.classList.add('active-task');
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            // Map Update: Fit bounds to all task geometries
+            if (task?.geometries?.length > 0) {
+                const features = [];
+                task.geometries.forEach(g => {
+                    if (g.kind === 'point' && g.lat) features.push(turf.point([g.lng, g.lat]));
+                    else if (g.geojson) features.push(...g.geojson.features);
+                });
+                if (features.length > 0) {
+                    const bbox = turf.bbox(turf.featureCollection(features));
+                    map.fitBounds(bbox, { padding: 80, maxZoom: 16, duration: 1200 });
+                }
+            }
+        });
 
         function updateFilters() {
             mapFilters.point = document.getElementById('filter-points').checked;
@@ -1089,7 +1042,7 @@ body {
             renderMapGeometries();
         }
 
-        let activeTaskId = null, activeAnchorId = null, activeWaypointId = null, activeTrackId = null;
+        let activeAnchorId = null, activeWaypointId = null, activeTrackId = null;
         let isEditingGeometry = false, isRouting = false, isAnalyzingSegment = false;
         let routePoints = [], segmentPoints = [], activeAnalysisTrack = null;
         let lastCalculatedRoute = null; // Stores multi-stop route until Enter is pressed
@@ -1368,9 +1321,9 @@ body {
                     return;
                 }
 
-                // Deduplicate geometries across tasks
+                // Deduplicate geometries across tasks using the Store
                 const uniqueGeoms = new Map();
-                allItinerary.forEach(task => {
+                AppStore.get('itinerary').forEach(task => {
                     if (!task.geometries) return;
                     task.geometries.forEach(g => {
                         if (g.anchor_id && !uniqueGeoms.has(g.anchor_id)) {
@@ -1651,7 +1604,7 @@ body {
                 });
             }
 
-            allItinerary.forEach(task => {
+            AppStore.get('itinerary').forEach(task => {
                 if (!task.geometries) return;
                 task.geometries.forEach(geom => {
                     // Deduplicate geometries tied to multiple tasks
@@ -1786,7 +1739,7 @@ body {
         }
 
         function flyToSection(dayLabel) {
-            const sectionTasks = allItinerary.filter(t => (t.day_label || 'Unscheduled') === dayLabel);
+            const sectionTasks = AppStore.get('itinerary').filter(t => (t.day_label || 'Unscheduled') === dayLabel);
             const features = [];
             sectionTasks.forEach(task => {
                 if (!task.geometries) return;
@@ -1835,38 +1788,18 @@ body {
             }
         }
 
-function cycleSidebar() {
-    const panel = document.getElementById('left-panel');
-    const elev = document.getElementById('elevation-panel');
-    panel.classList.toggle('hidden');
-    if (panel.classList.contains('hidden')) {
-        elev.style.left = '20px';
-    } else {
-        elev.style.left = '410px';
-    }
-    setTimeout(() => map.resize(), 300);
-}
-
-function renderSectionPills() {
-    const container = document.getElementById('section-pills');
-    container.innerHTML = allSections.map(s => `
-        <button class="section-pill" onclick="flyToSection('${s.title}')">
-            ${s.title}
-        </button>
-    `).join('');
-}
->>>>>>> SEARCH
-                allSections = await secRes.json();
-                allCategories = await catRes.json();
-                allTaskTypes = await typeRes.json();
-
-                // Update UI components
-                allSections = await secRes.json();
-                allCategories = await catRes.json();
-                allTaskTypes = await typeRes.json();
-                renderSectionPills();
-
-                // Update UI components
+        function cycleSidebar() {
+            const panel = document.getElementById('left-panel');
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+            } else if (!panel.classList.contains('wide')) {
+                panel.classList.add('wide');
+            } else {
+                panel.classList.add('hidden');
+                panel.classList.remove('wide');
+            }
+            setTimeout(() => map.resize(), 350);
+        }
 
         function focusTaskInSidebar(taskId) {
             const row = document.getElementById(`task-row-${taskId}`);
@@ -1879,7 +1812,7 @@ function renderSectionPills() {
 
         let activeParentTrackId = null;
         function startSegmentAnalysis(taskId, trackId) {
-            const task = allItinerary.find(t => t.task_id === taskId);
+            const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
             const geom = task?.geometries.find(g => g.track_id === trackId);
             if (!geom) { alert("Track not found!"); return; }
 
@@ -1933,7 +1866,7 @@ function renderSectionPills() {
             });
 
             // FIND WAYPOINTS: Locate all points belonging to the active task
-            const task = allItinerary.find(t => t.task_id === activeTaskId);
+            const task = AppStore.get('itinerary').find(t => t.task_id === activeTaskId);
             const waypointDataset = [];
             if (task && task.geometries) {
                 const trackFeature = geojson.features[0];
@@ -2045,7 +1978,7 @@ function renderSectionPills() {
 
             let activeTaskSection = '';
             if (activeTaskId) {
-                const t = allItinerary.find(x => x.task_id === activeTaskId);
+                const t = AppStore.get('itinerary').find(x => x.task_id === activeTaskId);
                 if (t && t.section_id) activeTaskSection = t.section_id;
             }
 
@@ -2162,9 +2095,8 @@ function renderSectionPills() {
         }
 
         async function refreshData() {
-            const previousActiveId = activeTaskId;
+            const previousActiveId = AppStore.get('activeTaskId');
             try {
-                // Fetch Sections, Categories, and Itinerary simultaneously
                 const [itRes, secRes, catRes, typeRes] = await Promise.all([
                     fetch(`${API_URL}/itinerary`),
                     fetch(`${API_URL}/sections`),
@@ -2172,55 +2104,30 @@ function renderSectionPills() {
                     fetch(`${API_URL}/task_types`)
                 ]);
 
-                allItinerary = await itRes.json();
-                allSections = await secRes.json();
+                // commit to store instead of globals
+                AppStore.set('itinerary', await itRes.json());
+                AppStore.set('sections', await secRes.json());
+
                 allCategories = await catRes.json();
                 allTaskTypes = await typeRes.json();
 
-                // Update UI components
+                renderSectionPills();
                 updateCategoryDropdowns();
                 updateSectionDropdowns();
                 updateTaskTypeDropdowns();
                 renderCategoryList();
                 renderTaskTypeList();
-                if (previousActiveId) activeTaskId = previousActiveId;
 
-                const dropdown = document.getElementById('existing-task');
-                dropdown.innerHTML = '<option value="">-- Create New Task --</option>';
-                allItinerary.forEach(t => {
-                    const option = document.createElement('option');
-                    option.value = t.task_id;
-                    option.textContent = t.task_name || 'Unnamed Task';
-                    dropdown.appendChild(option);
-                });
+                // Restore state and render UI
+                if (previousActiveId) AppStore.set('activeTaskId', previousActiveId);
                 renderProjectView();
                 renderMapGeometries();
-
-                // Hot-reload Elevation Chart if it's currently open
-                if (document.getElementById('elevation-panel').style.display === 'block' && currentElevationTrackId) {
-                    let trackGeom = null;
-                    let trackTitle = null;
-                    allItinerary.forEach(t => {
-                        const g = (t.geometries || []).find(geo => geo.track_id === currentElevationTrackId);
-                        if (g) { trackGeom = g; trackTitle = g.title; }
-                    });
-                    if (trackGeom) {
-                        const props = trackGeom.geojson.features[0].properties || {};
-                        showElevationProfile(trackGeom.geojson, trackTitle, {
-                            distance: trackGeom.distance || turf.length(trackGeom.geojson, { units: 'kilometers' }).toFixed(2),
-                            gain: trackGeom.gain,
-                            loss: trackGeom.loss
-                        }, currentElevationTrackId);
-                    }
-                }
-
             } catch (err) {
-                console.error("Data Load Error:", err);
-                if (allItinerary.length === 0) {
-                    document.getElementById('asana-container').innerHTML = `<div style="padding: 20px; color: #e74c3c;">⚠️ Cannot connect to database. If you recently updated the schema, please click 'Sync DB Schema' in the New Task menu.</div>`;
-                }
+                console.error("Critical Sync Failure:", err);
             }
         }
+
+
 
         function updateCategoryDropdowns() {
             const catSelect = document.getElementById('task-category-id');
@@ -2450,7 +2357,7 @@ function renderSectionPills() {
             const existingTaskId = document.getElementById('existing-task').value || null;
 
             // 2. Fetch the existing task to preserve fields not shown in the modal (like parent_id)
-            const baseTask = existingTaskId ? (allItinerary.find(t => t.task_id == existingTaskId) || {}) : {};
+            const baseTask = existingTaskId ? (AppStore.get('itinerary').find(t => t.task_id == existingTaskId) || {}) : {};
 
             // 3. Merge existing data with the form inputs
             const taskData = {
@@ -2534,7 +2441,7 @@ function renderSectionPills() {
         }
 
         function editSmartRoute(trackId) {
-            const track = allItinerary.flatMap(t => t.geometries).find(g => g.track_id === trackId);
+            const track = AppStore.get('itinerary').flatMap(t => t.geometries).find(g => g.track_id === trackId);
             const stops = track?.geojson?.features?.[0]?.properties?.stops;
             if (!stops || stops.length < 2) return alert("No valid stops found for this route.");
 
@@ -2553,7 +2460,7 @@ function renderSectionPills() {
         }
 
         async function updateTaskInline(taskId, field, value) {
-            const task = allItinerary.find(t => t.task_id === taskId);
+            const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
             // Null-safe comparison to prevent crashes
             if (!task || String(task[field] || "") === String(value || "")) return;
 
@@ -2627,7 +2534,7 @@ function renderSectionPills() {
         }
 
         function openTaskEditor(taskId) {
-            const task = allItinerary.find(t => t.task_id === taskId);
+            const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
             if (!task) return;
             resetForm();
             activeTaskId = taskId;
@@ -2646,7 +2553,7 @@ function renderSectionPills() {
         }
 
         function exportTaskToGPX(taskId) {
-            const task = allItinerary.find(t => t.task_id === taskId);
+            const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
             if (!task || !task.geometries || task.geometries.length === 0) return alert('No locations to export for this task.');
 
             let gpx = '<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="ExpeditionDashboard">';
@@ -2695,7 +2602,8 @@ function renderSectionPills() {
             gridCols += '100px';
 
             // 2. Filter tasks
-            let filtered = allItinerary.filter(t => {
+            // Pull directly from the Store
+            let filtered = AppStore.get('itinerary').filter(t => {
                 const name = t.task_name || t.task || "";
                 const matchSearch = name.toLowerCase().includes(searchTerm);
                 const matchGroup = !groupFilter || t.target_group === groupFilter;
@@ -2723,8 +2631,8 @@ function renderSectionPills() {
                 groups[sectionId].push(task);
             });
 
-            // 4. Render sections
-            allSections.forEach(section => {
+            // 4. Render sections using the Store
+            AppStore.get('sections').forEach(section => {
                 const tasks = groups[section.id] || [];
                 renderSectionUI(section, tasks, gridCols);
             });
@@ -2755,7 +2663,7 @@ function renderSectionPills() {
                         const taskRow = itemEl.querySelector('.task-row');
                         if (!taskRow) return;
                         const taskId = parseInt(taskRow.id.replace('task-row-', ''));
-                        const task = allItinerary.find(t => t.task_id === taskId);
+                        const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
                         if (!task) return;
 
                         let needsUpdate = false;
@@ -2770,7 +2678,7 @@ function renderSectionPills() {
                             }
 
                             // Inherit the day_label from the new parent task
-                            const parentTask = allItinerary.find(t => t.task_id === newParentId);
+                            const parentTask = AppStore.get('itinerary').find(t => t.task_id === newParentId);
                             if (parentTask && payload.day_label !== parentTask.day_label) {
                                 payload.day_label = parentTask.day_label;
                                 needsUpdate = true;
@@ -3079,7 +2987,7 @@ function renderSectionPills() {
         }
 
         function startEditGeometry(taskId, anchorId) {
-            const task = allItinerary.find(t => t.task_id === taskId);
+            const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
             const geom = task?.geometries.find(g => g.anchor_id === anchorId);
             if (!geom) {
                 alert("Geometry not found!");
@@ -3160,7 +3068,7 @@ function renderSectionPills() {
             taskListContainer.dataset.sectionId = section.id || 'null';
 
             tasks.forEach(task => {
-                if (!task.parent_id) renderTaskCard(taskListContainer, task, gridCols, allItinerary);
+                if (!task.parent_id) renderTaskCard(taskListContainer, task, gridCols, AppStore.get('itinerary'));
             });
 
             const inlineAdd = document.createElement('div');

@@ -13,7 +13,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'emergency_fallback_secret'; // 2. 
 // REPLACED: adminAuth now verifies tokens, not a static key
 const adminAuth = (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1]; // Expecting "Bearer <token>"
-  
+
   if (!token) return res.status(401).json({ error: 'No token provided' });
 
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
@@ -200,9 +200,9 @@ app.post('/tracks', adminAuth, async (req, res) => {
     }
 
     res.status(200).send({ message: "Track uploaded" });
-  } catch (err) { 
+  } catch (err) {
     console.error("DEBUG POST /tracks error:", err);
-    res.status(500).send({ error: err.message }); 
+    res.status(500).send({ error: err.message });
   }
 });
 
@@ -281,9 +281,9 @@ app.post('/waypoints', adminAuth, async (req, res) => {
       }
     }
     res.status(200).send({ message: "Waypoint created and linked!" });
-  } catch (err) { 
+  } catch (err) {
     console.error("DEBUG POST /waypoints error:", err);
-    res.status(500).send({ error: err.message }); 
+    res.status(500).send({ error: err.message });
   }
 });
 
@@ -334,7 +334,7 @@ app.put('/waypoints/:id', adminAuth, async (req, res) => {
 app.patch('/tasks/reorder', adminAuth, async (req, res) => {
   const { tasks } = req.body; // Expects an array of { id, sort_order }
   if (!tasks || !Array.isArray(tasks)) return res.status(400).json({ error: "Invalid payload" });
-  
+
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -436,7 +436,7 @@ app.get('/categories', async (req, res) => {
 app.post('/categories', adminAuth, async (req, res) => {
   const { name, color, icon, line_type, marker_size } = req.body;
   try {
-    const result = await pool.query('INSERT INTO categories (name, color, icon, line_type, marker_size) VALUES ($1, $2, $3, $4, $5) RETURNING *', 
+    const result = await pool.query('INSERT INTO categories (name, color, icon, line_type, marker_size) VALUES ($1, $2, $3, $4, $5) RETURNING *',
       [name, color || '#3498db', icon || '📍', line_type || 'solid', marker_size || 28]);
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -513,54 +513,57 @@ app.delete('/team_members/:id', adminAuth, async (req, res) => {
 
 // 4. ITINERARY: View Project Plan
 app.get('/itinerary', async (req, res) => {
+  const { section_id } = req.query; // Step 4: Pagination support
+  let filterClause = "";
+  let params = [];
+
+  if (section_id && section_id !== 'null') {
+    filterClause = "WHERE t.section_id = $1";
+    params.push(section_id);
+  }
+
   try {
     const query = `
-  SELECT t.*, t.id AS task_id, s.section_date, 
-         c.color AS category_color, c.icon AS category_icon, c.line_type AS category_line_type, c.marker_size AS category_marker_size,
-         tt.name AS task_type_name, tt.icon AS task_type_icon,
-         COALESCE(
-               json_agg(
-                 json_build_object(
-                   'anchor_id', ta.anchor_id,
-                   'waypoint_id', w.id,
-                   'track_id', tr.id,
-                   'kind', CASE WHEN w.id IS NOT NULL THEN 'point' ELSE 'line' END,
-                   'title', COALESCE(w.title, tr.title),
-                   'color', COALESCE(w.color, tr.color),
-                   'icon', w.icon,
-                   'lat', w.lat,
-                   'lng', w.lng,
-                   'geojson', tr.geojson_data,
-                   'link', COALESCE(w.link, tr.link),
-                   'comments', COALESCE(w.comments, tr.comments),
-                   'distance', tr.distance,
-                   'duration', tr.duration,
-                   'gain', tr.gain,
-                   'loss', tr.loss,
-                   'parent_track_id', COALESCE(w.parent_track_id, tr.parent_track_id),
-                   'photo_url', w.photo_url,
-                   'phone', w.phone,
-                   'address', w.address,
-                   'google_maps_url', w.google_maps_url
-                 )
-               ) FILTER (WHERE ta.anchor_id IS NOT NULL), '[]'
+      SELECT t.*, t.id AS task_id, s.section_date,
+             c.color AS category_color, c.icon AS category_icon,
+             tt.name AS task_type_name, tt.icon AS task_type_icon,
+             COALESCE(
+               (
+                 SELECT json_agg(geom_data)
+                 FROM (
+                   SELECT DISTINCT ON (sa.id) -- Step 4: Fix deduplication bug
+                     json_build_object(
+                       'anchor_id', sa.id,
+                       'waypoint_id', w.id,
+                       'track_id', tr.id,
+                       'kind', sa.kind,
+                       'title', COALESCE(w.title, tr.title),
+                       'color', COALESCE(w.color, tr.color),
+                       'lat', w.lat, 'lng', w.lng,
+                       'geojson', tr.geojson_data,
+                       'distance', tr.distance,
+                       'gain', tr.gain, 'loss', tr.loss
+                     ) AS geom_data
+                   FROM task_anchors ta
+                   JOIN spatial_anchors sa ON ta.anchor_id = sa.id
+                   LEFT JOIN waypoints w ON sa.waypoint_id = w.id
+                   LEFT JOIN tracks tr ON sa.track_id = tr.id
+                   WHERE ta.task_id = t.id
+                 ) sub
+               ), '[]'
              ) as geometries
       FROM tasks t
-      LEFT JOIN sections s ON t.section_id = s.id -- Join with sections
-      LEFT JOIN categories c ON t.category_id = c.id -- Join the categories table
+      LEFT JOIN sections s ON t.section_id = s.id
+      LEFT JOIN categories c ON t.category_id = c.id
       LEFT JOIN task_types tt ON t.task_type_id = tt.id
-      LEFT JOIN task_anchors ta ON t.id = ta.task_id
-      LEFT JOIN spatial_anchors sa ON ta.anchor_id = sa.id
-      LEFT JOIN waypoints w ON sa.waypoint_id = w.id
-      LEFT JOIN tracks tr ON sa.track_id = tr.id
-      GROUP BY t.id, s.section_date, c.color, c.icon, c.line_type, c.marker_size, tt.name, tt.icon
-      ORDER BY s.section_date ASC NULLS FIRST, t.sort_order ASC, t.starts_at ASC; -- This handles the "Auto Arrange"
+      ${filterClause}
+      GROUP BY t.id, s.section_date, c.color, c.icon, tt.name, tt.icon
+      ORDER BY s.section_date ASC NULLS FIRST, t.sort_order ASC, t.starts_at ASC;
     `;
-    const result = await pool.query(query);
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (err) {
-    console.error("ITINERARY ERROR:", err.message);
-    res.status(500).json({ error: "Database query failed", details: err.message });
+    res.status(500).json({ error: "Query failed", details: err.message });
   }
 });
 
