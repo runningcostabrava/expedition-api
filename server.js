@@ -200,7 +200,6 @@ app.put('/tracks/:id', adminAuth, async (req, res) => {
     if (existingAnchor.rows.length > 0) {
       anchorId = existingAnchor.rows[0].id;
     } else if (geojson_data && geojson_data.features && geojson_data.features.length > 0) {
-      // Safely ensure geojson_data exists before attempting to read its properties
       const geometryType = geojson_data.features[0].geometry.type;
       const kind = geometryType === 'Polygon' ? 'polygon' : 'line';
       const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, track_id) VALUES ($1, $2) RETURNING id', [kind, id]);
@@ -208,12 +207,10 @@ app.put('/tracks/:id', adminAuth, async (req, res) => {
     }
 
     if (existing_task_id && anchorId) {
-      await pool.query('DELETE FROM task_anchors WHERE anchor_id = $1', [anchorId]);
       await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [existing_task_id, anchorId]);
     } else if (tasks && tasks.length > 0) {
       for (let t of tasks) {
         const task = t;
-        // In the many-to-many world, we update the tasks linked to this anchor
         await pool.query(`
           UPDATE tasks SET
               task_name = COALESCE($1, task_name),
@@ -229,7 +226,6 @@ app.put('/tracks/:id', adminAuth, async (req, res) => {
           [task.name, task.responsible, task.target_group, task.day_label, task.starts_at, task.ends_at, task.is_completed, anchorId, task.section_id, task.category_id]);
       }
     }
-
     res.status(200).send({ message: "Track updated successfully" });
   } catch (err) { res.status(500).send({ error: err.message }); }
 });
@@ -287,7 +283,6 @@ app.put('/waypoints/:id', adminAuth, async (req, res) => {
     }
 
     if (existing_task_id && anchorId) {
-      await pool.query('DELETE FROM task_anchors WHERE anchor_id = $1', [anchorId]);
       await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [existing_task_id, anchorId]);
     }
 
@@ -309,7 +304,6 @@ app.put('/waypoints/:id', adminAuth, async (req, res) => {
           [task.name, task.responsible, task.target_group, task.day_label, task.starts_at, task.ends_at, task.is_completed, anchorId, task.section_id, task.category_id]);
       }
     }
-
     res.status(200).send({ message: "Waypoint updated successfully" });
   } catch (err) { res.status(500).send({ error: err.message }); }
 });
@@ -548,6 +542,16 @@ app.get('/itinerary', async (req, res) => {
     console.error("ITINERARY ERROR:", err.message);
     res.status(500).json({ error: "Database query failed", details: err.message });
   }
+});
+
+// Quick-Link an existing geometry to a new task without overwriting old links
+app.post('/link_anchor', adminAuth, async (req, res) => {
+  const { task_id, anchor_id } = req.body;
+  if (!task_id || !anchor_id) return res.status(400).json({ error: "Missing IDs" });
+  try {
+    await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [task_id, anchor_id]);
+    res.json({ message: 'Linked successfully' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/config', (req, res) => {
