@@ -361,18 +361,6 @@ app.delete('/tasks/:id', adminAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Delete an entire section (by day_label)
-app.delete('/tasks/section/:day_label', adminAuth, async (req, res) => {
-  try {
-    const label = req.params.day_label === 'Unscheduled' ? null : req.params.day_label;
-    if (label === null) {
-      await pool.query('DELETE FROM tasks WHERE day_label IS NULL');
-    } else {
-      await pool.query('DELETE FROM tasks WHERE day_label = $1', [label]);
-    }
-    res.json({ message: "Section deleted" });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
 
 // Rename a section (bulk update day_label)
 app.put('/tasks/section/:old_label', adminAuth, async (req, res) => {
@@ -410,6 +398,24 @@ app.get('/sections', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// NEW: Create a new Section (Day)
+app.post('/sections', adminAuth, async (req, res) => {
+  const { section_date, title } = req.body;
+  try {
+    const result = await pool.query('INSERT INTO sections (section_date, title) VALUES ($1, $2) RETURNING *', [section_date, title || `Day: ${section_date}`]);
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// NEW: Delete a Section AND all tasks within it
+app.delete('/sections/:id', adminAuth, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM tasks WHERE section_id = $1', [req.params.id]);
+    await pool.query('DELETE FROM sections WHERE id = $1', [req.params.id]);
+    res.json({ message: "Section and tasks deleted" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Update Section Metadata
