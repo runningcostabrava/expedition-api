@@ -125,6 +125,7 @@
             flex: 1;
             overflow-y: auto;
             padding-bottom: 20px;
+            min-height: 0;
         }
 
         /* Smooth Hover Lifts for Task Cards */
@@ -865,9 +866,9 @@
             </div>
         </div>
 
-        <div id="section-pills" style="display:flex; gap:8px; flex: 1; margin-left: 10px; overflow-x: auto;"></div>
+        <div id="section-pills" style="display:flex; gap:8px; flex: 1; margin-left: 10px; overflow-x: auto; min-width: 0;"></div>
 
-        <div style="display: flex; gap: 8px; align-items: center;">
+        <div style="display: flex; gap: 8px; align-items: center; flex-shrink: 0;">
             <div id="google-search-container" style="position: relative;"></div>
 
             <button onclick="startSmartRoute()" class="action-btn-modern" style="font-size: 1.1em;"
@@ -1182,17 +1183,17 @@
             if (task?.geometries?.length > 0) {
                 const features = [];
                 task.geometries.forEach(g => {
-                    // Strict finite check to prevent WebGL NaN crashes
-                    if (g.kind === 'point' && isFinite(g.lng) && isFinite(g.lat)) features.push(turf.point([g.lng, g.lat]));
-                    else if (g.geojson) features.push(...g.geojson.features);
+                    if (g.kind === 'point' && _isValidLngLat(g.lng, g.lat)) {
+                        features.push(turf.point([g.lng, g.lat]));
+                    } else if (g.geojson && _geometryHasValidCoords(g.geojson)) {
+                        features.push(...g.geojson.features);
+                    }
                 });
 
                 if (features.length > 0) {
                     try {
                         const bbox = turf.bbox(turf.featureCollection(features));
-                        // Ensure Turf didn't return Infinity
                         if (bbox.every(val => isFinite(val))) {
-                            // Prevent zero-area bbox from crashing Mapbox
                             if (bbox[0] === bbox[2] && bbox[1] === bbox[3]) {
                                 map.flyTo({ center: [bbox[0], bbox[1]], zoom: 16, duration: 1200 });
                             } else {
@@ -3203,8 +3204,7 @@
         }
 
         function openStreetView(lat, lng) {
-            // Official modern Google Maps URL for dropping directly into Street View
-            const svUrl = `https://www.google.com/maps?layer=c&cbll=${lat},${lng}`;
+            const svUrl = `http://googleusercontent.com/maps.google.com/${lat},${lng}`;
             window.open(svUrl, '_blank');
         }
 
@@ -3430,6 +3430,17 @@
             btn.innerText = "Create Type";
             btn.style.background = "#27ae60";
             refreshData();
+        }
+
+        function _isValidLngLat(lng, lat) {
+            return typeof lng === 'number' && typeof lat === 'number' && isFinite(lng) && isFinite(lat);
+        }
+
+        function _geometryHasValidCoords(geojson) {
+            try {
+                const coords = turf.coordAll(geojson);
+                return coords.length > 0 && coords.every(c => _isValidLngLat(c[0], c[1]));
+            } catch (e) { return false; }
         }
 
         initializeApp();
