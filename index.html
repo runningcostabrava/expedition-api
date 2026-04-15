@@ -923,8 +923,8 @@
 
         <div id="map"></div>
 
-        <div id="style-switcher" style="position: absolute; top: 120px; right: 10px; z-index: 100;">
-            <select onchange="changeMapStyle(this.value)" style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); font-weight: bold; cursor: pointer; outline: none; background: var(--glass-dark); color: white; backdrop-filter: var(--glass-blur); box-shadow: var(--card-shadow);">
+        <div id="style-switcher" style="position: absolute; bottom: 80px; left: 15px; z-index: 100;">
+            <select onchange="changeMapStyle(this.value)" style="padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); font-weight: bold; cursor: pointer; outline: none; background: var(--glass-dark); color: white; backdrop-filter: var(--glass-blur); box-shadow: var(--card-shadow); border-bottom: 2px solid var(--accent);">
                 <option value="mapbox://styles/mapbox/outdoors-v12">⛰️ Outdoors (Hiking)</option>
                 <option value="mapbox://styles/mapbox/satellite-streets-v12">🌍 Satellite 3D</option>
                 <option value="mapbox://styles/mapbox/dark-v11">🌙 Dark Mode</option>
@@ -2560,10 +2560,14 @@
         function changeMapStyle(style) {
             map.setStyle(style);
             map.once('style.load', () => {
+                // 1. Re-inject 3D Terrain
                 map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
                 map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
                 map.setLight({ anchor: 'map' });
                 map.addLayer({ 'id': 'sky', 'type': 'sky', 'paint': { 'sky-type': 'atmosphere', 'sky-atmosphere-sun-intensity': 15 } });
+
+                // 2. RE-RENDER ALL GEOMETRIES (Waypoints & Tracks)
+                renderMapGeometries();
             });
         }
 
