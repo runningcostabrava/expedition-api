@@ -1205,6 +1205,31 @@
                     }
                 }
             }
+
+            map.on('draw.update', async (e) => {
+                const feature = e.features[0];
+                const isSmart = feature.properties?.route_type === 'smart';
+
+                if (isEditingGeometry && isSmart && feature.geometry.type === 'LineString') {
+                    const coords = feature.geometry.coordinates;
+                    // Use the Directions API to find the best trail between the new coordinates
+                    const waypoints = coords.map(c => c.slice(0, 2).join(',')).join(';');
+                    const res = await fetch(`https://api.mapbox.com/directions/v5/mapbox/${currentSmartProfile}/${waypoints}?geometries=geojson&overview=full&access_token=${mapboxgl.accessToken}`);
+                    const data = await res.json();
+
+                    if (data.routes && data.routes[0]) {
+                        const newRoute = data.routes[0];
+                        feature.geometry = newRoute.geometry;
+                        feature.properties.distance = (newRoute.distance / 1000).toFixed(2);
+                        feature.properties.duration = Math.round(newRoute.duration / 60);
+                        draw.add(feature); // Update the drawing on screen
+
+                        showToast(`Path Recalculated: ${feature.properties.distance}km`, 'success');
+                        // Update elevation chart if open
+                        if (elevationChart) showElevationProfile({ type: 'FeatureCollection', features: [feature] }, feature.properties.title, feature.properties);
+                    }
+                }
+            });
         });
 
         function updateFilters() {
@@ -2191,9 +2216,16 @@
             const popupContent = document.createElement('div');
             popupContent.style.padding = '5px';
             popupContent.style.width = '200px';
+
+            const drawnFeatures = draw.getAll().features;
+            const featureToSave = drawnFeatures.length > 0 ? drawnFeatures[0] : { type: 'Feature', geometry: geometry, properties: {} };
+
             popupContent.innerHTML = `
         <h4 style="margin: 0 0 5px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">Save to Map</h4>
         ${taskWarning}
+        <div style="margin-bottom: 8px; font-size: 0.8em; font-weight: bold; color: ${geometry.type === 'LineString' ? '#38bdf8' : '#7f8c8d'};">
+            MODE: ${featureToSave.properties.route_type === 'smart' ? '🚗 SMART SNAP' : '✏️ MANUAL DRAW'}
+        </div>
         <input type="text" id="ctx-title" value="${defaultTitle}" placeholder="Title" style="width: 100%; margin-bottom: 5px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing:border-box;">
         <input type="url" id="ctx-link" value="${existingLink || ''}" placeholder="https:// link (optional)" style="width: 100%; margin-bottom: 8px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing:border-box; font-size:0.85em;">
         <select id="ctx-section" style="width: 100%; margin-bottom: 8px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing:border-box; font-size:0.85em;">
@@ -3203,7 +3235,6 @@
         }
 
         function openStreetView(lat, lng) {
-            // Uses the official Google Maps URL parameter for Street View
             const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
             window.open(svUrl, '_blank');
         }
