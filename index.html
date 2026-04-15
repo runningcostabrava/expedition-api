@@ -80,6 +80,10 @@
         }
 
         #left-panel.hidden { transform: translateX(-410px); opacity: 0; }
+
+        #left-panel.wide {
+            width: 600px; /* Expands the panel for better timeline viewing */
+        }
         
         /* Smooth Hover Lifts for Task Cards */
         .task-row {
@@ -1186,13 +1190,191 @@
 
 
         async function initializeApp() {
-            const configRes = await fetch(`${API_URL}/api/config`);
-            const config = await configRes.json();
+            try {
+                const configRes = await fetch(`${API_URL}/api/config`);
+                if (!configRes.ok) throw new Error(`Server returned ${configRes.status}: Check Render deployment`);
 
-            document.getElementById('loading-overlay').style.display = 'none';
-            mapboxgl.accessToken = config.MAPBOX_TOKEN;
+                const config = await configRes.json();
+                document.getElementById('loading-overlay').style.display = 'none';
+                mapboxgl.accessToken = config.MAPBOX_TOKEN;
 
-            // --- DYNAMICALLY LOAD GOOGLE PLACES SCRIPT ---
+                // --- DYNAMICALLY LOAD GOOGLE PLACES SCRIPT ---
+                const script = document.createElement('script');
+                // ADDED &loading=async and &callback=initGoogleSearch
+                script.src = `https://maps.googleapis.com/maps/api/js?key=${config.GOOGLE_PLACES_API_KEY}&libraries=places&loading=async&callback=initGoogleSearch`;
+                script.async = true;
+                script.defer = true;
+                document.head.appendChild(script);
+
+                map = new mapboxgl.Map({
+                    container: 'map',
+                    style: 'mapbox://styles/mapbox/outdoors-v12',
+                    // Longitude first, then Latitude! Centered on Trapani/Bonagia, Sicily
+                    center: [12.5928, 38.0662],
+                    zoom: 10 // Slightly zoomed out so you can see the whole coast
+                });
+
+                draw = new MapboxDraw({ displayControlsDefault: false, controls: { trash: true } });
+                map.addControl(draw);
+                map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+                // 1. Unified Click Handler for Routing and Analysis
+                map.on('click', async (e) => {
+                    if (isAnalyzingSegment && activeAnalysisTrack) {
+                        const snapped = turf.nearestPointOnLine(activeAnalysisTrack.features[0], [e.lngLat.lng, e.lngLat.lat]);
+                        segmentPoints.push(snapped);
+                        if (segmentPoints.length === 2) {
+                            const sliced = turf.lineSlice(segmentPoints[0], segmentPoints[1], activeAnalysisTrack.features[0]);
+                            const dist = turf.length(sliced, { units: 'kilometers' }).toFixed(2);
+                            const coords = sliced.geometry.coordinates;
+                            const gain = (coords[coords.length - 1][2] || 0) - (coords[0][2] || 0);
+
+                            showElevationProfile({ type: 'FeatureCollection', features: [sliced] }, "Selected Segment");
+
+                            draw.deleteAll();
+                            draw.add(sliced);
+
+                            const centerIndex = Math.floor(sliced.geometry.coordinates.length / 2);
+                            const centerPoint = sliced.geometry.coordinates[centerIndex];
+                            showGeometryContextPopup(centerPoint, sliced.geometry, `Segment (${dist}km)`, `📈 Segment Stats: Distance ${dist}km, Elev Change ${gain.toFixed(1)}m`);
+
+                            isAnalyzingSegment = false;
+                            map.getCanvas().style.cursor = '';
+                        }
+                        return;
+                    }
+
+                    if (isRouting) {
+                        // With MapboxDirections UI, the plugin natively handles map clicks.
+                        return;
+                    }
+                });
+
+                // Listen for ENTER to finish Multi-stop Route
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && isRouting && lastCalculatedRoute) {
+                        isRouting = false;
+                        map.getCanvas().style.cursor = '';
+
+                        const distKm = (lastCalculatedRoute.distance / 1000).toFixed(2);
+                        const durationMins = Math.round(lastCalculatedRoute.duration / 60);
+
+                        // CRITICAL FIX: Use our safely tracked variable instead of the non-existent Mapbox function!
+                        const activeProfile = currentSmartProfile;
+
+                        // --- THE INSTANT FIX: Extract the decoded GeoJSON directly from the map BEFORE destroying
+                        let validGeoJSONGeometry = null;
+                        const dirSource = map.getSource('directions');
+                        if (dirSource && dirSource._data && dirSource._data.features) {
+                            // Find the actual blue line drawn on the map
+                            const lineFeature = dirSource._data.features.find(f => f.geometry.type === 'LineString' || f.geometry.type === 'MultiLineString');
+                            if (lineFeature) validGeoJSONGeometry = lineFeature.geometry;
+                        }
+
+                        // Now it is safe to remove the Mapbox UI box (this erases the 'directions' source!)
+                        if (directionsControl) {
+                            map.removeControl(directionsControl);
+                            directionsControl = null;
+                        }
+
+                        if (!validGeoJSONGeometry) {
+                            alert("Could not extract route geometry. Please try again.");
+                            return;
+                        }
+
+                        // Clean up map and transfer the line to our custom Drawing tool
+                        draw.deleteAll();
+
+                        const routeFeature = {
+                            type: 'Feature',
+                            geometry: validGeoJSONGeometry,
+                            properties: {
+                                route_type: 'smart',
+                                profile: activeProfile,
+                                stops: routePoints,
+                                distance: distKm,
+                                duration: durationMins,
+                                title: `Smart Route (${distKm}km)`
+                            }
+                        };
+                        draw.add(routeFeature);
+
+                        const centerIndex = Math.floor(validGeoJSONGeometry.coordinates.length / 2);
+                        const centerPoint = validGeoJSONGeometry.coordinates[centerIndex];
+
+                        showGeometryContextPopup(centerPoint, validGeoJSONGeometry, `Smart Route`, `🚗 Stats: Distance ${distKm}km, Time: ${durationMins}m`);
+                        lastCalculatedRoute = null;
+                    } else if (e.key === 'Escape' && isRouting) {
+                        isRouting = false;
+                        map.getCanvas().style.cursor = '';
+                        if (directionsControl) {
+                            map.removeControl(directionsControl);
+                            directionsControl = null;
+                        }
+                        draw.deleteAll();
+                        routePoints = [];
+                        lastCalculatedRoute = null;
+                    }
+                });
+
+                map.on('load', () => {
+                    map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
+                    map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
+                    map.setLight({ anchor: 'map' });
+                    map.addLayer({ 'id': 'sky', 'type': 'sky', 'paint': { 'sky-type': 'atmosphere', 'sky-atmosphere-sun-intensity': 15 } });
+                    refreshData();
+                });
+
+                // Engine that dynamically scales and hides map pins based on zoom level
+                map.on('zoom', () => {
+                    const zoom = map.getZoom();
+                    const scale = Math.max(0.4, Math.min(1.5, zoom / 14));
+                    document.getElementById('map').style.setProperty('--pin-scale', scale);
+
+                    // 1. Hide markers entirely if zoom is less than 14 (Island level)
+                    if (zoom < 14) {
+                        document.getElementById('map').classList.add('hide-markers');
+                    } else {
+                        document.getElementById('map').classList.remove('hide-markers');
+                    }
+
+                    // 2. Show text labels only at Street level (15.5+)
+                    if (zoom >= 15.5) {
+                        document.getElementById('map').classList.add('show-pin-labels');
+                    } else {
+                        document.getElementById('map').classList.remove('show-pin-labels');
+                    }
+                });
+
+                // Trigger once on load to set initial state
+                const initZoom = map.getZoom();
+                document.getElementById('map').style.setProperty('--pin-scale', Math.max(0.4, Math.min(1.5, initZoom / 14)));
+                if (initZoom < 14) document.getElementById('map').classList.add('hide-markers');
+                if (initZoom >= 15.5) document.getElementById('map').classList.add('show-pin-labels');
+
+                map.on('draw.create', (e) => {
+                    const feature = e.features[0];
+                    let centerPoint;
+
+                    // Safely extract coordinates based on Geometry type
+                    if (feature.geometry.type === 'Point') {
+                        centerPoint = feature.geometry.coordinates;
+                    } else if (feature.geometry.type === 'LineString') {
+                        centerPoint = feature.geometry.coordinates[Math.floor(feature.geometry.coordinates.length / 2)];
+                    } else if (feature.geometry.type === 'Polygon') {
+                        centerPoint = feature.geometry.coordinates[0][0];
+                    }
+
+                    // If draw tool was used, open the Save Context Popup
+                    if (centerPoint) {
+                        showGeometryContextPopup(centerPoint, feature.geometry, `New ${feature.geometry.type}`, '');
+                    }
+                });
+            } catch (err) {
+                console.error("Initialization Error:", err);
+                document.getElementById('loading-overlay').innerHTML = `🚨 Fatal Error: Could not reach API.<br><span style="font-size:0.5em; margin-top:10px; display:block;">${err.message}</span>`;
+            }
+        }
             const script = document.createElement('script');
             // ADDED &loading=async and &callback=initGoogleSearch
             script.src = `https://maps.googleapis.com/maps/api/js?key=${config.GOOGLE_PLACES_API_KEY}&libraries=places&loading=async&callback=initGoogleSearch`;
@@ -1606,7 +1788,10 @@
                 const photoUrl = place.photos && place.photos.length > 0 ? place.photos[0].getURI({ maxWidth: 600 }) : 'https://via.placeholder.com/600x300?text=No+Photo';
                 const title = place.displayName || 'Unknown Place';
                 // NEW API FIX: isOpen() is called directly on the 'place' object
-                const isOpen = place.regularOpeningHours ? (place.isOpen() ? '<span style="color:#27ae60; font-weight:bold;">🟢 Open Now</span>' : '<span style="color:#e74c3c; font-weight:bold;">🔴 Closed</span>') : '';
+                let isOpen = '';
+                try {
+                    if (place.regularOpeningHours) isOpen = place.isOpen() ? '<span style="color:#27ae60; font-weight:bold;">🟢 Open Now</span>' : '<span style="color:#e74c3c; font-weight:bold;">🔴 Closed</span>';
+                } catch (e) { /* Ignore if Google fails to parse the current time */ }
 
                 const googleData = {
                     photoUrl: photoUrl,
@@ -2601,16 +2786,23 @@
             } catch (e) { console.error("Geom Meta Update Failed:", e); }
         }
 
-        async function updateSection(oldDay, newDay) {
-            if (oldDay === newDay) return;
-            await authFetch(`${API_URL}/tasks/section/${encodeURIComponent(oldDay)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ new_label: newDay }) });
-            refreshData();
+        async function createSection(dateString) {
+            try {
+                await authFetch(`${API_URL}/sections`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ section_date: dateString })
+                });
+                refreshData();
+            } catch (err) { showToast("Error creating section", "error"); }
         }
 
-        async function deleteSection(day) {
-            if (!confirm(`Delete all tasks in ${day}?`)) return;
-            await authFetch(`${API_URL}/tasks/section/${encodeURIComponent(day)}`, { method: 'DELETE' });
-            refreshData();
+        async function deleteSection(id, title) {
+            if (!confirm(`Delete section "${title}" AND all its tasks? This cannot be undone.`)) return;
+            try {
+                await authFetch(`${API_URL}/sections/${id}`, { method: 'DELETE' });
+                refreshData();
+            } catch (err) { showToast("Error deleting section", "error"); }
         }
 
         async function updateSectionMetadata(sectionId, field, value) {
@@ -2739,7 +2931,7 @@
             // 5. Add "New Section" button at the bottom
             const newSectionDiv = document.createElement('div');
             newSectionDiv.style.marginTop = '30px';
-            newSectionDiv.innerHTML = `<input type="date" title="Add New Day" style="padding:10px; border:1px solid #ddd; border-radius:6px; cursor:pointer; background:#fff; color:#333; font-weight:bold; outline:none;" onchange="if(this.value) { updateSection('new_temp_section', this.value); this.value=''; }"> <span style="font-size:0.85em; color:#7f8c8d; margin-left:10px;">+ Add Date Section</span>`;
+            newSectionDiv.innerHTML = `<input type="date" title="Add New Day" style="padding:10px; border:1px solid #ddd; border-radius:6px; cursor:pointer; background:#fff; color:#333; font-weight:bold; outline:none;" onchange="if(this.value) { createSection(this.value); this.value=''; }"> <span style="font-size:0.85em; color:#7f8c8d; margin-left:10px;">+ Add Date Section</span>`;
             container.appendChild(newSectionDiv);
 
             // Initialize Sortable JS for BOTH sections and nested subtasks
@@ -3151,7 +3343,7 @@
                     </span>
                     <div style="display:flex; gap:2px; margin-left:auto; flex-shrink: 0;" onclick="event.stopPropagation()">
                         <button class="edit-btn" title="Center Map" onclick="event.stopPropagation(); flyToSection(${section.id || null})">🎯</button>
-                        ${section.id ? `<button class="delete-btn" title="Delete Section" onclick="deleteSection('${sectionTitle}')">🗑️</button>` : ''}
+                        ${section.id ? `<button class="delete-btn" title="Delete Section" onclick="event.stopPropagation(); deleteSection(${section.id}, '${sectionTitle.replace(/'/g, "\\'")}')">🗑️</button>` : ''}
                     </div>
                 </div>
                 <div class="section-content">
@@ -3171,6 +3363,9 @@
             inlineAdd.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 10px; border-bottom: 1px dashed #ccc;">
                     <input type="text" placeholder="+ Add task..." style="flex: 1; border:none; padding:5px; outline:none; background:transparent; font-size:0.9em;" onkeydown="if(event.key==='Enter') createInlineTask(this, ${section.id || null}, '${sectionTitle.replace(/'/g, "\\'")}')">
+                    <label style="font-size: 0.8em; color: #7f8c8d; cursor:pointer; margin:0; display:flex; align-items:center; gap:4px;">
+                        <input type="checkbox" class="inline-fite-checkbox"> 📍 Fite
+                    </label>
                 </div>
             `;
 
