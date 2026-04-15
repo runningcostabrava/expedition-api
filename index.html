@@ -922,6 +922,15 @@
 
         <div id="map"></div>
 
+        <div id="style-switcher" style="position: absolute; bottom: 30px; left: 15px; z-index: 10;">
+            <select onchange="changeMapStyle(this.value)" style="padding: 8px 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; outline: none; background: var(--glass-dark); color: white; backdrop-filter: var(--glass-blur); box-shadow: var(--card-shadow);">
+                <option value="mapbox://styles/mapbox/outdoors-v12">⛰️ Outdoors (Hiking Topo)</option>
+                <option value="mapbox://styles/mapbox/satellite-streets-v12">🌍 Satellite 3D</option>
+                <option value="mapbox://styles/mapbox/dark-v11">🌙 Dark Mode</option>
+                <option value="mapbox://styles/mapbox/streets-v12">🛣️ Standard Map</option>
+            </select>
+        </div>
+
         <div id="elevation-panel">
             <span id="close-elevation"
                 onclick="document.getElementById('elevation-panel').style.display='none'">❌</span>
