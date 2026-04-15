@@ -21,55 +21,73 @@
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <style>
+        :root {
+            --bg-main: #0f172a;       /* Slate 900 */
+            --glass-white: rgba(255, 255, 255, 0.85);
+            --glass-dark: rgba(15, 23, 42, 0.85);
+            --accent: #38bdf8;        /* Sky 400 */
+            --success: #10b981;       /* Teal 400 */
+            --danger: #ef4444;        /* Rose 500 */
+            --glass-blur: blur(14px) saturate(180%);
+            --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            --border-light: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
         body {
-            margin: 0;
-            padding: 0;
+            margin: 0; padding: 0;
             font-family: 'Inter', -apple-system, sans-serif;
-            height: 100vh;
-            width: 100vw;
+            height: 100vh; width: 100vw;
             overflow: hidden;
-            background: #0f172a;
+            background: var(--bg-main);
         }
 
-        /* 1. Command Bar: Top Navigation */
+        /* 1. Command Bar: High-Contrast Dark Glass */
         #command-bar {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            right: 15px;
+            position: absolute; top: 15px; left: 15px; right: 15px;
             height: 55px;
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(12px) saturate(180%);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            background: var(--glass-dark);
+            backdrop-filter: var(--glass-blur);
+            border: var(--border-light);
             border-radius: 12px;
-            z-index: 100;
-            display: flex;
-            align-items: center;
-            padding: 0 15px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            gap: 15px;
+            z-index: 100; display: flex; align-items: center;
+            padding: 0 15px; box-shadow: var(--card-shadow); gap: 15px;
+            color: white;
         }
+        
+        /* Overrides for dark bar legibility */
+        #command-bar div[style*="color: #0f172a"] { color: white !important; letter-spacing: 1px; }
+        #command-bar .action-btn-modern { color: white; }
+        #command-bar .action-btn-modern:hover { background: rgba(255,255,255,0.2); }
+        
+        #internal-map-search {
+            background: rgba(255, 255, 255, 0.1) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            color: white !important;
+        }
+        #internal-map-search::placeholder { color: rgba(255,255,255,0.6) !important; }
 
-        /* 2. Left Panel: Floating Overlay Drawer */
+        /* 2. Left Panel: Light Glass */
         #left-panel {
-            position: absolute;
-            top: 85px;
-            left: 15px;
-            bottom: 15px;
+            position: absolute; top: 85px; left: 15px; bottom: 15px;
             width: 380px;
-            background: rgba(255, 255, 255, 0.92);
-            backdrop-filter: blur(10px);
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-            z-index: 90;
-            display: flex;
-            flex-direction: column;
+            background: var(--glass-white);
+            backdrop-filter: var(--glass-blur);
+            border: var(--border-light);
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            z-index: 90; display: flex; flex-direction: column;
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
         }
 
-        #left-panel.hidden {
-            transform: translateX(-410px);
-            opacity: 0;
+        #left-panel.hidden { transform: translateX(-410px); opacity: 0; }
+        
+        /* Smooth Hover Lifts for Task Cards */
+        .task-row {
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s;
+        }
+        .task-row:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--card-shadow);
         }
 
         #map-wrapper {
@@ -1020,6 +1038,35 @@
 
         let activeCategoryIdForEdit = null;
         const API_URL = 'https://mapbox-api-uz9a.onrender.com';
+
+        // UI Helper: Non-blocking notifications
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed; bottom: 25px; right: 25px; z-index: 10000;
+                padding: 14px 24px; border-radius: 12px; color: white;
+                background: ${type === 'success' ? 'var(--success)' : (type === 'info' ? 'var(--accent)' : 'var(--danger)')};
+                backdrop-filter: var(--glass-blur); box-shadow: var(--card-shadow);
+                font-weight: 600; font-size: 0.95em; pointer-events: none;
+                transition: opacity 0.4s ease, transform 0.4s ease;
+                transform: translateY(20px); opacity: 0;
+            `;
+            toast.innerText = message;
+            document.body.appendChild(toast);
+            
+            // Trigger animation
+            requestAnimationFrame(() => {
+                toast.style.transform = 'translateY(0)';
+                toast.style.opacity = '1';
+            });
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(10px)';
+                setTimeout(() => toast.remove(), 400);
+            }, 3000);
+        }
         let map, draw;
         let activeMarkers = [];
         let allCategories = [], allTaskTypes = [];
@@ -1053,6 +1100,9 @@
         AppStore.subscribe('activeTaskId', (taskId) => {
             if (!taskId) return;
             const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
+
+            // HUD Notification
+            if (task) showToast(`Focused: ${task.task_name || 'Unnamed Task'}`, 'info');
 
             // UI Update: Highlight sidebar row
             document.querySelectorAll('.task-row, .fite-row').forEach(row => row.classList.remove('active-task'));
