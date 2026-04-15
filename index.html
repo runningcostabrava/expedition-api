@@ -923,14 +923,14 @@
 
         <div id="map"></div>
 
-        <div id="style-switcher" style="position: absolute; bottom: 30px; left: 410px; z-index: 100;">
-            <select onchange="changeMapStyle(this.value)" style="padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); font-weight: bold; cursor: pointer; outline: none; background: var(--glass-dark); color: white; backdrop-filter: var(--glass-blur); box-shadow: var(--card-shadow); border-bottom: 2px solid var(--accent);">
-                <option value="mapbox://styles/mapbox/outdoors-v12">⛰️ Outdoors (Hiking)</option>
-                <option value="mapbox://styles/mapbox/satellite-streets-v12">🌍 Satellite 3D</option>
-                <option value="mapbox://styles/mapbox/dark-v11">🌙 Dark Mode</option>
-                <option value="mapbox://styles/mapbox/streets-v12">🛣️ Standard</option>
-            </select>
-        </div>
+<div id="style-switcher" style="position: absolute; bottom: 80px; left: 410px; z-index: 100;">
+    <select onchange="changeMapStyle(this.value)" style="padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); font-weight: bold; cursor: pointer; outline: none; background: var(--glass-dark); color: white; backdrop-filter: var(--glass-blur); box-shadow: var(--card-shadow); border-bottom: 2px solid var(--accent);">
+        <option value="mapbox://styles/mapbox/outdoors-v12">⛰️ Outdoors (Hiking)</option>
+        <option value="mapbox://styles/mapbox/satellite-streets-v12">🌍 Satellite 3D</option>
+        <option value="mapbox://styles/mapbox/dark-v11">🌙 Dark Mode</option>
+        <option value="mapbox://styles/mapbox/streets-v12">🛣️ Standard</option>
+    </select>
+</div>
 
         <div id="elevation-panel">
             <span id="close-elevation"
@@ -1208,26 +1208,29 @@
 
             map.on('draw.update', async (e) => {
                 const feature = e.features[0];
+                if (!isEditingGeometry || feature.geometry.type !== 'LineString') return;
                 const isSmart = feature.properties?.route_type === 'smart';
-
-                if (isEditingGeometry && isSmart && feature.geometry.type === 'LineString') {
-                    const coords = feature.geometry.coordinates;
-                    // Use the Directions API to find the best trail between the new coordinates
-                    const waypoints = coords.map(c => c.slice(0, 2).join(',')).join(';');
-                    const res = await fetch(`https://api.mapbox.com/directions/v5/mapbox/${currentSmartProfile}/${waypoints}?geometries=geojson&overview=full&access_token=${mapboxgl.accessToken}`);
+                if (!isSmart) {
+                    const dist = turf.length(feature, { units: 'kilometers' }).toFixed(2);
+                    showToast(`Manual Edit: ${dist}km (Detail Preserved)`, 'info');
+                    return;
+                }
+                const coords = feature.geometry.coordinates;
+                const sampled = coords.filter((_, i) => i % Math.max(1, Math.floor(coords.length / 24)) === 0 || i === coords.length - 1);
+                const waypoints = sampled.map(c => c.slice(0, 2).join(',')).join(';');
+                try {
+                    const res = await fetch(`https://api.mapbox.com/directions/v5/mapbox/${currentSmartProfile || 'walking'}/${waypoints}?geometries=geojson&overview=full&access_token=${mapboxgl.accessToken}`);
                     const data = await res.json();
-
-                    if (data.routes && data.routes[0]) {
-                        const newRoute = data.routes[0];
-                        feature.geometry = newRoute.geometry;
-                        feature.properties.distance = (newRoute.distance / 1000).toFixed(2);
-                        feature.properties.duration = Math.round(newRoute.duration / 60);
-                        draw.add(feature); // Update the drawing on screen
-
-                        showToast(`Path Recalculated: ${feature.properties.distance}km`, 'success');
-                        // Update elevation chart if open
-                        if (elevationChart) showElevationProfile({ type: 'FeatureCollection', features: [feature] }, feature.properties.title, feature.properties);
+                    if (data.routes?.[0]) {
+                        feature.geometry = data.routes[0].geometry;
+                        feature.properties.distance = (data.routes[0].distance / 1000).toFixed(2);
+                        draw.add(feature);
+                        showToast(`Snapped to Trail: ${feature.properties.distance}km`, 'success');
                     }
+                } catch (err) {
+                    showToast("No trail found here. Keeping manual points.", "info");
+                    feature.properties.route_type = 'manual';
+                    draw.add(feature);
                 }
             });
         });
@@ -2248,6 +2251,14 @@
                         <option value="⚠️" ${existingIcon === '⚠️' ? 'selected' : ''}>⚠️ Alert</option>
                     </select>` : ''}
                 </div>
+                <div style="margin: 10px 0; padding: 10px; background: rgba(56, 189, 248, 0.1); border-radius: 8px; border: 1px solid var(--accent);">
+                    <label style="display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 0.85em; cursor: pointer; color: #0f172a;">
+                        <input type="checkbox" id="ctx-snap-toggle" ${featureToSave.properties.route_type === 'smart' ? 'checked' : ''} 
+                               style="width: 18px; height: 18px;"
+                               onchange="const f = draw.getAll().features[0]; f.properties.route_type = this.checked ? 'smart' : 'manual'; draw.add(f); showToast(this.checked ? 'Smart Snapping Active' : 'Manual Mode: All Points Preserved', 'info');">
+                        🛰️ Snap to Trails (Komoot Mode)
+                    </label>
+                </div>
                 <button id="ctx-save" style="width: 100%; padding: 8px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight:bold;">Save Shape</button>
             `;
 
@@ -2589,14 +2600,19 @@
             }
         }
 
-        function changeMapStyle(style) {
-            map.setStyle(style);
-            map.once('style.load', () => {
-                map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
-                map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
-                renderMapGeometries();
-            });
+function changeMapStyle(style) {
+    map.setStyle(style);
+    map.once('style.load', () => {
+        // Re-inject 3D Terrain
+        if (!map.getSource('mapbox-dem')) {
+            map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
         }
+        map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
+        
+        // Re-render all your tracks and waypoints from the database
+        renderMapGeometries();
+    });
+}
 
         document.getElementById('unified-save-btn').onclick = async () => {
             // 1. Grab the ID first so we can fetch existing data
@@ -3234,10 +3250,10 @@
             }
         }
 
-        function openStreetView(lat, lng) {
-            const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
-            window.open(svUrl, '_blank');
-        }
+function openStreetView(lat, lng) {
+    const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+    window.open(svUrl, '_blank');
+}
 
         function startEditGeometry(taskId, anchorId) {
             const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
@@ -3355,18 +3371,14 @@
 
                     // Convert GPX to GeoJSON using the imported toGeoJSON library
                     const geojson = toGeoJSON.gpx(gpxXml);
-
                     if (geojson && geojson.features.length > 0) {
                         draw.deleteAll();
-                        draw.add(geojson);
-
                         const feature = geojson.features[0];
+                        feature.properties = feature.properties || {};
+                        feature.properties.route_type = 'manual'; // Default to manual to preserve every point
+                        draw.add(feature);
                         const centerPoint = feature.geometry.type === 'Polygon' ? feature.geometry.coordinates[0][0] : feature.geometry.coordinates[Math.floor(feature.geometry.coordinates.length / 2)];
-
-                        // Send straight to the Context Popup
-                        showGeometryContextPopup(centerPoint, feature.geometry, file.name.replace('.gpx', ''), '');
-
-                        // Zoom map to the uploaded track bounds
+                        showGeometryContextPopup(centerPoint, feature.geometry, file.name.replace('.gpx', ''), 'GPX Imported (Manual Mode)');
                         const bbox = turf.bbox(geojson);
                         map.fitBounds(bbox, { padding: 50 });
                     } else {
