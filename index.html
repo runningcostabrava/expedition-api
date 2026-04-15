@@ -1317,6 +1317,36 @@
                     }
                 });
 
+                // --- NEW: Universal Right-Click Context Menu ---
+                map.on('contextmenu', (e) => {
+                    // 1. Don't trigger if they right-click while drawing a route
+                    if (isAnalyzingSegment || isRouting || isEditingGeometry) return;
+
+                    const { lng, lat } = e.lngLat;
+
+                    // 2. Clear any existing popups to keep the UI clean
+                    const popups = document.getElementsByClassName("mapboxgl-popup");
+                    while (popups.length > 0) popups[0].remove();
+
+                    // 3. Spawn a mini Context Menu
+                    new mapboxgl.Popup({ closeButton: false, offset: 5, className: 'custom-popup' })
+                        .setLngLat([lng, lat])
+                        .setHTML(`
+                            <div style="padding: 5px; text-align: center; min-width: 140px;">
+                                <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 8px; font-family: monospace;">
+                                    📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}
+                                </div>
+                                <button class="popup-btn" style="width: 100%; background: #f39c12; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s;" 
+                                        onmouseover="this.style.background='#e67e22'" 
+                                        onmouseout="this.style.background='#f39c12'"
+                                        onclick="openStreetView(${lat}, ${lng}); this.closest('.mapboxgl-popup').remove();">
+                                    🚶‍♂️ Street View Here
+                                </button>
+                            </div>
+                        `)
+                        .addTo(map);
+                });
+
                 // Listen for ENTER to finish Multi-stop Route
                 document.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter' && isRouting && lastCalculatedRoute) {
@@ -3164,8 +3194,8 @@
         }
 
         function openStreetView(lat, lng) {
-            // Official Google Maps Universal URL intent for Street View
-            const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+            // Official modern Google Maps URL for dropping directly into Street View
+            const svUrl = `https://www.google.com/maps?layer=c&cbll=${lat},${lng}`;
             window.open(svUrl, '_blank');
         }
 
