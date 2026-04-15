@@ -923,12 +923,12 @@
 
         <div id="map"></div>
 
-        <div id="style-switcher" style="position: absolute; bottom: 30px; left: 15px; z-index: 10;">
-            <select onchange="changeMapStyle(this.value)" style="padding: 8px 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; outline: none; background: var(--glass-dark); color: white; backdrop-filter: var(--glass-blur); box-shadow: var(--card-shadow);">
-                <option value="mapbox://styles/mapbox/outdoors-v12">⛰️ Outdoors (Hiking Topo)</option>
+        <div id="style-switcher" style="position: absolute; top: 120px; right: 10px; z-index: 100;">
+            <select onchange="changeMapStyle(this.value)" style="padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); font-weight: bold; cursor: pointer; outline: none; background: var(--glass-dark); color: white; backdrop-filter: var(--glass-blur); box-shadow: var(--card-shadow);">
+                <option value="mapbox://styles/mapbox/outdoors-v12">⛰️ Outdoors (Hiking)</option>
                 <option value="mapbox://styles/mapbox/satellite-streets-v12">🌍 Satellite 3D</option>
                 <option value="mapbox://styles/mapbox/dark-v11">🌙 Dark Mode</option>
-                <option value="mapbox://styles/mapbox/streets-v12">🛣️ Standard Map</option>
+                <option value="mapbox://styles/mapbox/streets-v12">🛣️ Standard</option>
             </select>
         </div>
 
@@ -3204,7 +3204,8 @@
         }
 
         function openStreetView(lat, lng) {
-            const svUrl = `http://googleusercontent.com/maps.google.com/${lat},${lng}`;
+            // Uses the official Google Maps URL parameter for Street View
+            const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
             window.open(svUrl, '_blank');
         }
 
