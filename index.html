@@ -1006,7 +1006,9 @@
         }
 
         function toggleSectionAccordion(targetId) {
-            const targetSection = document.querySelector(`.asana-section[data-section-id="${targetId}"]`);
+            // Force targetId to string for consistent comparison with dataset
+            const strId = String(targetId);
+            const targetSection = document.querySelector(`.asana-section[data-section-id="${strId}"]`);
             if (!targetSection) return;
 
             const targetContent = targetSection.querySelector('.section-content');
@@ -1339,7 +1341,9 @@
             let payload = {
                 title: currentMode === 'section' ? `Detour: ${title}` : title,
                 color: chosenColor,
-                existing_task_id: AppStore.get('activeTaskId') || null // CRITICAL: Must link to a task to show on map
+                existing_task_id: AppStore.get('activeTaskId') || null, // CRITICAL: Must link to a task to show on map
+                // NEW: If no task is active, try to at least put it in the currently open section
+                section_id: AppStore.get('activeTaskId') ? null : (document.querySelector('.asana-section:not(.collapsed)')?.dataset.sectionId || null)
             };
 
             if (isPoint) {

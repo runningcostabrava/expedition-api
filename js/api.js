@@ -82,7 +82,8 @@ async function refreshData() {
 
         // 3. FORCE the previously open section to expand again
         if (openSectionId) {
-            const targetSection = document.querySelector(`.asana-section[data-section-id="${openSectionId}"]`);
+            const strId = String(openSectionId);
+            const targetSection = document.querySelector(`.asana-section[data-section-id="${strId}"]`);
             if (targetSection) {
                 const content = targetSection.querySelector('.section-content');
                 const icon = targetSection.querySelector('.section-toggle-icon');
