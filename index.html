@@ -1532,6 +1532,12 @@
         }
 
         function openModal(id = 'command-modal') {
+            // If it's the old task modal, we redirect it to our better Right Panel
+            if (id === 'command-modal' && AppStore.get('activeTaskId')) {
+                openTaskEditor(AppStore.get('activeTaskId'));
+                return;
+            }
+
             const target = document.getElementById(id);
             if (target) {
                 target.style.display = 'flex';
