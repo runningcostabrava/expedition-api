@@ -11,6 +11,10 @@
         type="text/css">
     <script
         src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet"
         href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css"
         type="text/css">
@@ -35,7 +39,8 @@
             </div>
         </div>
 
-        <div id="section-pills" style="display:flex; gap:8px; flex: 1; margin-left: 10px; overflow-x: auto; min-width: 0;"></div>
+        <div id="section-pills"
+            style="display:flex; gap:8px; flex: 1; margin-left: 10px; overflow-x: auto; min-width: 0;"></div>
 
         <div style="display: flex; gap: 8px; align-items: center; flex-shrink: 0;">
             <div id="google-search-container" style="position: relative;"></div>
@@ -84,6 +89,28 @@
         <div id="asana-container"></div>
     </div>
 
+    <div id="task-detail-panel">
+        <div
+            style="padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
+            <button onclick="closeTaskDetailPanel()"
+                style="width:auto; padding: 6px 12px; background: transparent; color: #64748b; border: 1px solid #cbd5e0; font-weight: bold;">←
+                Back to Plan</button>
+            <button id="detail-edit-btn" class="action-btn-modern"
+                style="color: #3498db; font-weight: bold; padding: 6px 12px;">⚙️ Edit Task</button>
+        </div>
+        <div id="task-detail-content" style="padding: 20px; overflow-y: auto; flex: 1;">
+        </div>
+    </div>
+
+    <div id="right-panel" class="hidden">
+        <div id="right-panel-header">
+            <span id="right-panel-title">Details</span>
+            <button onclick="closeRightPanel()" style="width: auto; background: none; border: none; font-size: 1.2em; cursor: pointer; color: #94a3b8; padding: 0;">✖</button>
+        </div>
+        <div id="right-panel-content">
+            </div>
+    </div>
+
     <div id="map-wrapper">
         <div id="loading-overlay"
             style="position:absolute; inset:0; background:rgba(255,255,255,0.8); z-index:9999; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#1e293b;">
@@ -92,14 +119,15 @@
 
         <div id="map"></div>
 
-<div id="style-switcher" style="position: absolute; bottom: 80px; left: 410px; z-index: 100;">
-    <select onchange="changeMapStyle(this.value)" style="padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); font-weight: bold; cursor: pointer; outline: none; background: var(--glass-dark); color: white; backdrop-filter: var(--glass-blur); box-shadow: var(--card-shadow); border-bottom: 2px solid var(--accent);">
-        <option value="mapbox://styles/mapbox/outdoors-v12">⛰️ Outdoors (Hiking)</option>
-        <option value="mapbox://styles/mapbox/satellite-streets-v12">🌍 Satellite 3D</option>
-        <option value="mapbox://styles/mapbox/dark-v11">🌙 Dark Mode</option>
-        <option value="mapbox://styles/mapbox/streets-v12">🛣️ Standard</option>
-    </select>
-</div>
+        <div id="style-switcher">
+            <select onchange="changeMapStyle(this.value)"
+                style="padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); font-weight: bold; cursor: pointer; outline: none; background: var(--glass-dark); color: white; backdrop-filter: var(--glass-blur); box-shadow: var(--card-shadow); border-bottom: 2px solid var(--accent);">
+                <option value="mapbox://styles/mapbox/outdoors-v12">⛰️ Outdoors (Hiking)</option>
+                <option value="mapbox://styles/mapbox/satellite-streets-v12">🌍 Satellite 3D</option>
+                <option value="mapbox://styles/mapbox/dark-v11">🌙 Dark Mode</option>
+                <option value="mapbox://styles/mapbox/streets-v12">🛣️ Standard</option>
+            </select>
+        </div>
 
         <div id="elevation-panel">
             <span id="close-elevation"
@@ -270,195 +298,34 @@
         </div>
     </div>
 
+    <script src="js/store.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/elevation.js"></script>
+    <script src="js/route-editor.js"></script>
+
+
     <script>
 
-        let activeCategoryIdForEdit = null;
-        const API_URL = 'https://mapbox-api-uz9a.onrender.com';
+        function openRightPanel(title, htmlContent) {
+            // Close the left detail panel if it's open to prevent screen crowding
+            closeTaskDetailPanel();
 
-        // UI Helper: Non-blocking notifications
-        function showToast(message, type = 'success') {
-            const toast = document.createElement('div');
-            toast.style.cssText = `
-                position: fixed; bottom: 25px; right: 25px; z-index: 10000;
-                padding: 14px 24px; border-radius: 12px; color: white;
-                background: ${type === 'success' ? 'var(--success)' : (type === 'info' ? 'var(--accent)' : 'var(--danger)')};
-                backdrop-filter: var(--glass-blur); box-shadow: var(--card-shadow);
-                font-weight: 600; font-size: 0.95em; pointer-events: none;
-                transition: opacity 0.4s ease, transform 0.4s ease;
-                transform: translateY(20px); opacity: 0;
-            `;
-            toast.innerText = message;
-            document.body.appendChild(toast);
-
-            // Trigger animation
-            requestAnimationFrame(() => {
-                toast.style.transform = 'translateY(0)';
-                toast.style.opacity = '1';
-            });
-
-            // Remove after 3 seconds
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateY(10px)';
-                setTimeout(() => toast.remove(), 400);
-            }, 3000);
-        }
-        let map, draw;
-        let activeMarkers = [];
-        let allCategories = [], allTaskTypes = [];
-        let mapFilters = { point: true, line: true, smart: true, polygon: true };
-
-        // --- THE REACTIVE STORE (Step 3: Signals Pattern) ---
-        const createStore = (initialState) => {
-            let state = { ...initialState };
-            const listeners = new Map();
-            return {
-                get: (key) => state[key],
-                set: (key, value) => {
-                    state[key] = value;
-                    if (listeners.has(key)) listeners.get(key).forEach(fn => fn(value));
-                },
-                subscribe: (key, fn) => {
-                    if (!listeners.has(key)) listeners.set(key, new Set());
-                    listeners.get(key).add(fn);
-                    return () => listeners.get(key).delete(fn);
-                }
-            };
-        };
-
-        const AppStore = createStore({
-            itinerary: [],
-            sections: [],
-            activeTaskId: null
-        });
-
-        // SIGNAL: Map and Sidebar react instantly to state changes
-        AppStore.subscribe('activeTaskId', (taskId) => {
-            if (!taskId) return;
-            const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
-
-            // HUD Notification
-            if (task) showToast(`Focused: ${task.task_name || 'Unnamed Task'}`, 'info');
-
-            // UI Update: Highlight sidebar row
-            document.querySelectorAll('.task-row, .fite-row').forEach(row => row.classList.remove('active-task'));
-            const row = document.getElementById(`task-row-${taskId}`);
-            if (row) {
-                row.classList.add('active-task');
-                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-
-            // Map Update: Fit bounds to all task geometries SAFELY
-            if (task?.geometries?.length > 0) {
-                const features = [];
-                task.geometries.forEach(g => {
-                    if (g.kind === 'point' && _isValidLngLat(g.lng, g.lat)) {
-                        features.push(turf.point([g.lng, g.lat]));
-                    } else if (g.geojson && _geometryHasValidCoords(g.geojson)) {
-                        features.push(...g.geojson.features);
-                    }
-                });
-
-                if (features.length > 0) {
-                    try {
-                        const bbox = turf.bbox(turf.featureCollection(features));
-                        if (bbox.every(val => isFinite(val))) {
-                            if (bbox[0] === bbox[2] && bbox[1] === bbox[3]) {
-                                map.flyTo({ center: [bbox[0], bbox[1]], zoom: 16, duration: 1200 });
-                            } else {
-                                map.fitBounds(bbox, { padding: 80, maxZoom: 16, duration: 1200 });
-                            }
-                        }
-                    } catch (e) {
-                        console.error("Mapbox fitBounds safely bypassed invalid geometry:", e);
-                    }
-                }
-            }
-
-            map.on('draw.update', async (e) => {
-                const feature = e.features[0];
-                if (!isEditingGeometry || feature.geometry.type !== 'LineString') return;
-                const isSmart = feature.properties?.route_type === 'smart';
-                if (!isSmart) {
-                    const dist = turf.length(feature, { units: 'kilometers' }).toFixed(2);
-                    showToast(`Manual Edit: ${dist}km (Detail Preserved)`, 'info');
-                    return;
-                }
-                const coords = feature.geometry.coordinates;
-                const sampled = coords.filter((_, i) => i % Math.max(1, Math.floor(coords.length / 24)) === 0 || i === coords.length - 1);
-                const waypoints = sampled.map(c => c.slice(0, 2).join(',')).join(';');
-                try {
-                    const res = await fetch(`https://api.mapbox.com/directions/v5/mapbox/${currentSmartProfile || 'walking'}/${waypoints}?geometries=geojson&overview=full&access_token=${mapboxgl.accessToken}`);
-                    const data = await res.json();
-                    if (data.routes?.[0]) {
-                        feature.geometry = data.routes[0].geometry;
-                        feature.properties.distance = (data.routes[0].distance / 1000).toFixed(2);
-                        draw.add(feature);
-                        showToast(`Snapped to Trail: ${feature.properties.distance}km`, 'success');
-                    }
-                } catch (err) {
-                    showToast("No trail found here. Keeping manual points.", "info");
-                    feature.properties.route_type = 'manual';
-                    draw.add(feature);
-                }
-            });
-        });
-
-        function updateFilters() {
-            const p = document.getElementById('filter-points');
-            const l = document.getElementById('filter-lines');
-            const s = document.getElementById('filter-smart');
-            const poly = document.getElementById('filter-polygons');
-
-            mapFilters.point = p ? p.checked : true;
-            mapFilters.line = l ? l.checked : true;
-            mapFilters.smart = s ? s.checked : true;
-            mapFilters.polygon = poly ? poly.checked : true;
-            renderMapGeometries();
+            document.getElementById('right-panel-title').innerHTML = title;
+            document.getElementById('right-panel-content').innerHTML = htmlContent;
+            document.getElementById('right-panel').classList.remove('hidden');
         }
 
-        let activeAnchorId = null, activeWaypointId = null, activeTrackId = null;
-        let isEditingGeometry = false, isRouting = false, isAnalyzingSegment = false;
-        let routePoints = [], segmentPoints = [], activeAnalysisTrack = null;
-        let lastCalculatedRoute = null; // Stores multi-stop route until Enter is pressed
-        let AUTH_TOKEN = sessionStorage.getItem('expedition_token');
-
-        /**
-         * A wrapper for fetch that automatically adds the JWT token.
-         * If no token exists, it prompts for the password and logs in first.
-         */
-        async function authFetch(url, options = {}) {
-            if (!AUTH_TOKEN) {
-                const pass = prompt("Enter Admin Password:");
-                if (!pass) return;
-
-                const res = await fetch(`${API_URL}/api/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: pass })
-                });
-
-                const data = await res.json();
-                if (data.token) {
-                    AUTH_TOKEN = data.token;
-                    sessionStorage.setItem('expedition_token', AUTH_TOKEN);
-                } else {
-                    alert("Unauthorized: Incorrect Password");
-                    return;
-                }
-            }
-
-            // Inject the token into the headers
-            options.headers = {
-                ...options.headers,
-                'Authorization': `Bearer ${AUTH_TOKEN}`
-            };
-            return fetch(url, options);
+        function closeRightPanel() {
+            document.getElementById('right-panel').classList.add('hidden');
         }
 
         let elevationChart = null;
         let directionsControl = null; // Holds the Mapbox Directions UI
         let currentSmartProfile = 'driving'; // Safely tracks the active routing mode
+        // --- RESTORED MAP STATE VARIABLES ---
+        let activeAnchorId = null, activeWaypointId = null, activeTrackId = null;
+        let isEditingGeometry = false, isRouting = false, isAnalyzingSegment = false;
+        let routePoints = [], segmentPoints = [], activeAnalysisTrack = null, lastCalculatedRoute = null;
 
         const groupColors = { 'Hikers': '#2ecc71', 'Runners': '#e67e22', 'Staff': '#9b59b6', 'Transport': '#f1c40f' };
 
@@ -543,8 +410,8 @@
                                 <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 8px; font-family: monospace;">
                                     📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}
                                 </div>
-                                <button class="popup-btn" style="width: 100%; background: #f39c12; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s;" 
-                                        onmouseover="this.style.background='#e67e22'" 
+                                <button class="popup-btn" style="width: 100%; background: #f39c12; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s;"
+                                        onmouseover="this.style.background='#e67e22'"
                                         onmouseout="this.style.background='#f39c12'"
                                         onclick="openStreetView(${lat}, ${lng}); this.closest('.mapboxgl-popup').remove();">
                                     🚶‍♂️ Street View Here
@@ -1031,36 +898,39 @@
                         `;
                         el.style.cursor = 'pointer';
 
-                        // Add click listener to highlight the sidebar task
-                        el.addEventListener('click', () => focusTaskInSidebar(task.task_id));
-
                         // focusAfterOpen: false prevents the ARIA warning
                         const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
                             .setLngLat([geom.lng, geom.lat])
-                            .setPopup(new mapboxgl.Popup({ offset: 25, focusAfterOpen: false, className: 'custom-popup', maxWidth: '280px' }).setHTML(`
-                            <div style="padding: 5px;">
-                                ${geom.photo_url ? `<img src="${geom.photo_url}" style="width:100%; height:120px; object-fit:cover; border-radius:6px; margin-bottom:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1);">` : ''}
-                                <h4 style="margin-top:0; font-size:1.1em; color:#2c3e50; margin-bottom:5px;">${renderIcon} ${geom.title}</h4>
-                                <p style="margin: 0 0 8px 0; font-size: 0.85em; color: #7f8c8d;">Task: ${task.task_name || 'Unnamed Task'}</p>
-
-                                ${geom.address ? `<div style="font-size:0.8em; margin-bottom:4px; color:#34495e;">📍 ${geom.address}</div>` : ''}
-                                ${geom.phone ? `<div style="font-size:0.8em; margin-bottom:10px; color:#34495e;">📞 ${geom.phone}</div>` : ''}
-
-                                <div style="display:flex; gap:8px; font-size:0.85em; margin-bottom:12px; border-bottom:1px solid #eee; padding-bottom:10px;">
-                                    ${geom.link ? `<a href="${geom.link.startsWith('http') ? geom.link : 'https://' + geom.link}" target="_blank" style="color:#3498db; text-decoration:none; font-weight:bold;">🌐 Website</a>` : ''}
-                                    ${geom.google_maps_url ? `<a href="${geom.google_maps_url}" target="_blank" style="color:#27ae60; text-decoration:none; font-weight:bold;">🗺️ Maps</a>` : ''}
-                                </div>
-
-                                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                                    <button class="popup-btn edit" onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="flex:1;">Edit</button>
-                                    <button class="popup-btn delete" onclick="deleteGeometry('point', ${geom.waypoint_id || geom.anchor_id})" style="flex:1;">Delete</button>
-                                </div>
-                                <button class="popup-btn" style="width: 100%; background: #f39c12; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-weight: bold;" onclick="openStreetView(${geom.lat}, ${geom.lng})">
-                                    🚶‍♂️ Open Street View
-                                </button>
-                            </div>
-                        `))
                             .addTo(map);
+
+                        // Route the click to the Right Panel
+                        el.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            if (isEditingGeometry) return;
+                            focusTaskInSidebar(task.task_id);
+
+                            const html = `
+                                ${geom.photo_url ? `<img src="${geom.photo_url}" style="width:100%; height:180px; object-fit:cover; border-radius:8px; margin-bottom:15px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">` : ''}
+                                <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                                    <p style="margin: 0 0 10px 0; font-size: 0.9em; color: #64748b; font-weight: bold;">Parent Task: ${task.task_name || 'Unnamed Task'}</p>
+                                    ${geom.address ? `<div style="font-size:0.9em; margin-bottom:8px; color:#334155;">📍 ${geom.address}</div>` : ''}
+                                    ${geom.phone ? `<div style="font-size:0.9em; margin-bottom:8px; color:#334155;">📞 ${geom.phone}</div>` : ''}
+                                    <div style="display:flex; gap:12px; margin-top: 15px;">
+                                        ${geom.link ? `<a href="${geom.link.startsWith('http') ? geom.link : 'https://' + geom.link}" target="_blank" style="color:#0ea5e9; text-decoration:none; font-weight:bold;">🌐 Website</a>` : ''}
+                                        ${geom.google_maps_url ? `<a href="${geom.google_maps_url}" target="_blank" style="color:#10b981; text-decoration:none; font-weight:bold;">🗺️ Open in Google Maps</a>` : ''}
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                                    <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="flex:1; background:#0ea5e9; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">⚙️ Edit Tool</button>
+                                    <button onclick="deleteGeometry('point', ${geom.waypoint_id || geom.anchor_id})" style="flex:1; background:#fee2e2; color:#ef4444; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🗑️ Delete</button>
+                                </div>
+                                <button style="width: 100%; background: #f59e0b; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold;" onclick="openStreetView(${geom.lat}, ${geom.lng})">
+                                    🚶‍♂️ Drop Street View Here
+                                </button>
+                            `;
+                            openRightPanel(`${renderIcon} ${geom.title}`, html);
+                        });
+
                         activeMarkers.push(marker);
                     } else if (geom.geojson) {
                         // Apply the inherited color to lines/polygons as well
@@ -1084,12 +954,12 @@
                         });
 
                         map.on('click', layerId, (e) => {
-                            // CRITICAL: Lock onto the task so waypoints from the chart go into this task
+                            if (isEditingGeometry) return;
+
                             AppStore.set('activeTaskId', task.task_id);
                             focusTaskInSidebar(task.task_id);
                             const dist = turf.length(geom.geojson, { units: 'kilometers' }).toFixed(2);
 
-                            // Calculate Elevation Gain/Loss
                             let gain = 0, loss = 0;
                             const coords = geom.geojson.features[0].geometry.type === 'Polygon' ? geom.geojson.features[0].geometry.coordinates[0] : geom.geojson.features[0].geometry.coordinates;
                             for (let i = 1; i < coords.length; i++) {
@@ -1098,22 +968,27 @@
                                 else loss -= diff;
                             }
 
-                            new mapboxgl.Popup({ focusAfterOpen: false, anchor: 'bottom', offset: 15, className: 'custom-popup' })
-                                .setLngLat(e.lngLat)
-                                .setHTML(`
-                                    <div style="padding-right: 5px;">
-                                        <h4 style="margin-top:0; font-size:1.1em; color:#2c3e50;">${geom.kind === 'polygon' ? '🛑' : '📈'} ${geom.title}</h4>
-                                        <p style="margin: 5px 0; font-weight:bold;">Distance: ${dist} km</p>
-                                        <p style="margin: 0; font-size: 0.9em; color: #7f8c8d;">Task: ${task.task_name || task.task || 'Unnamed Task'}</p>
-                                        <p style="margin: 8px 0; font-size: 0.85em; color: #e74c3c; font-weight:bold;">🔺 +${gain.toFixed(0)}m &nbsp;|&nbsp; 🔻 ${loss.toFixed(0)}m</p>
-                                        <div style="margin-top: 12px; display: flex; gap: 8px;">
-                                            <button class="popup-btn edit" onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})">Edit</button>
-                                            ${geom.kind === 'line' ? `<button class="popup-btn analyze" onclick="startSegmentAnalysis(${task.task_id}, ${geom.track_id})">Analyze</button>` : ''}
-                                            <button class="popup-btn delete" onclick="deleteGeometry('${geom.kind}', ${geom.track_id})">Delete</button>
+                            const html = `
+                                <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                                    <p style="margin: 0 0 10px 0; font-size: 0.9em; color: #64748b; font-weight: bold;">Parent Task: ${task.task_name || 'Unnamed Task'}</p>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: center;">
+                                        <div style="background: white; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                                            <div style="font-size: 0.8em; color: #64748b;">Distance</div>
+                                            <div style="font-weight: bold; color: #0f172a;">📏 ${dist} km</div>
+                                        </div>
+                                        <div style="background: white; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                                            <div style="font-size: 0.8em; color: #64748b;">Elevation</div>
+                                            <div style="font-weight: bold;"><span style="color:#10b981">▲ ${gain.toFixed(0)}m</span> | <span style="color:#ef4444">▼ ${loss.toFixed(0)}m</span></div>
                                         </div>
                                     </div>
-                                `)
-                                .addTo(map);
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 10px;">
+                                    <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="width:100%; background:#0ea5e9; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">⚙️ Edit Route Geometry</button>
+                                    ${geom.kind === 'line' ? `<button onclick="startSegmentAnalysis(${task.task_id}, ${geom.track_id})" style="width:100%; background:#8b5cf6; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">✂️ Slice Segment (Analyzer)</button>` : ''}
+                                    <button onclick="deleteGeometry('${geom.kind}', ${geom.track_id})" style="width:100%; background:#fee2e2; color:#ef4444; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🗑️ Delete Track</button>
+                                </div>
+                            `;
+                            openRightPanel(`${geom.kind === 'polygon' ? '🛑' : '📈'} ${geom.title}`, html);
 
                             const props = geom.geojson.features[0].properties || {};
                             showElevationProfile(geom.geojson, geom.title, {
@@ -1129,7 +1004,43 @@
             });
         }
 
+        function toggleSectionAccordion(targetId) {
+            const targetSection = document.querySelector(`.asana-section[data-section-id="${targetId}"]`);
+            if (!targetSection) return;
+
+            const targetContent = targetSection.querySelector('.section-content');
+            const targetIcon = targetSection.querySelector('.section-toggle-icon');
+            const wasCollapsed = targetContent.classList.contains('collapsed');
+
+            // 1. Force close ALL sections
+            document.querySelectorAll('.asana-section').forEach(sec => {
+                sec.querySelector('.section-content').classList.add('collapsed');
+                sec.querySelector('.section-toggle-icon').classList.add('collapsed');
+            });
+
+            // 2. If the one we clicked was closed, open it (otherwise leave it closed)
+            if (wasCollapsed) {
+                targetContent.classList.remove('collapsed');
+                targetIcon.classList.remove('collapsed');
+
+                // Smoothly scroll it into view
+                setTimeout(() => {
+                    targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+            }
+        }
+
         function flyToSection(sectionId) {
+            if (isEditingGeometry) return;
+
+            // 1. Manage the Accordion Sidebar
+            toggleSectionAccordion(sectionId || 'null');
+            const targetSection = document.querySelector(`.asana-section[data-section-id="${sectionId || 'null'}"]`);
+            if (targetSection && !targetSection.querySelector('.section-content').classList.contains('collapsed')) {
+                targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+
+            // 2. Fly the Map
             const sectionTasks = AppStore.get('itinerary').filter(t => t.section_id === sectionId || (sectionId === null && !t.section_id));
             const features = [];
             sectionTasks.forEach(task => {
@@ -1168,6 +1079,7 @@
         }
 
         function flyToGeometry(lng, lat, kind, layerId) {
+            if (isEditingGeometry) return; // 🚫 Block camera jump
             if (kind === 'point') {
                 map.flyTo({ center: [lng, lat], zoom: 16 });
             } else {
@@ -1220,337 +1132,285 @@
             alert("Analysis: Click two points on the track to create a subsection.");
         }
 
-        let elevationHoverMarker = null;
-        let currentElevationTrackId = null;
-
-        function showElevationProfile(geojson, title, metadata = null, trackId = null) {
-            currentElevationTrackId = trackId;
-            document.getElementById('elevation-panel').style.display = 'block';
-            const statsHeader = document.getElementById('elevation-stats-header');
-            const props = metadata || geojson.features?.[0]?.properties || {};
-
-            // Helper to reset header to track stats
-            const resetHeader = () => {
-                statsHeader.innerHTML = `
-                    <span style="color:#000;">🏁 <strong>${title}</strong></span>
-                    <span style="color:#000;">📏 <strong>${props.distance || 0} km</strong></span>
-                    <span style="color:#27ae60;">▲ <strong>${props.gain || 0}m</strong></span>
-                    <span style="color:#e74c3c;">▼ <strong>${props.loss || 0}m</strong></span>
-                    ${props.duration ? `<span style="color:#000;">🕒 <strong>${props.duration} min</strong></span>` : ''}
-                `;
-            };
-            resetHeader();
-
-            let distances = [], elevations = [], cumulative = 0;
-            let cumulativeGains = [], currentGain = 0;
-            const coords = geojson.features[0].geometry.type === 'Polygon' ? geojson.features[0].geometry.coordinates[0] : geojson.features[0].geometry.coordinates;
-
-            coords.forEach((c, i) => {
-                elevations.push(c[2] || 0);
-                if (i > 0) {
-                    cumulative += turf.distance(turf.point(coords[i - 1]), turf.point(c), { units: 'kilometers' });
-                    const diff = (c[2] || 0) - (coords[i - 1][2] || 0);
-                    if (diff > 0) currentGain += diff;
-                }
-                distances.push(cumulative.toFixed(2));
-                cumulativeGains.push(currentGain.toFixed(0));
-            });
-
-            // FIND WAYPOINTS: Locate all points belonging to the active task
-            const task = AppStore.get('itinerary').find(t => t.task_id === AppStore.get('activeTaskId'));
-            const waypointDataset = [];
-            if (task && task.geometries && geojson.features[0].geometry.type !== 'Polygon') {
-                const trackFeature = geojson.features[0];
-                task.geometries.forEach(g => {
-                    if (g.kind === 'point' && g.lng && g.lat) {
-                        const snapped = turf.nearestPointOnLine(trackFeature, [g.lng, g.lat]);
-                        const sliced = turf.lineSlice(coords[0], snapped, trackFeature);
-                        const distOnTrack = turf.length(sliced, { units: 'kilometers' });
-
-                        waypointDataset.push({
-                            x: distOnTrack.toFixed(2),
-                            y: snapped.geometry.coordinates[2] || 0,
-                            title: g.title,
-                            icon: g.icon || '📍',
-                            lng: g.lng,
-                            lat: g.lat
-                        });
-                    }
-                });
-            }
-
-            if (elevationChart) elevationChart.destroy();
-            elevationChart = new Chart(document.getElementById('elevation-chart'), {
-                type: 'line',
-                data: {
-                    labels: distances,
-                    datasets: [
-                        {
-                            label: 'Waypoints',
-                            data: waypointDataset,
-                            type: 'scatter',
-                            backgroundColor: '#e67e22',
-                            borderColor: '#fff',
-                            borderWidth: 2,
-                            pointRadius: 6,
-                            pointHoverRadius: 9,
-                            zIndex: 10
-                        },
-                        { label: title, data: elevations, fill: true, tension: 0.4, borderColor: '#3498db', backgroundColor: 'rgba(52, 152, 219, 0.2)' }
-                    ]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false }, // Improved tracking
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: (context) => {
-                                    if (context.dataset.type === 'scatter') return `📍 ${context.raw.title}`;
-                                    return `Elev: ${context.parsed.y}m`;
-                                }
-                            }
-                        }
-                    },
-                    // RESTORED: Move dot on map when hovering chart
-                    onHover: (event, activeElements) => {
-                        if (activeElements.length > 0) {
-                            const index = activeElements[0].index;
-                            const coord = coords[index];
-                            if (!elevationHoverMarker) {
-                                elevationHoverMarker = new mapboxgl.Marker({ color: '#f1c40f' })
-                                    .setLngLat([coord[0], coord[1]])
-                                    .addTo(map);
-                            } else {
-                                elevationHoverMarker.setLngLat([coord[0], coord[1]]);
-                            }
-                        } else if (elevationHoverMarker) {
-                            elevationHoverMarker.remove();
-                            elevationHoverMarker = null;
-                        }
-                    },
-                    onClick: (e, activeElements) => {
-                        if (activeElements.length > 0) {
-                            const element = activeElements[0];
-                            if (element.datasetIndex === 0) {
-                                // CLICKED EXISTING WAYPOINT
-                                const wp = waypointDataset[element.index];
-                                map.flyTo({ center: [wp.lng, wp.lat], zoom: 17 });
-                                statsHeader.innerHTML = `<span style="color:#e67e22;">📍 <strong>${wp.icon} ${wp.title}</strong></span> <span style="margin-left:15px; color:#666;">at ${wp.x}km</span> <button onclick="refreshData()" style="width:auto; padding:2px 8px; margin-left:10px; font-size:10px; background:#95a5a6;">Reset View</button>`;
-                            } else {
-                                // CLICKED LINE (CREATE NEW)
-                                const index = element.index;
-                                const activeCoord = coords[index];
-                                draw.deleteAll();
-                                const feat = { type: 'Feature', geometry: { type: 'Point', coordinates: [activeCoord[0], activeCoord[1]] } };
-                                draw.add(feat);
-                                map.flyTo({ center: [activeCoord[0], activeCoord[1]], zoom: 15 });
-                                // Correctly passing the pre-calculated stats to the save popup
-                                const dist = distances[index];
-                                const gain = cumulativeGains[index];
-                                activeParentTrackId = trackId; // LINK IT: Tells the save popup to nest this point
-                                showGeometryContextPopup([activeCoord[0], activeCoord[1]], feat.geometry, `KM ${dist}`, `📏 ${dist}km | 🔺 +${gain}m`, null, '📍');
-                            }
-                        }
-                    },
-                    scales: {
-                        y: { beginAtZero: false, ticks: { color: '#000', font: { weight: 'bold' } } },
-                        x: { ticks: { color: '#000', font: { weight: 'bold' } } }
-                    }
-                }
-            });
-        }
 
         let activeContextPopup = null;
 
-        function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, editConfig = null, existingIcon = '📍', existingColor = '#3498db', existingLink = '', googleData = null) {
-            if (activeContextPopup) activeContextPopup.remove();
 
-            let activeTaskSection = '';
-            if (AppStore.get('activeTaskId')) {
-                const t = AppStore.get('itinerary').find(x => x.task_id === AppStore.get('activeTaskId'));
-                if (t && t.section_id) activeTaskSection = t.section_id;
+
+
+
+
+
+
+
+
+
+
+
+
+        // --- 🧠 ULTIMATE GLOBAL TRACKING ---
+        // Decoupled state object to survive Engine redraws
+        window.ActiveSaveState = {
+            mode: 'overwrite',
+            color: '#3498db',
+            title: '',
+            isTitleEdited: false
+        };
+        let globalEditTrackId = null;
+
+        function startEditGeometry(taskId, anchorId) {
+            console.log(`[START-EDIT] Task: ${taskId}, Anchor: ${anchorId}`);
+            const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
+
+            // NEW: Automatically open the task details in the sidebar when editing starts
+            if (task) {
+                openTaskDetailPanel(task);
             }
 
-            const sectionOptions = (AppStore.get('sections') || []).map(s => {
-                const dateStr = s.section_date ? new Date(s.section_date).toISOString().split('T')[0] : '';
-                return `<option value="${s.id}" ${activeTaskSection == s.id ? 'selected' : ''}>${dateStr} ${s.title || ''}</option>`;
-            }).join('');
+            const geom = task?.geometries.find(g => g.anchor_id === anchorId);
+            if (!geom) return alert("Geometry not found!");
 
-            const taskWarning = AppStore.get('activeTaskId')
-                ? `<div style="color:#27ae60; font-size:0.8em; margin-bottom:10px; font-weight:bold;">✅ Attached to active task</div>`
-                : `<div style="background:#fff3cd; color:#856404; padding:8px; border-radius:4px; font-size:0.8em; margin-bottom:10px; border:1px solid #ffeeba;">
-                     ⚠️ <strong>No Task Selected!</strong><br>
-                     <button onclick="activeContextPopup.remove(); document.getElementById('left-panel').classList.remove('hidden');" style="margin-top:8px; padding:6px 10px; background:#e67e22; color:white; border:none; border-radius:4px; cursor:pointer; width:100%; font-weight:bold;">← Go to Sidebar & Select Task</button>
-                   </div>`;
+            globalEditTrackId = geom.track_id || geom.waypoint_id;
+            console.log(`[START-EDIT] ID Captured: ${globalEditTrackId}`);
 
-            const popupContent = document.createElement('div');
-            popupContent.style.padding = '5px';
-            popupContent.style.width = '200px';
+            isEditingGeometry = true;
+            AppStore.set('activeTaskId', taskId);
+            draw.deleteAll();
 
-            const drawnFeatures = draw.getAll().features;
-            const featureToSave = drawnFeatures.length > 0 ? drawnFeatures[0] : { type: 'Feature', geometry: geometry, properties: {} };
+            if (geom.kind === 'point') {
+                const feature = { type: 'Feature', id: 'edit-point', geometry: { type: 'Point', coordinates: [geom.lng, geom.lat] }, properties: {} };
+                draw.add(feature);
+                draw.changeMode('simple_select', { featureIds: ['edit-point'] });
+                showGeometryContextPopup([geom.lng, geom.lat], feature.geometry, geom.title, '', { id: globalEditTrackId });
+            } else if (geom.geojson) {
+                // 🧠 MEMORY: Save the original geometry BEFORE the engine modifies it so we can diff it later!
+                window.originalGeometryForDiff = geom.geojson;
 
-            popupContent.innerHTML = `
-        <h4 style="margin: 0 0 5px 0; border-bottom: 1px solid #eee; padding-bottom: 5px;">Save to Map</h4>
-        ${taskWarning}
-        <div style="margin-bottom: 8px; font-size: 0.8em; font-weight: bold; color: ${geometry.type === 'LineString' ? '#38bdf8' : '#7f8c8d'};">
-            MODE: ${featureToSave.properties.route_type === 'smart' ? '🚗 SMART SNAP' : '✏️ MANUAL DRAW'}
-        </div>
-        <input type="text" id="ctx-title" value="${defaultTitle}" placeholder="Title" style="width: 100%; margin-bottom: 5px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing:border-box;">
-        <input type="url" id="ctx-link" value="${existingLink || ''}" placeholder="https:// link (optional)" style="width: 100%; margin-bottom: 8px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing:border-box; font-size:0.85em;">
-        <select id="ctx-section" style="width: 100%; margin-bottom: 8px; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing:border-box; font-size:0.85em;">
-            <option value="">-- No Section (Global) --</option>
-            ${sectionOptions}
-        </select>
-        <div style="display: flex; gap: 5px; margin-bottom: 10px; align-items: center;">
-            <label style="font-size: 0.8em; margin:0;">Color:</label>
-            <input type="color" id="ctx-color" value="${existingColor || '#3498db'}" style="width: 40px; height: 25px; padding: 0; cursor: pointer; border: none;">
-                    ${geometry.type === 'Point' ? `
-                    <select id="ctx-icon" style="flex:1; padding: 4px; border: 1px solid #ccc; border-radius: 4px;">
-                        <option value="📍" ${existingIcon === '📍' ? 'selected' : ''}>📍 Pin</option>
-                        <option value="🥾" ${existingIcon === '🥾' ? 'selected' : ''}>🥾 Hike</option>
-                        <option value="🏃‍♂️" ${existingIcon === '🏃‍♂️' ? 'selected' : ''}>🏃‍♂️ Run</option>
-                        <option value="🚌" ${existingIcon === '🚌' ? 'selected' : ''}>🚌 Bus</option>
-                        <option value="⛵" ${existingIcon === '⛵' ? 'selected' : ''}>⛵ Boat</option>
-                        <option value="🍽️" ${existingIcon === '🍽️' ? 'selected' : ''}>🍽️ Food</option>
-                        <option value="🏨" ${existingIcon === '🏨' ? 'selected' : ''}>🏨 Hotel</option>
-                        <option value="📸" ${existingIcon === '📸' ? 'selected' : ''}>📸 Photo</option>
-                        <option value="⚠️" ${existingIcon === '⚠️' ? 'selected' : ''}>⚠️ Alert</option>
-                    </select>` : ''}
-                </div>
-                <div style="margin: 10px 0; padding: 10px; background: rgba(56, 189, 248, 0.1); border-radius: 8px; border: 1px solid var(--accent);">
-                    <label style="display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 0.85em; cursor: pointer; color: #0f172a;">
-                        <input type="checkbox" id="ctx-snap-toggle" ${featureToSave.properties.route_type === 'smart' ? 'checked' : ''} 
-                               style="width: 18px; height: 18px;"
-                               onchange="const f = draw.getAll().features[0]; f.properties.route_type = this.checked ? 'smart' : 'manual'; draw.add(f); showToast(this.checked ? 'Smart Snapping Active' : 'Manual Mode: All Points Preserved', 'info');">
-                        🛰️ Snap to Trails (Komoot Mode)
+                const feature = geom.geojson.features[0];
+                if (feature.geometry.type.includes('LineString')) {
+                    KomootEngine.initFromGpx(feature, geom.title, { config: { id: globalEditTrackId }, color: geom.color });
+                }
+            }
+        }
+
+
+
+        function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, editConfig = null, icon = '📍', color = '#3498db') {
+            if (editConfig && editConfig.id) {
+                globalEditTrackId = editConfig.id;
+            }
+
+            if (!window.ActiveSaveState.isTitleEdited) {
+                window.ActiveSaveState.color = color;
+                window.ActiveSaveState.title = defaultTitle;
+            }
+
+            let strategyHtml = '';
+
+            if (activeParentTrackId) {
+                window.ActiveSaveState.mode = 'section';
+                strategyHtml = `
+                    <label style="display:block;">
+                        <input type="radio" name="save-mode" value="section" checked> (c) Save Extracted Section
                     </label>
+                    <div style="font-size: 0.8em; color: #10b981; margin-top: 5px; font-weight: bold;">✂️ Sliced from original track</div>
+                `;
+            } else if (globalEditTrackId) {
+                if (!['overwrite', 'new', 'section'].includes(window.ActiveSaveState.mode)) {
+                    window.ActiveSaveState.mode = 'overwrite';
+                }
+                strategyHtml = `
+                    <label style="display:block; margin-bottom:10px;">
+                        <input type="radio" name="save-mode" value="overwrite"
+                        ${window.ActiveSaveState.mode === 'overwrite' ? 'checked' : ''}
+                        onclick="window.ActiveSaveState.mode='overwrite';"> Update Original
+                    </label>
+                    <label style="display:block; margin-bottom:10px;">
+                        <input type="radio" name="save-mode" value="new"
+                        ${window.ActiveSaveState.mode === 'new' ? 'checked' : ''}
+                        onclick="window.ActiveSaveState.mode='new';"> Save as New Copy
+                    </label>
+                    <label style="display:block;">
+                        <input type="radio" name="save-mode" value="section"
+                        ${window.ActiveSaveState.mode === 'section' ? 'checked' : ''}
+                        onclick="window.ActiveSaveState.mode='section';"> Save as Alternative/Child Track
+                    </label>
+                `;
+            } else {
+                window.ActiveSaveState.mode = 'new';
+                strategyHtml = `
+                    <label style="display:block; margin-bottom:5px;">
+                        <input type="radio" name="save-mode" value="new" checked> Save as New Item
+                    </label>
+                `;
+            }
+
+            // INJECT INTO RIGHT PANEL INSTEAD OF FLOATING DIV
+            const html = `
+                <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #bae6fd;">
+                    ${strategyHtml}
                 </div>
-                <button id="ctx-save" style="width: 100%; padding: 8px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight:bold;">Save Shape</button>
+                <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+                    <input type="color" id="ctx-color" value="${window.ActiveSaveState.color}"
+                        style="height: 42px; width: 50px; padding: 0; border: none; border-radius: 6px; cursor: pointer;"
+                        title="Track Color"
+                        oninput="window.ActiveSaveState.color = this.value;">
+                    <input type="text" id="ctx-title" value="${window.ActiveSaveState.title}"
+                        style="flex: 1; padding:10px; border: 1px solid #ddd; border-radius: 6px; font-weight:bold;"
+                        oninput="window.ActiveSaveState.title = this.value; window.ActiveSaveState.isTitleEdited = true;">
+                </div>
+                <button onclick="executeDatabaseSync()" style="width:100%; padding:14px; background:#0ea5e9; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold; font-size: 1.05em; box-shadow: 0 4px 10px rgba(14, 165, 233, 0.3);">💾 SAVE CHANGES</button>
             `;
 
-            // Added focusAfterOpen: false to prevent the ARIA warning on the close button
-            activeContextPopup = new mapboxgl.Popup({ closeOnClick: false, anchor: 'bottom', offset: 15, focusAfterOpen: false })
-                .setLngLat(lngLat)
-                .setDOMContent(popupContent)
-                .addTo(map);
+            window.currentGeometryToSave = geometry;
+            openRightPanel(`🗺️ Save Strategy`, html);
+        }
 
-            const segmentTrackId = activeParentTrackId;
-            activeParentTrackId = null;
 
-            document.getElementById('ctx-save').onclick = async () => {
-                const title = document.getElementById('ctx-title').value;
-                const link = document.getElementById('ctx-link').value;
-                const color = document.getElementById('ctx-color').value;
-                const icon = document.getElementById('ctx-icon') ? document.getElementById('ctx-icon').value : '📍';
-                const section_id = document.getElementById('ctx-section').value || null;
-                document.getElementById('ctx-save').innerText = 'Saving...';
 
-                // Append the link to the description text if it exists
-                const finalDesc = link ? `${statsText}\nLink: ${link}` : statsText;
+        async function executeDatabaseSync() {
+            console.group('🚀 DATABASE SYNC INITIATED');
+            const title = window.ActiveSaveState.title;
+            const chosenColor = window.ActiveSaveState.color;
+            const currentMode = window.ActiveSaveState.mode;
 
-                // CRITICAL FIX: Extract the full valid Feature directly from the map drawing engine to preserve Properties
-                const drawnFeatures = draw.getAll().features;
-                const featureToSave = drawnFeatures.length > 0 ? drawnFeatures[0] : { type: 'Feature', geometry: geometry, properties: {} };
-                const props = featureToSave.properties || {};
+            let featureToSave;
 
-                try {
-                    if (editConfig) {
-                        // UPDATE Existing Shape (PUT)
-                        if (editConfig.kind === 'point') {
-                            await authFetch(`${API_URL}/waypoints/${editConfig.id}`, {
-                                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, color, icon, link, section_id: section_id, lat: geometry.coordinates[1], lng: geometry.coordinates[0], description: finalDesc })
-                            });
-                        } else {
-                            await authFetch(`${API_URL}/tracks/${editConfig.id}`, {
-                                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, color, link, section_id: section_id, geojson_data: { type: 'FeatureCollection', features: [featureToSave] }, comments: finalDesc, distance: props.distance, duration: props.duration })
-                            });
-                        }
-                    } else {
-                        // CREATE New Shape (POST)
-                        if (geometry.type === 'Point') {
-                            await authFetch(`${API_URL}/waypoints`, {
-                                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-                                    title, color, icon, link, section_id: section_id,
-                                    existing_task_id: AppStore.get('activeTaskId'),
-                                    parent_track_id: segmentTrackId,
-                                    lat: geometry.coordinates[1],
-                                    lng: geometry.coordinates[0],
-                                    description: finalDesc,
-                                    photo_url: googleData ? googleData.photoUrl : null,
-                                    phone: googleData ? googleData.phone : null,
-                                    address: googleData ? googleData.address : null,
-                                    google_maps_url: googleData ? googleData.googleMapsUri : null
-                                })
-                            });
-                        } else {
-                            await authFetch(`${API_URL}/tracks`, {
-                                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, color, link, section_id: section_id, existing_task_id: AppStore.get('activeTaskId'), parent_track_id: segmentTrackId, geojson_data: { type: 'FeatureCollection', features: [featureToSave] }, comments: finalDesc, distance: props.distance, duration: props.duration })
-                            });
+            if (currentMode === 'section') {
+                console.log('✂️ Mode C: Initiating Geometric Diff Analysis...');
+                const origFeat = window.originalGeometryForDiff?.features?.[0];
+                const newGeom = typeof KomootEngine !== 'undefined' ? KomootEngine.getUnifiedGeometry() : window.currentGeometryToSave;
+
+                if (origFeat && newGeom.coordinates?.length > 0) {
+                    const newCoords = newGeom.coordinates;
+                    let firstDiv = -1;
+                    let lastDiv = -1;
+                    const TOLERANCE_KM = 0.02; // 20 meters of tolerance for snapping jitter
+
+                    // Walk the new line and find where it strays from the original
+                    for (let i = 0; i < newCoords.length; i++) {
+                        const dist = turf.pointToLineDistance(turf.point(newCoords[i]), origFeat);
+                        if (dist > TOLERANCE_KM) {
+                            if (firstDiv === -1) firstDiv = i;
+                            lastDiv = i;
                         }
                     }
 
-                    activeContextPopup.remove();
-                    draw.deleteAll();
-                    isEditingGeometry = false;
-                    refreshData();
-                } catch (err) { alert('Error saving shape.'); document.getElementById('ctx-save').innerText = 'Save Shape'; }
+                    if (firstDiv !== -1) {
+                        // FIX: Increased buffer from 1 to 3 to guarantee the purple line overlaps and connects!
+                        const startIdx = Math.max(0, firstDiv - 3);
+                        const endIdx = Math.min(newCoords.length - 1, lastDiv + 3);
+
+                        featureToSave = {
+                            type: 'Feature',
+                            geometry: { type: 'LineString', coordinates: newCoords.slice(startIdx, endIdx + 1) },
+                            properties: { route_type: 'smart' }
+                        };
+                        console.log(`✅ Detour Isolated! Sliced points ${startIdx} through ${endIdx}`);
+                    } else {
+                        alert("No significant deviation detected. Drag a point further away from the original route to extract a detour.");
+                        console.groupEnd();
+                        return; // Halt the save
+                    }
+                } else {
+                    console.log('⚠️ Warning: Original geometry missing. Falling back to simple slice.');
+                    featureToSave = { type: 'Feature', geometry: window.currentGeometryToSave, properties: { route_type: 'smart' } };
+                }
+            } else if (typeof KomootEngine !== 'undefined' && KomootEngine.state.segments?.length > 0) {
+                console.log('🗺️ Compiling full geometry from Komoot Engine...');
+                featureToSave = {
+                    type: 'Feature',
+                    geometry: KomootEngine.getUnifiedGeometry(),
+                    properties: { route_type: 'smart' }
+                };
+            } else {
+                featureToSave = { type: 'Feature', geometry: window.currentGeometryToSave, properties: {} };
+            }
+
+            const isPoint = featureToSave.geometry.type === 'Point';
+            const isOverwrite = globalEditTrackId && currentMode === 'overwrite';
+
+            const endpoint = isPoint ? 'waypoints' : 'tracks';
+            const method = isOverwrite ? 'PUT' : 'POST';
+            const url = isOverwrite ? `${API_URL}/${endpoint}/${globalEditTrackId}` : `${API_URL}/${endpoint}`;
+
+            let payload = {
+                title: currentMode === 'section' ? `Detour: ${title}` : title,
+                color: chosenColor,
+                existing_task_id: AppStore.get('activeTaskId')
             };
+
+            if (isPoint) {
+                payload.lat = featureToSave.geometry.coordinates[1];
+                payload.lng = featureToSave.geometry.coordinates[0];
+            } else {
+                payload.geojson_data = { type: 'FeatureCollection', features: [featureToSave] };
+            }
+
+            // Link to Parent Track for Mode C
+            if (currentMode === 'section' || activeParentTrackId) {
+                payload.parent_track_id = globalEditTrackId || activeParentTrackId;
+            }
+
+            try {
+                const res = await authFetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    console.log('🎉 Save Successful!');
+                    closeGeometryPanel();
+                    refreshData();
+                } else { throw new Error(res.status); }
+            } catch (err) { alert("Save Error: " + err.message); }
+            console.groupEnd();
         }
+
+
+        function closeGeometryPanel() {
+            closeRightPanel();
+            globalEditTrackId = null;
+            activeParentTrackId = null;
+            isEditingGeometry = false;
+            window.ActiveSaveState.mode = 'overwrite';
+            window.ActiveSaveState.isTitleEdited = false;
+            if (typeof KomootEngine !== 'undefined') KomootEngine.cleanup();
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         // NEW: Renders the dynamic day-navigation buttons in the Command Bar
         function renderSectionPills() {
-            const container = document.getElementById('section-pills');
-            if (!container) return;
-
-            const sections = AppStore.get('sections') || [];
-
-            container.innerHTML = sections.map(s => {
-                const title = s.title || 'Unscheduled';
-                return `
-                <button onclick="flyToSection(${s.id || null})"
-                        style="padding: 6px 14px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 20px; color: white; font-size: 0.85em; font-weight: 600; cursor: pointer; white-space: nowrap; transition: 0.2s;"
-                        onmouseover="this.style.background='rgba(255, 255, 255, 0.2)'"
-                        onmouseout="this.style.background='rgba(255, 255, 255, 0.1)'">
-                    ${title}
-                </button>
-            `}).join('');
+            // Disabled: Top bar section pills have been removed to clean up the layout.
+            return;
         }
 
-        async function refreshData() {
-            const previousActiveId = AppStore.get('activeTaskId');
-            try {
-                const [itRes, secRes, catRes, typeRes] = await Promise.all([
-                    fetch(`${API_URL}/itinerary`),
-                    fetch(`${API_URL}/sections`),
-                    fetch(`${API_URL}/categories`),
-                    fetch(`${API_URL}/task_types`)
-                ]);
-
-                // commit to store instead of globals
-                AppStore.set('itinerary', await itRes.json());
-                AppStore.set('sections', await secRes.json());
-
-                allCategories = await catRes.json();
-                allTaskTypes = await typeRes.json();
-
-                renderSectionPills();
-                updateCategoryDropdowns();
-                updateSectionDropdowns();
-                updateTaskTypeDropdowns();
-                renderCategoryList();
-                renderTaskTypeList();
-
-                // Restore state and render UI
-                if (previousActiveId) AppStore.set('activeTaskId', previousActiveId);
-                renderProjectView();
-                renderMapGeometries();
-            } catch (err) {
-                console.error("Critical Sync Failure:", err);
-            }
-        }
 
 
 
@@ -1672,17 +1532,24 @@
 
         function openModal(id = 'command-modal') {
             const target = document.getElementById(id);
-            if (target) target.style.display = 'flex';
+            if (target) {
+                target.style.display = 'flex';
+                target.classList.add('open');
+            }
         }
 
         function closeModal(id = 'command-modal') {
             const target = document.getElementById(id);
-            if (target) target.style.display = 'none';
+            if (target) {
+                target.style.display = 'none';
+                target.classList.remove('open');
+            }
 
             // Only reset the drawing tools and task form if closing the main editor
             if (id === 'command-modal') {
                 resetForm();
                 draw.deleteAll();
+                KomootEngine.cleanup();
             }
         }
 
@@ -1708,33 +1575,38 @@
         }
 
         function startSmartRoute() {
-            // Toggle off if it's already open
+            // 1. Toggle off if already active
             if (directionsControl) {
                 map.removeControl(directionsControl);
                 directionsControl = null;
                 isRouting = false;
+                if (typeof showToast !== 'undefined') showToast("Smart Route deactivated", "info");
                 return;
             }
 
-            // Spawn the official Mapbox UI
+            // 2. Initialize with updated config
             directionsControl = new MapboxDirections({
                 accessToken: mapboxgl.accessToken,
                 unit: 'metric',
                 profile: 'mapbox/driving',
-                controls: { instructions: false, profileSwitcher: true },
-                flyTo: false,
+                controls: {
+                    instructions: false, // Keep it clean as requested
+                    profileSwitcher: true
+                },
+                flyTo: false, // Prevent camera jumps during edit
                 geocoder: {
                     language: 'it,en',
-                    // The ultimate fix: Restrict the old geocoder exclusively to Italy and Spain
                     countries: 'it,es'
                 }
             });
 
+            // 3. Add to the map and update state
             map.addControl(directionsControl, 'top-left');
             isRouting = true;
             routePoints = [];
             lastCalculatedRoute = null;
             currentSmartProfile = 'driving';
+            if (typeof showToast !== 'undefined') showToast("Smart Route active: Click map to set points", "success");
 
             // Track profile changes (driving, walking, cycling) safely!
             directionsControl.on('profile', (e) => {
@@ -1769,19 +1641,19 @@
             }
         }
 
-function changeMapStyle(style) {
-    map.setStyle(style);
-    map.once('style.load', () => {
-        // Re-inject 3D Terrain
-        if (!map.getSource('mapbox-dem')) {
-            map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
+        function changeMapStyle(style) {
+            map.setStyle(style);
+            map.once('style.load', () => {
+                // Re-inject 3D Terrain
+                if (!map.getSource('mapbox-dem')) {
+                    map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
+                }
+                map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
+
+                // Re-render all your tracks and waypoints from the database
+                renderMapGeometries();
+            });
         }
-        map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
-        
-        // Re-render all your tracks and waypoints from the database
-        renderMapGeometries();
-    });
-}
 
         document.getElementById('unified-save-btn').onclick = async () => {
             // 1. Grab the ID first so we can fetch existing data
@@ -2176,68 +2048,65 @@ function changeMapStyle(style) {
             });
         }
 
+
+
         function renderTaskCard(parentContainer, task, gridCols, allTasks) {
-            const timeOnly = (task.starts_at && task.starts_at.length >= 16) ? task.starts_at.substring(11, 16) : '--:--';
             const timeValue = (task.starts_at && task.starts_at.length >= 16) ? task.starts_at.substring(11, 16) : '';
             const catColor = task.category_color || '#dfe6e9';
             const isFite = task.is_milestone;
 
             const taskContainer = document.createElement('div');
-            taskContainer.style.position = 'relative';
 
             const taskEl = document.createElement('div');
             taskEl.id = `task-row-${task.task_id}`;
 
             if (isFite) {
-                // RENDER AS A FITE (NODE ON LINE)
+                // COMPACT FITE
                 taskEl.className = 'fite-row';
                 taskEl.innerHTML = `
                     <div class="fite-dot" style="border-color: ${catColor}"></div>
-                    <div class="fite-text" style="display: flex; align-items: center; flex: 1; min-width:0;">
-                        <span style="color:#64748b; font-size:0.75em; margin-right:8px; font-weight:600;">${timeOnly}</span>
+                    <div class="fite-text">
+                        <input type="time" class="modern-inline-input" value="${timeValue}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()">
                         <span class="inline-edit" contenteditable="true"
-                              style="font-size:0.9em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+                              style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
                               onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }"
                               onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())"
                               onclick="event.stopPropagation()">${task.task_name || 'Milestone'}</span>
-                    </div>
-                    <div class="task-actions-modern" style="opacity:1; margin-left:auto;">
-                        <button class="action-btn-modern" title="Edit Milestone" onclick="event.stopPropagation(); openTaskEditor(${task.task_id})">✏️</button>
-                        <button class="action-btn-modern del" title="Delete Milestone" onclick="event.stopPropagation(); deleteTask(${task.task_id})">🗑️</button>
+                        <div class="task-actions-modern" onclick="event.stopPropagation()">
+                            <button class="action-btn-modern" title="Details" onclick="openTaskDetailPanel(AppStore.get('itinerary').find(t => t.task_id === ${task.task_id}))">ℹ️</button>
+                            <button class="action-btn-modern" title="Edit" onclick="openTaskEditor(${task.task_id})">⚙️</button>
+                            <button class="action-btn-modern del" onclick="deleteTask(${task.task_id})">🗑️</button>
+                        </div>
                     </div>
                 `;
             } else {
-                // RENDER AS A TASK CARD
+                // COMPACT 2-ROW TASK
                 taskEl.className = 'task-row';
-                taskEl.style.borderLeft = `8px solid ${catColor}`;
-
+                taskEl.style.borderLeft = `5px solid ${catColor}`; // Slimmer border
                 if (task.is_completed) taskEl.style.opacity = '0.6';
 
-                // Build the Category Dropdown options dynamically
-                let catOptions = `<option value="">🏷️ No Cat</option>`;
+                let catOptions = `<option value="">🏷️</option>`;
                 allCategories.forEach(c => {
                     const sel = (c.id === task.category_id) ? 'selected' : '';
                     catOptions += `<option value="${c.id}" ${sel}>${c.icon} ${c.name}</option>`;
                 });
 
                 taskEl.innerHTML = `
-                    <div class="task-header-row">
-                        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-                            <input type="time" class="modern-inline-input" value="${timeValue}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()" style="width:70px;">
-                            <select class="modern-inline-input" onchange="updateTaskInline(${task.task_id}, 'category_id', this.value)" onclick="event.stopPropagation()" style="max-width:110px;">
+                    <div class="task-row-1">
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <input type="time" class="modern-inline-input" value="${timeValue}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()">
+                            <select class="modern-inline-input" onchange="updateTaskInline(${task.task_id}, 'category_id', this.value)" onclick="event.stopPropagation()">
                                 ${catOptions}
                             </select>
-                            ${task.responsible ? `<span style="font-size:0.75em; color:#64748b; background:#e2e8f0; padding:2px 6px; border-radius:10px;">👤 ${task.responsible}</span>` : ''}
                         </div>
                         <div class="task-actions-modern" onclick="event.stopPropagation()">
-                            <button class="action-btn-modern" title="Add Subtask" onclick="createSubtask(${task.task_id}, '${task.day_label || ''}')">➕</button>
-                            <button class="action-btn-modern" title="Edit Task" onclick="openTaskEditor(${task.task_id})">✏️</button>
-                            <button class="action-btn-modern del" title="Delete Task" onclick="deleteTask(${task.task_id})">🗑️</button>
+                            <button class="action-btn-modern" onclick="openTaskEditor(${task.task_id})">⚙️</button>
+                            <button class="action-btn-modern del" onclick="deleteTask(${task.task_id})">🗑️</button>
                         </div>
                     </div>
-                    <div class="task-title-row">
-                        ${task.is_completed ? '<span style="margin-right:5px; user-select:none;">✅</span>' : ''}
-                        <span class="inline-edit" contenteditable="true"
+                    <div class="task-row-2">
+                        ${task.is_completed ? '<span style="margin-right:4px;">✅</span>' : ''}
+                        <span class="inline-edit" contenteditable="true" style="flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
                               onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }"
                               onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())"
                               onclick="event.stopPropagation()">${task.task_name || 'Unnamed Task'}</span>
@@ -2245,18 +2114,19 @@ function changeMapStyle(style) {
                 `;
             }
 
+            // Click to open Detail Panel
             taskEl.onclick = () => {
                 document.querySelectorAll('.task-row, .fite-row').forEach(row => row.classList.remove('active-task'));
                 taskEl.classList.add('active-task');
                 AppStore.set('activeTaskId', task.task_id);
-                const acc = document.getElementById(`acc-${task.task_id}`);
-                if (acc) acc.classList.toggle('open');
+                if (isEditingGeometry) return;
+                openTaskDetailPanel(task);
 
-                // Fly the map to all geometries attached to this task
+                // Fly to geom
                 if (task.geometries && task.geometries.length > 0) {
                     const features = [];
                     task.geometries.forEach(g => {
-                        if (g.kind === 'point' && g.lat && g.lng) features.push(turf.point([g.lng, g.lat]));
+                        if (g.kind === 'point' && g.lat) features.push(turf.point([g.lng, g.lat]));
                         else if (g.geojson) features.push(...g.geojson.features);
                     });
                     if (features.length > 0) {
@@ -2266,111 +2136,22 @@ function changeMapStyle(style) {
                 }
             };
 
-            const accordionEl = document.createElement('div');
-            accordionEl.className = 'task-accordion';
-            accordionEl.id = `acc-${task.task_id}`;
-
-            const geoms = task.geometries || [];
-            // 1. Separate parents from children (Safely handle null/undefined)
-            const parents = geoms.filter(g => !g.parent_track_id);
-            const children = geoms.filter(g => g.parent_track_id);
-
-            const renderGeomUI = (g, isNested = false) => {
-                const emoji = g.kind === 'point' ? (g.icon || '📍') : (g.kind === 'polygon' ? '🛑' : '📈');
-                const layerId = `layer-${g.track_id}`;
-                const isVisible = map.getLayer(layerId) ? map.getLayoutProperty(layerId, 'visibility') !== 'none' : true;
-                const color = g.color || '#3498db';
-
-                let displayTitle = g.title || 'Location';
-                let d = g.distance;
-                let elevGain = g.gain;
-                let elevLoss = g.loss;
-
-                // ON-THE-FLY CALCULATION: Instantly calculate stats if DB missed them
-                if (g.kind === 'line' && g.geojson) {
-                    const coords = g.geojson.features[0].geometry.type === 'Polygon' ? g.geojson.features[0].geometry.coordinates[0] : g.geojson.features[0].geometry.coordinates;
-                    if (!d || d == 0) d = turf.length(g.geojson, { units: 'kilometers' }).toFixed(2);
-                    if (!elevGain && !elevLoss) {
-                        let cg = 0, cl = 0;
-                        for (let i = 1; i < coords.length; i++) {
-                            const diff = (coords[i][2] || 0) - (coords[i - 1][2] || 0);
-                            if (diff > 0) cg += diff; else cl -= diff;
-                        }
-                        elevGain = cg.toFixed(0);
-                        elevLoss = cl.toFixed(0);
-                    }
-                }
-
-                const hasStats = d || elevGain || elevLoss;
-
-                let html = `
-                    <div class="geom-row ${isNested ? 'nested-geom' : ''}" style="border-left: 4px solid ${color};">
-                        <div class="geom-header-layout">
-
-                            <div class="geom-left-controls">
-                                <button class="visibility-btn ${!isVisible ? 'hidden' : ''}" title="Toggle Visibility" onclick="event.stopPropagation(); toggleLayerVisibility('${layerId}', this)">${isVisible ? '👁️' : '🙈'}</button>
-                                <span style="font-size: 1.2em;">${emoji}</span>
-                            </div>
-
-                            <div class="geom-main-content" onclick="event.stopPropagation(); flyToGeometry(${g.lng}, ${g.lat}, '${g.kind}', '${layerId}')">
-                                <div class="geom-title">${displayTitle}</div>
-
-                                ${hasStats ? `
-                                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                                    ${d ? `<span class="stat-badge">📏 ${parseFloat(d).toFixed(2)}km</span>` : ''}
-                                    ${elevGain ? `<span class="stat-badge gain">▲ +${parseFloat(elevGain).toFixed(0)}m</span>` : ''}
-                                    ${elevLoss ? `<span class="stat-badge loss">▼ -${Math.abs(parseFloat(elevLoss)).toFixed(0)}m</span>` : ''}
-                                </div>` : ''}
-
-                                ${g.comments ? `<div style="font-size:0.85em; color:#718096; font-style:italic;">📝 ${g.comments}</div>` : ''}
-                            </div>
-
-                            <div class="geom-actions">
-                                ${g.link ? `<a href="${g.link.startsWith('http') ? g.link : 'https://' + g.link}" target="_blank" class="action-icon-btn" title="Open Link" onclick="event.stopPropagation()">🔗</a>` : ''}
-                                ${g.kind === 'line' ? `<button class="action-icon-btn" title="Analyze Segment" onclick="event.stopPropagation(); startSegmentAnalysis(${task.task_id}, ${g.track_id})">📊</button>` : ''}
-                                <button class="action-icon-btn" title="Edit Location" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})">⚙️</button>
-                                <button class="action-icon-btn delete" title="Delete Location" onclick="event.stopPropagation(); deleteGeometry('${g.kind}', ${g.waypoint_id || g.track_id})">🗑️</button>
-                            </div>
-
-                        </div>
-                    </div>`;
-
-                // Use == instead of === to prevent string/integer mismatch bugs
-                const myChildren = children.filter(child => child.parent_track_id == (g.track_id || g.waypoint_id));
-                myChildren.forEach(child => {
-                    html += renderGeomUI(child, true);
-                });
-
-                return html;
-            };
-
-            let finalGeomHtml = '';
-            parents.forEach(p => {
-                finalGeomHtml += renderGeomUI(p);
-            });
-
-            accordionEl.innerHTML = finalGeomHtml || `<div style="color: #a0aec0; font-size: 0.8em; font-style: italic; padding: 5px 0;">No locations attached.</div>`;
-
             taskContainer.appendChild(taskEl);
-            taskContainer.appendChild(accordionEl);
 
-            // Create a specific drop-zone container for subtasks
             const subtaskListContainer = document.createElement('div');
             subtaskListContainer.className = 'sortable-task-list subtask-list';
             subtaskListContainer.dataset.parentId = task.task_id;
-            subtaskListContainer.style.minHeight = '10px';
-            subtaskListContainer.style.marginLeft = '20px';
-            subtaskListContainer.style.marginTop = '5px';
-
             taskContainer.appendChild(subtaskListContainer);
             parentContainer.appendChild(taskContainer);
 
-            // Recursion: Find and render children inside the new drop zone
             const subtasks = allTasks.filter(t => t.parent_id === task.task_id);
             subtasks.forEach(st => renderTaskCard(subtaskListContainer, st, gridCols, allTasks));
 
             return taskContainer;
         }
+
+
+
 
         async function createSubtask(parentId, dayLabel) {
 
@@ -2419,86 +2200,34 @@ function changeMapStyle(style) {
             }
         }
 
-function openStreetView(lat, lng) {
-    const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
-    window.open(svUrl, '_blank');
-}
-
-        function startEditGeometry(taskId, anchorId) {
-            const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
-            const geom = task?.geometries.find(g => g.anchor_id === anchorId);
-            if (!geom) {
-                alert("Geometry not found!");
-                return;
-            }
-
-            // Clear any lingering mapbox popups
-            const popups = document.getElementsByClassName("mapboxgl-popup");
-            while (popups.length > 0) {
-                popups[0].remove();
-            }
-
-            isEditingGeometry = true;
-            AppStore.set('activeTaskId', taskId);
-
-            draw.deleteAll();
-            let centerPoint;
-            const editConfig = { kind: geom.kind, id: geom.waypoint_id || geom.track_id };
-
-            if (geom.kind === 'point') {
-                const feature = { type: 'Feature', id: 'edit-point', geometry: { type: 'Point', coordinates: [geom.lng, geom.lat] }, properties: {} };
-                draw.add(feature);
-
-                // CRITICAL FIX: Points must use 'simple_select' to be moved, not 'direct_select'!
-                draw.changeMode('simple_select', { featureIds: ['edit-point'] });
-
-                centerPoint = [geom.lng, geom.lat];
-                showGeometryContextPopup(centerPoint, feature.geometry, geom.title, '', editConfig, geom.icon, geom.color, geom.link);
-            } else if (geom.geojson) {
-                const feature = geom.geojson.features[0];
-
-                // 1. MapboxDraw requires an explicit string/number ID to use direct_select
-                feature.id = feature.id || "edit-track";
-
-                // 2. Add the track to the drawing layer
-                draw.add(feature);
-
-                // 3. Activate Komoot-style vertex editing
-                draw.changeMode("direct_select", { featureId: feature.id });
-
-                centerPoint = feature.geometry.type === "Polygon" ? feature.geometry.coordinates[0][0] : feature.geometry.coordinates[Math.floor(feature.geometry.coordinates.length / 2)];
-                showGeometryContextPopup(centerPoint, feature.geometry, geom.title, "", editConfig, "📈", geom.color, geom.link);
-            }
+        function openStreetView(lat, lng) {
+            const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+            window.open(svUrl, '_blank');
         }
+
+
 
         function renderSectionUI(section, tasks, gridCols) {
             const container = document.getElementById('asana-container');
             const sectionDiv = document.createElement('div');
             sectionDiv.className = 'asana-section';
+            sectionDiv.dataset.sectionId = section.id || 'null'; // Added for targeting
 
             const dateVal = section.section_date ? new Date(section.section_date).toISOString().split('T')[0] : '';
             const sectionTitle = section.title || 'Unscheduled';
-            const sectionDesc = section.description || 'Add description...';
 
+            // FIX: Expanded the date input width to 115px so the date is actually visible!
             sectionDiv.innerHTML = `
-                <div class="asana-header" style="display: flex; align-items: center; gap: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 10px; cursor: pointer;"
-                     onclick="const content = this.parentElement.querySelector('.section-content'); content.classList.toggle('collapsed'); this.querySelector('.section-toggle-icon').classList.toggle('collapsed');">
-                    <span class="section-toggle-icon" style="flex-shrink: 0;">▼</span>
-                    ${section.id ? `<input type="date" value="${dateVal}" class="inline-edit-input" style="width: 35px; overflow:hidden; padding:0; border:none; flex-shrink: 0;" onchange="updateSectionMetadata(${section.id}, 'section_date', this.value)" onclick="event.stopPropagation()">` : ''}
-                    <span class="inline-edit section-title-text" contenteditable="true" style="font-weight: bold; flex-shrink: 0;" onblur="updateSectionMetadata(${section.id}, 'title', this.innerText)" onclick="event.stopPropagation()">${sectionTitle}</span>
-                    <span class="inline-edit" contenteditable="true"
-                          onblur="updateSectionMetadata(${section.id}, 'description', this.innerText)"
-                          onclick="event.stopPropagation()"
-                          style="font-size: 0.85em; color: #95a5a6; font-style: italic; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                          ${sectionDesc}
-                    </span>
+                <div class="asana-header" style="display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #eee; padding-bottom: 6px; margin-bottom: 8px; cursor: pointer;"
+                     onclick="toggleSectionAccordion('${section.id || 'null'}')">
+                    <span class="section-toggle-icon collapsed" style="flex-shrink: 0; font-size: 0.8em; color: #94a3b8; transition: transform 0.2s;">▼</span>
+                    ${section.id ? `<input type="date" value="${dateVal}" class="inline-edit-input" style="width: 115px; padding:0; border:none; background:transparent; font-size:0.9em; color:#64748b; font-weight:bold; flex-shrink: 0;" onchange="updateSectionMetadata(${section.id}, 'section_date', this.value)" onclick="event.stopPropagation()">` : ''}
+                    <span class="inline-edit section-title-text" contenteditable="true" style="font-weight: bold; flex-shrink: 0; font-size: 0.95em; color: #1e293b;" onblur="updateSectionMetadata(${section.id}, 'title', this.innerText)" onclick="event.stopPropagation()">${sectionTitle}</span>
                     <div style="display:flex; gap:2px; margin-left:auto; flex-shrink: 0;" onclick="event.stopPropagation()">
-                        <button class="edit-btn" title="Center Map" onclick="event.stopPropagation(); flyToSection(${section.id || null})">🎯</button>
                         ${section.id ? `<button class="delete-btn" title="Delete Section" onclick="event.stopPropagation(); deleteSection(${section.id}, '${sectionTitle.replace(/'/g, "\\'")}')">🗑️</button>` : ''}
                     </div>
                 </div>
-                <div class="section-content">
-                </div>
+                <div class="section-content collapsed"></div>
             `;
 
             const taskListContainer = document.createElement('div');
@@ -2510,10 +2239,10 @@ function openStreetView(lat, lng) {
             });
 
             const inlineAdd = document.createElement('div');
-            inlineAdd.style.padding = '10px 15px';
+            inlineAdd.style.padding = '8px 10px';
             inlineAdd.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 10px; border-bottom: 1px dashed #ccc;">
-                    <input type="text" placeholder="+ Add task..." style="flex: 1; border:none; padding:5px; outline:none; background:transparent; font-size:0.9em;" onkeydown="if(event.key==='Enter') createInlineTask(this, ${section.id || null}, '${sectionTitle.replace(/'/g, "\\'")}')">
+                <div style="display: flex; align-items: center; gap: 10px; border-bottom: 1px dashed #ccc; padding-bottom: 4px;">
+                    <input type="text" placeholder="+ Add task..." style="flex: 1; border:none; outline:none; background:transparent; font-size:0.85em;" onkeydown="if(event.key==='Enter') createInlineTask(this, ${section.id || null}, '${sectionTitle.replace(/'/g, "\\'")}')">
                     <label style="font-size: 0.8em; color: #7f8c8d; cursor:pointer; margin:0; display:flex; align-items:center; gap:4px;">
                         <input type="checkbox" class="inline-fite-checkbox"> 📍 Fite
                     </label>
@@ -2526,43 +2255,13 @@ function openStreetView(lat, lng) {
             container.appendChild(sectionDiv);
         }
 
-        // GPX Upload Handler
+        // GPX Upload Handler (Komoot Engine)
         document.getElementById('gpx-file').addEventListener('change', function (e) {
             const file = e.target.files[0];
             if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function (event) {
-                try {
-                    const gpxString = event.target.result;
-                    const parser = new DOMParser();
-                    const gpxXml = parser.parseFromString(gpxString, "text/xml");
-
-                    // Convert GPX to GeoJSON using the imported toGeoJSON library
-                    const geojson = toGeoJSON.gpx(gpxXml);
-                    if (geojson && geojson.features.length > 0) {
-                        draw.deleteAll();
-                        const feature = geojson.features[0];
-                        feature.properties = feature.properties || {};
-                        feature.properties.route_type = 'manual'; // Default to manual to preserve every point
-                        draw.add(feature);
-                        const centerPoint = feature.geometry.type === 'Polygon' ? feature.geometry.coordinates[0][0] : feature.geometry.coordinates[Math.floor(feature.geometry.coordinates.length / 2)];
-                        showGeometryContextPopup(centerPoint, feature.geometry, file.name.replace('.gpx', ''), 'GPX Imported (Manual Mode)');
-                        const bbox = turf.bbox(geojson);
-                        map.fitBounds(bbox, { padding: 50 });
-                    } else {
-                        alert("Could not extract valid track data from this GPX file.");
-                    }
-                } catch (err) {
-                    console.error("GPX Parsing Error:", err);
-                    alert("Error parsing GPX file.");
-                }
-                // Clear the input so the same file can be uploaded again if needed
-                e.target.value = '';
-            };
-            reader.readAsText(file);
+            KomootEngine.handleGpxUpload(file);
+            e.target.value = ''; // Reset input
         });
-
 
 
         let activeTypeIdForEdit = null;
@@ -2655,8 +2354,111 @@ function openStreetView(lat, lng) {
             } catch (e) { return false; }
         }
 
-        initializeApp();
+        function toggleGeomVisibility(kind, id, btn) {
+            if (kind === 'point') {
+                const marker = activeMarkers.find(m => m.getElement().dataset.anchorId == id || m.getLngLat().lng == id); // Fallback logic
+                if (marker) {
+                    const el = marker.getElement();
+                    const isHidden = el.style.opacity === '0';
+                    el.style.opacity = isHidden ? '1' : '0';
+                    el.style.pointerEvents = isHidden ? 'auto' : 'none';
+                    btn.innerText = isHidden ? '👁️' : '🙈';
+                }
+            } else {
+                const layerId = `layer-${id}`;
+                if (map.getLayer(layerId)) {
+                    const currentVis = map.getLayoutProperty(layerId, 'visibility') || 'visible';
+                    const nextVis = currentVis === 'visible' ? 'none' : 'visible';
+                    map.setLayoutProperty(layerId, 'visibility', nextVis);
+                    btn.innerText = nextVis === 'visible' ? '👁️' : '🙈';
+                }
+            }
+        }
 
+        function openTaskDetailPanel(task) {
+            const panel = document.getElementById('task-detail-panel');
+            const content = document.getElementById('task-detail-content');
+            if (!panel || !content) return;
+
+            // Wire up the edit button in the header
+            const editBtn = document.getElementById('detail-edit-btn');
+            if (editBtn) editBtn.onclick = () => openTaskEditor(task.task_id);
+
+            let html = `
+                <h2 style="margin: 0 0 15px 0; font-size: 1.5em; color: #0f172a; line-height: 1.2;">${task.task_name}</h2>
+                <div style="font-size: 0.9em; color: #64748b; margin-bottom: 25px; display: flex; gap: 15px; flex-wrap: wrap;">
+                    ${task.starts_at ? `<span style="background: #f1f5f9; padding: 4px 8px; border-radius: 6px; font-weight: bold;">🕒 ${task.starts_at.substring(11, 16)}</span>` : ''}
+                    ${task.responsible ? `<span style="background: #f1f5f9; padding: 4px 8px; border-radius: 6px; font-weight: bold;">👤 ${task.responsible}</span>` : ''}
+                </div>
+                ${task.characteristics ? `<div style="font-size: 0.95em; line-height: 1.6; color: #334155; margin-bottom: 30px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">${task.characteristics}</div>` : ''}
+
+                <h3 style="font-size: 1.1em; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px;">Route & Waypoints</h3>
+            `;
+
+            if (task.geometries && task.geometries.length > 0) {
+                task.geometries.forEach(g => {
+                    const icon = g.kind === 'point' ? (g.icon || '📍') : (g.kind === 'polygon' ? '🛑' : '📈');
+                    const title = g.title || 'Location';
+                    const layerId = `layer-${g.track_id}`;
+                    let statsHtml = '';
+
+                    // On-the-fly stat calculation for the compact view
+                    let d = g.distance;
+                    let elevGain = g.gain;
+                    let elevLoss = g.loss;
+
+                    if (g.kind === 'line' && g.geojson) {
+                        const coords = g.geojson.features[0].geometry.type === 'Polygon' ? g.geojson.features[0].geometry.coordinates[0] : g.geojson.features[0].geometry.coordinates;
+                        if (!d || d == 0) d = turf.length(g.geojson, { units: 'kilometers' }).toFixed(2);
+                        if (!elevGain && !elevLoss) {
+                            let cg = 0, cl = 0;
+                            for (let i = 1; i < coords.length; i++) {
+                                const diff = (coords[i][2] || 0) - (coords[i - 1][2] || 0);
+                                if (diff > 0) cg += diff; else cl -= diff;
+                            }
+                            elevGain = cg.toFixed(0);
+                            elevLoss = cl.toFixed(0);
+                        }
+                    }
+
+                    if (d) statsHtml += `<span style="color:#475569;">📏 ${parseFloat(d).toFixed(2)}km</span>`;
+                    if (elevGain) statsHtml += `<span style="color:#16a34a;">▲ +${parseFloat(elevGain).toFixed(0)}m</span>`;
+                    if (elevLoss) statsHtml += `<span style="color:#dc2626;">▼ -${Math.abs(parseFloat(elevLoss)).toFixed(0)}m</span>`;
+
+                    // Check if it's a child track to indent it
+                    const isChild = g.parent_track_id ? 'margin-left: 20px; border-left: 2px solid #cbd5e0;' : '';
+
+                    html += `
+                        <div class="compact-geom-row" style="${isChild}" onclick="flyToGeometry(${g.lng}, ${g.lat}, '${g.kind}', '${layerId}')">
+                            <span style="font-size: 1.4em;">${icon}</span>
+                            <div class="geom-info">
+                                <div class="geom-title">${title}</div>
+                                <div class="geom-stats">${statsHtml || 'No stats recorded'}</div>
+                            </div>
+                            <div style="display:flex; gap:6px;">
+                                <button class="action-btn-modern" title="Show/Hide" onclick="event.stopPropagation(); toggleGeomVisibility('${g.kind}', '${g.track_id || g.anchor_id}', this)">👁️</button>
+                                <button class="action-btn-modern" title="Edit" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})">⚙️</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                html += `<div style="color: #94a3b8; font-size: 0.95em; font-style: italic; padding: 10px 0;">No locations or tracks attached to this task.</div>`;
+            }
+
+            content.innerHTML = html;
+            panel.classList.add('open');
+        }
+
+        function closeTaskDetailPanel() {
+            const panel = document.getElementById('task-detail-panel');
+            if (panel) panel.classList.remove('open');
+            // Remove active highlighting from sidebar
+            document.querySelectorAll('.task-row, .fite-row').forEach(row => row.classList.remove('active-task'));
+            AppStore.set('activeTaskId', null);
+        }
+
+        initializeApp();
 
     </script>
 </body>
