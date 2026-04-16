@@ -1120,12 +1120,31 @@
         }
 
         function focusTaskInSidebar(taskId) {
-            const row = document.getElementById(`task-row-${taskId}`);
-            if (row) {
-                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                const acc = document.getElementById(`acc-${taskId}`);
-                if (acc && !acc.classList.contains('open')) acc.classList.add('open');
-            }
+            // 1. Find the task data to know which section it lives in
+            const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
+            if (!task) return;
+
+            // 2. Open that specific section's accordion (handles 'null' for Unscheduled)
+            const sectionIdStr = task.section_id ? String(task.section_id) : 'null';
+            toggleSectionAccordion(sectionIdStr);
+
+            // 3. Wait a tiny fraction of a second for the CSS accordion to open, then scroll
+            setTimeout(() => {
+                // Clear any existing highlights
+                document.querySelectorAll('.task-row, .fite-row').forEach(row => {
+                    row.classList.remove('active-task');
+                });
+
+                // Find the DOM element, highlight it, and scroll it perfectly into the center
+                const row = document.getElementById(`task-row-${taskId}`);
+                if (row) {
+                    row.classList.add('active-task');
+                    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
+                    // Set it as the globally active task for editing/adding
+                    AppStore.set('activeTaskId', taskId);
+                }
+            }, 150); 
         }
 
         let activeParentTrackId = null;
