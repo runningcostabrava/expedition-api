@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Komoot Logic Test: Dynamic Stops</title>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <script src="https://unpkg.com/togeojson@0.16.0/togeojson.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
+        }
+
+        #map {
+            position: absolute;
+            inset: 0;
+        }
+
+        #controls {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 12px;
+            width: 340px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .segment {
+            padding: 8px;
+            margin-top: 5px;
+            border-radius: 6px;
+            font-size: 0.8em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #ddd;
+        }
+
+        .smart {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .manual {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .btn-mode {
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-weight: bold;
+        }
+
+        .tip {
+            font-size: 0.75em;
+            color: #64748b;
+            margin-top: 10px;
+            background: #f1f5f9;
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        /* New Elevation Window Styling */
+        #elevation-box {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            z-index: 100;
+            font-size: 0.9em;
+            min-width: 150px;
+        }
+
+        .stat-val {
+            font-weight: bold;
+            color: #1e293b;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="controls">
+        <h3>🏔️ Komoot Editor PoC</h3>
+        <input type="file" id="gpx-input" accept=".gpx" style="width:100%;">
+
+        <div class="tip">
+            <strong>How to Edit:</strong><br>
+            • 🖱️ <strong>Click the line</strong> to add a new stop.<br>
+            • 🖱️ <strong>Drag dots</strong> to move the route.<br>
+            • 🖱️ <strong>Right-click dots</strong> to delete a stop.
+        </div>
+
+        <div id="status" style="font-size: 0.8em; margin-top:10px; color: #64748b;">Ready</div>
+        <div id="segment-list" style="margin-top:15px; max-height: 350px; overflow-y: auto;"></div>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+
+        async function getMapboxToken() {
+            try {
+                const res = await fetch('https://mapbox-api-uz9a.onrender.com/api/config');
+                const config = await res.json();
+                return config.MAPBOX_TOKEN;
+            } catch (err) {
+                console.error("Failed to fetch token:", err);
+                return null;
+            }
+        }
+
+        async function init() {
+            const token = await getMapboxToken();
+            if (!token) {
+                alert("Could not load Mapbox token. Check API status.");
+                return;
+            }
+            mapboxgl.accessToken = token;
+
+            const map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/outdoors-v12',
+                center: [12.5928, 38.0662],
+                zoom: 12
+            });
+
+            window.map = map;
+            let state = { intersections: [], segments: [] };
+            let markers = [];
+
+            // Initialize Terrain for Elevation logic
+            map.on('load', () => {
+                map.addSource('mapbox-dem', {
+                    'type': 'raster-dem',
+                    'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                    'tileSize': 512
+                });
+                map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
+            });
+
+            document.getElementById('gpx-input').onchange = (e) => {
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    const gpxXml = new DOMParser().parseFromString(event.target.result, "text/xml");
+                    const geojson = toGeoJSON.gpx(gpxXml);
+                    await initRouteFromGpx(geojson.features[0]);
+                };
+                reader.readAsText(e.target.files[0]);
+            };
+
+            // --- 1. INITIAL TRANSFORMATION ---
+            async function initRouteFromGpx(feature) {
+                document.getElementById('status').innerText = "Analyzing route...";
+                const simplified = turf.simplify(feature, { tolerance: 0.005, highQuality: true });
+                const coords = simplified.geometry.coordinates;
+
+                state.intersections = coords.map((c, i) => ({ id: Date.now() + i, lngLat: [c[0], c[1]] }));
+                state.segments = [];
+
+                for (let i = 0; i < state.intersections.length - 1; i++) {
+                    const type = await autoDetectType(state.intersections[i].lngLat, state.intersections[i + 1].lngLat);
+                    state.segments.push({ id: Date.now() + i + 100, type, startIdx: i, endIdx: i + 1, geometry: null });
+                }
+
+                await refreshAllSegments();
+                document.getElementById('status').innerText = `Track Split into ${state.segments.length} segments.`;
+            }
+
+            async function autoDetectType(start, end) {
+                const url = `https://api.mapbox.com/directions/v5/mapbox/walking/${start.join(',')};${end.join(',')}?geometries=geojson&access_token=${mapboxgl.accessToken}`;
+                try {
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    if (data.routes?.[0]) {
+                        const routedDist = data.routes[0].distance / 1000;
+                        const directDist = turf.distance(start, end);
+                        return routedDist < directDist * 1.4 ? 'smart' : 'manual';
+                    }
+                } catch (e) { }
+                return 'manual';
+            }
+
+            // --- 2. DYNAMIC MODIFICATION ---
+            map.on('click', 'route-line', (e) => {
+                const coords = [e.lngLat.lng, e.lngLat.lat];
+                let clickedSegIdx = -1;
+
+                state.segments.forEach((seg, index) => {
+                    if (!seg.geometry) return;
+                    const line = turf.feature(seg.geometry);
+                    const dist = turf.pointToLineDistance(turf.point(coords), line);
+                    if (dist < 0.05) clickedSegIdx = index;
+                });
+
+                if (clickedSegIdx !== -1) insertStop(clickedSegIdx, coords);
+            });
+
+            async function insertStop(segIdx, coords) {
+                const newStop = { id: Date.now(), lngLat: coords };
+                const oldSeg = state.segments[segIdx];
+                state.intersections.splice(oldSeg.endIdx, 0, newStop);
+
+                for (let i = segIdx + 1; i < state.segments.length; i++) {
+                    state.segments[i].startIdx++;
+                    state.segments[i].endIdx++;
+                }
+
+                const newSeg1 = { id: Date.now() + 1, type: oldSeg.type, startIdx: oldSeg.startIdx, endIdx: oldSeg.startIdx + 1, geometry: null };
+                const newSeg2 = { id: Date.now() + 2, type: oldSeg.type, startIdx: oldSeg.startIdx + 1, endIdx: oldSeg.endIdx + 1, geometry: null };
+
+                state.segments.splice(segIdx, 1, newSeg1, newSeg2);
+                await refreshAllSegments();
+            }
+
+            async function deleteStop(idx) {
+                if (state.intersections.length <= 2) return;
+                state.intersections.splice(idx, 1);
+                state.segments = [];
+                for (let i = 0; i < state.intersections.length - 1; i++) {
+                    state.segments.push({ id: Date.now() + i, type: 'smart', startIdx: i, endIdx: i + 1, geometry: null });
+                }
+                await refreshAllSegments();
+            }
+
+            // --- 3. RECALCULATION & ELEVATION ENGINE ---
+            async function refreshAllSegments() {
+                const list = document.getElementById('segment-list');
+                list.innerHTML = '';
+                let totalGain = 0;
+                let totalLoss = 0;
+
+                for (const seg of state.segments) {
+                    const start = state.intersections[seg.startIdx].lngLat;
+                    const end = state.intersections[seg.endIdx].lngLat;
+
+                    if (seg.type === 'smart') {
+                        const url = `https://api.mapbox.com/directions/v5/mapbox/walking/${start.join(',')};${end.join(',')}?geometries=geojson&access_token=${mapboxgl.accessToken}`;
+                        const res = await fetch(url);
+                        const data = await res.json();
+                        seg.geometry = data.routes[0].geometry;
+                    } else {
+                        seg.geometry = turf.lineString([start, end]).geometry;
+                    }
+
+                    // Elevation Calculation
+                    const coords = seg.geometry.coordinates;
+                    for (let i = 1; i < coords.length; i++) {
+                        const h1 = map.queryTerrainElevation(coords[i - 1]) || 0;
+                        const h2 = map.queryTerrainElevation(coords[i]) || 0;
+                        const diff = h2 - h1;
+                        if (diff > 0) totalGain += diff;
+                        else totalLoss += Math.abs(diff);
+                    }
+
+                    const div = document.createElement('div');
+                    div.className = `segment ${seg.type}`;
+                    div.innerHTML = `
+                <strong>Seg ${seg.startIdx + 1}-${seg.endIdx + 1}</strong>
+                <button class="btn-mode" onclick="toggleMode(${state.segments.indexOf(seg)})">${seg.type.toUpperCase()}</button>
+            `;
+                    list.appendChild(div);
+                }
+                updateElevationUI(totalGain, totalLoss);
+                render();
+            }
+
+            function updateElevationUI(gain, loss) {
+                let box = document.getElementById('elevation-box');
+                if (!box) {
+                    box = document.createElement('div');
+                    box.id = 'elevation-box';
+                    document.body.appendChild(box);
+                }
+                box.innerHTML = `
+            <strong>📈 Route Stats</strong><br>
+            Gain: <span class="stat-val" style="color:#166534">▲ ${gain.toFixed(0)}m</span><br>
+            Loss: <span class="stat-val" style="color:#991b1b">▼ ${loss.toFixed(0)}m</span>
+        `;
+            }
+
+            function render() {
+                const features = state.segments.map(s => {
+                    const feat = turf.feature(s.geometry);
+                    feat.properties = { type: s.type };
+                    return feat;
+                });
+
+                const data = turf.featureCollection(features);
+
+                if (map.getSource('route')) {
+                    map.getSource('route').setData(data);
+                } else {
+                    map.addSource('route', { type: 'geojson', data });
+                    map.addLayer({
+                        id: 'route-line',
+                        type: 'line',
+                        source: 'route',
+                        layout: { 'line-join': 'round', 'line-cap': 'round' },
+                        paint: {
+                            'line-color': ['case', ['==', ['get', 'type'], 'smart'], '#38bdf8', '#94a3b8'],
+                            'line-width': 5,
+                            'line-dasharray': ['case', ['==', ['get', 'type'], 'smart'], ['literal', [1, 2]], ['literal', [1, 0]]]
+                        }
+                    });
+                }
+
+                // Restore Markers logic
+                markers.forEach(m => m.remove());
+                markers = [];
+
+                // Add numbered draggable intersections
+                state.intersections.forEach((point, i) => {
+                    const el = document.createElement('div');
+                    el.style.cssText = `background:#1e293b; width:26px; height:26px; border-radius:50%; color:white; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; cursor:move; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3);`;
+                    el.innerText = i + 1;
+
+                    // Create a popup for Street View access
+                    const popup = new mapboxgl.Popup({ offset: 10 }).setHTML(`
+        <div style="text-align:center; padding:5px;">
+            <strong style="display:block; margin-bottom:8px;">Stop ${i + 1}</strong>
+            <button onclick="openStreetView(${point.lngLat[1]}, ${point.lngLat[0]})"
+                    style="background:#e67e22; color:white; border:none; padding:6px 10px; border-radius:4px; cursor:pointer; font-weight:bold; width:100%;">
+                🚶‍♂️ Street View
+            </button>
+            <div style="font-size:10px; color:#666; margin-top:8px;">Right-click to Delete</div>
+        </div>
+    `);
+
+                    const m = new mapboxgl.Marker({ element: el, draggable: true })
+                        .setLngLat(point.lngLat)
+                        .setPopup(popup) // Attach the popup to the marker
+                        .addTo(map);
+
+                    m.on('dragend', () => {
+                        const pos = m.getLngLat();
+                        state.intersections[i].lngLat = [pos.lng, pos.lat];
+                        refreshAllSegments();
+                    });
+
+                    el.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        deleteStop(i);
+                    });
+                    markers.push(m);
+                });
+            }
+
+            window.toggleMode = function(idx) {
+                state.segments[idx].type = state.segments[idx].type === 'smart' ? 'manual' : 'smart';
+                refreshAllSegments();
+            };
+
+            window.openStreetView = function(lat, lng) {
+                // Official Google Maps URL for Street View at specific coordinates
+                const svUrl = `https://www.google.com/maps?q=&layer=c&cbll=${lat},${lng}`;
+                window.open(svUrl, '_blank');
+            };
+        }
+
+        init();
+    </script>
+
+</body>
+
+</html>
