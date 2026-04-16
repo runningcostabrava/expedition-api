@@ -1335,10 +1335,11 @@
             const method = isOverwrite ? 'PUT' : 'POST';
             const url = isOverwrite ? `${API_URL}/${endpoint}/${globalEditTrackId}` : `${API_URL}/${endpoint}`;
 
+            // Ensure existing_task_id is always present for new tracks
             let payload = {
                 title: currentMode === 'section' ? `Detour: ${title}` : title,
                 color: chosenColor,
-                existing_task_id: AppStore.get('activeTaskId')
+                existing_task_id: AppStore.get('activeTaskId') || null // CRITICAL: Must link to a task to show on map
             };
 
             if (isPoint) {
@@ -1348,10 +1349,11 @@
                 payload.geojson_data = { type: 'FeatureCollection', features: [featureToSave] };
             }
 
-            // FIX: Ensure parent_track_id is ONLY sent if it has a real numeric value
+            // Link to Parent Track for Mode C
             if (currentMode === 'section' || activeParentTrackId) {
                 const pId = globalEditTrackId || activeParentTrackId;
-                if (pId && pId !== 'null') {
+                // Only add to payload if it's a valid number
+                if (pId && !isNaN(pId) && pId !== 'null') {
                     payload.parent_track_id = parseInt(pId);
                     console.log(`🔗 Linking to Parent Track ID: ${payload.parent_track_id}`);
                 }
