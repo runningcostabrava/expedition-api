@@ -1271,112 +1271,113 @@
 
 
 
-        async function executeDatabaseSync() {
-            console.group('🚀 DATABASE SYNC INITIATED');
-            const title = window.ActiveSaveState.title;
-            const chosenColor = window.ActiveSaveState.color;
-            const currentMode = window.ActiveSaveState.mode;
+async function executeDatabaseSync() {
+    console.group('🚀 DEBUGGING DATABASE SYNC');
+    
+    const title = window.ActiveSaveState.title;
+    const chosenColor = window.ActiveSaveState.color;
+    const currentMode = window.ActiveSaveState.mode;
+    
+    let featureToSave;
 
-            let featureToSave;
+    // 1. Determine Geometry (Mode C vs Engine vs Current)
+    if (currentMode === 'section') {
+        const origFeat = window.originalGeometryForDiff?.features?.[0];
+        const newGeom = typeof KomootEngine !== 'undefined' ? KomootEngine.getUnifiedGeometry() : window.currentGeometryToSave;
 
-            if (currentMode === 'section') {
-                console.log('✂️ Mode C: Initiating Geometric Diff Analysis...');
-                const origFeat = window.originalGeometryForDiff?.features?.[0];
-                const newGeom = typeof KomootEngine !== 'undefined' ? KomootEngine.getUnifiedGeometry() : window.currentGeometryToSave;
+        if (origFeat && newGeom.coordinates?.length > 0) {
+            const newCoords = newGeom.coordinates;
+            let firstDiv = -1; let lastDiv = -1;
+            const TOLERANCE_KM = 0.02;
 
-                if (origFeat && newGeom.coordinates?.length > 0) {
-                    const newCoords = newGeom.coordinates;
-                    let firstDiv = -1;
-                    let lastDiv = -1;
-                    const TOLERANCE_KM = 0.02; // 20 meters of tolerance for snapping jitter
-
-                    // Walk the new line and find where it strays from the original
-                    for (let i = 0; i < newCoords.length; i++) {
-                        const dist = turf.pointToLineDistance(turf.point(newCoords[i]), origFeat);
-                        if (dist > TOLERANCE_KM) {
-                            if (firstDiv === -1) firstDiv = i;
-                            lastDiv = i;
-                        }
-                    }
-
-                    if (firstDiv !== -1) {
-                        // FIX: Increased buffer from 1 to 3 to guarantee the purple line overlaps and connects!
-                        const startIdx = Math.max(0, firstDiv - 3);
-                        const endIdx = Math.min(newCoords.length - 1, lastDiv + 3);
-
-                        featureToSave = {
-                            type: 'Feature',
-                            geometry: { type: 'LineString', coordinates: newCoords.slice(startIdx, endIdx + 1) },
-                            properties: { route_type: 'smart' }
-                        };
-                        console.log(`✅ Detour Isolated! Sliced points ${startIdx} through ${endIdx}`);
-                    } else {
-                        alert("No significant deviation detected. Drag a point further away from the original route to extract a detour.");
-                        console.groupEnd();
-                        return; // Halt the save
-                    }
-                } else {
-                    console.log('⚠️ Warning: Original geometry missing. Falling back to simple slice.');
-                    featureToSave = { type: 'Feature', geometry: window.currentGeometryToSave, properties: { route_type: 'smart' } };
+            for (let i = 0; i < newCoords.length; i++) {
+                const dist = turf.pointToLineDistance(turf.point(newCoords[i]), origFeat);
+                if (dist > TOLERANCE_KM) {
+                    if (firstDiv === -1) firstDiv = i;
+                    lastDiv = i;
                 }
-            } else if (typeof KomootEngine !== 'undefined' && KomootEngine.state.segments?.length > 0) {
-                console.log('🗺️ Compiling full geometry from Komoot Engine...');
+            }
+
+            if (firstDiv !== -1) {
+                const startIdx = Math.max(0, firstDiv - 3);
+                const endIdx = Math.min(newCoords.length - 1, lastDiv + 3);
                 featureToSave = {
                     type: 'Feature',
-                    geometry: KomootEngine.getUnifiedGeometry(),
+                    geometry: { type: 'LineString', coordinates: newCoords.slice(startIdx, endIdx + 1) },
                     properties: { route_type: 'smart' }
                 };
-            } else {
-                featureToSave = { type: 'Feature', geometry: window.currentGeometryToSave, properties: {} };
             }
-
-            const isPoint = featureToSave.geometry.type === 'Point';
-            const isOverwrite = globalEditTrackId && currentMode === 'overwrite';
-
-            const endpoint = isPoint ? 'waypoints' : 'tracks';
-            const method = isOverwrite ? 'PUT' : 'POST';
-            const url = isOverwrite ? `${API_URL}/${endpoint}/${globalEditTrackId}` : `${API_URL}/${endpoint}`;
-
-            // Ensure existing_task_id is always present for new tracks
-            let payload = {
-                title: currentMode === 'section' ? `Detour: ${title}` : title,
-                color: chosenColor,
-                existing_task_id: AppStore.get('activeTaskId') || null, // CRITICAL: Must link to a task to show on map
-                // NEW: If no task is active, try to at least put it in the currently open section
-                section_id: AppStore.get('activeTaskId') ? null : (document.querySelector('.asana-section:not(.collapsed)')?.dataset.sectionId || null)
-            };
-
-            if (isPoint) {
-                payload.lat = featureToSave.geometry.coordinates[1];
-                payload.lng = featureToSave.geometry.coordinates[0];
-            } else {
-                payload.geojson_data = { type: 'FeatureCollection', features: [featureToSave] };
-            }
-
-            // Link to Parent Track for Mode C
-            if (currentMode === 'section' || activeParentTrackId) {
-                const pId = globalEditTrackId || activeParentTrackId;
-                // Only add to payload if it's a valid number
-                if (pId && !isNaN(pId) && pId !== 'null') {
-                    payload.parent_track_id = parseInt(pId);
-                    console.log(`🔗 Linking to Parent Track ID: ${payload.parent_track_id}`);
-                }
-            }
-
-            try {
-                const res = await authFetch(url, {
-                    method,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                if (res.ok) {
-                    console.log('🎉 Save Successful!');
-                    closeGeometryPanel();
-                    refreshData();
-                } else { throw new Error(res.status); }
-            } catch (err) { alert("Save Error: " + err.message); }
-            console.groupEnd();
         }
+    } else if (typeof KomootEngine !== 'undefined' && KomootEngine.state.segments?.length > 0) {
+        featureToSave = { type: 'Feature', geometry: KomootEngine.getUnifiedGeometry(), properties: { route_type: 'smart' } };
+    } else {
+        featureToSave = { type: 'Feature', geometry: window.currentGeometryToSave, properties: {} };
+    }
+
+    if (!featureToSave) {
+        console.error("❌ No geometry found to save!");
+        console.groupEnd();
+        return;
+    }
+
+    const isPoint = featureToSave.geometry.type === 'Point';
+    const isOverwrite = globalEditTrackId && currentMode === 'overwrite';
+
+    // 2. BUILD PAYLOAD WITH STRICT TYPE CHECKING
+    const taskId = AppStore.get('activeTaskId');
+    
+    let payload = {
+        title: currentMode === 'section' ? `Detour: ${title}` : title,
+        color: chosenColor,
+        // FORCE NULL IF NOT A NUMBER
+        existing_task_id: (taskId && !isNaN(taskId)) ? parseInt(taskId) : null 
+    };
+
+    if (isPoint) {
+        payload.lat = featureToSave.geometry.coordinates[1];
+        payload.lng = featureToSave.geometry.coordinates[0];
+    } else {
+        payload.geojson_data = { type: 'FeatureCollection', features: [featureToSave] };
+    }
+
+    // 3. FIX PARENT TRACK ID (The likely "null" vs Number culprit)
+    if (currentMode === 'section' || activeParentTrackId) {
+        const pId = globalEditTrackId || activeParentTrackId;
+        // CRITICAL: Only send if it's a real number, otherwise don't include the key at all
+        if (pId && !isNaN(pId) && pId !== 'null') {
+            payload.parent_track_id = parseInt(pId);
+        } else {
+            payload.parent_track_id = null;
+        }
+    }
+
+    console.log('📦 Final Payload for DB:', payload);
+
+    const endpoint = isPoint ? 'waypoints' : 'tracks';
+    const method = isOverwrite ? 'PUT' : 'POST';
+    const url = isOverwrite ? `${API_URL}/${endpoint}/${globalEditTrackId}` : `${API_URL}/${endpoint}`;
+
+    try {
+        const res = await authFetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        if (res.ok) {
+            console.log('✅ Save Successful!');
+            closeGeometryPanel();
+            refreshData();
+        } else {
+            const errData = await res.json();
+            console.error('❌ Server Error Response:', errData);
+            alert(`Save Failed: ${errData.error || res.status}`);
+        }
+    } catch (err) {
+        console.error('❌ Network Error:', err);
+    }
+    console.groupEnd();
+}
 
 
         function closeGeometryPanel() {
