@@ -185,9 +185,11 @@ body {
     background: #ffffff !important;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
-    margin: 4px 10px; /* Tighter margins */
-    padding: 6px 8px; /* Tighter padding */
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    margin: 4px 10px;
+    /* Tighter margins */
+    padding: 6px 8px;
+    /* Tighter padding */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     transition: all 0.2s ease;
     cursor: pointer;
     position: relative;
@@ -240,7 +242,9 @@ body {
     outline: none;
     font-weight: 600;
 }
-.modern-inline-input:hover, .modern-inline-input:focus {
+
+.modern-inline-input:hover,
+.modern-inline-input:focus {
     border-bottom: 1px dashed #cbd5e0;
     color: #0f172a;
 }
@@ -266,6 +270,11 @@ body {
     cursor: pointer;
     font-size: 0.9em;
     color: #64748b;
+}
+
+/* Push Mapbox default controls below the Command Bar */
+.mapboxgl-ctrl-top-right {
+    top: 60px !important;
 }
 
 .action-btn-modern:hover {
@@ -582,18 +591,21 @@ body {
 /* --- MAP STYLE SWITCHER INTEGRATION --- */
 #style-switcher {
     position: absolute;
-    top: 15px; /* Moved to top */
-    right: 50px; /* Nestled next to the navigation controls */
+    top: 15px;
+    /* Moved to top */
+    right: 50px;
+    /* Nestled next to the navigation controls */
     z-index: 100;
     background: transparent;
     box-shadow: none;
     padding: 0;
 }
+
 #style-switcher select {
     padding: 6px 10px;
     border-radius: 6px;
-    background: rgba(255,255,255,0.9);
-    border: 1px solid rgba(0,0,0,0.1);
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(0, 0, 0, 0.1);
     box-shadow: var(--card-shadow);
     font-size: 0.85em;
     color: #334155;
@@ -652,18 +664,27 @@ body {
 .modal {
     display: none;
     position: fixed;
-    top: 0; right: 0; bottom: 0; left: 0; /* Cover screen but ignore clicks when hidden */
-    padding: 20px; 
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    /* Cover screen but ignore clicks when hidden */
+    padding: 20px;
     z-index: 1000;
-    pointer-events: none !important; /* CRITICAL FIX: Stops it from blocking the map! */
+    pointer-events: none !important;
+    /* CRITICAL FIX: Stops it from blocking the map! */
     align-items: flex-start;
     justify-content: flex-end;
 }
+
 .modal.open {
-    pointer-events: auto !important; /* Only block map when explicitly open */
+    pointer-events: auto !important;
+    /* Only block map when explicitly open */
 }
+
 .modal-content {
-    pointer-events: auto; /* Ensures you can click inside the form */
+    pointer-events: auto;
+    /* Ensures you can click inside the form */
 }
 
 .form-group {
@@ -768,6 +789,7 @@ button {
     padding: 4px 0 !important;
     margin: 4px 0 !important;
 }
+
 .fite-text {
     font-size: 0.85em;
     display: flex;
@@ -779,13 +801,15 @@ button {
 /* 3. ENSURE FITE TITLES NEVER DISAPPEAR */
 .fite-text span.inline-edit {
     flex: 1;
-    min-width: 100px; /* Forces it to hold space even if empty */
+    min-width: 100px;
+    /* Forces it to hold space even if empty */
     min-height: 1.2em;
     display: inline-block;
-    color: #1e293b !important; /* Forces dark text */
+    color: #1e293b !important;
+    /* Forces dark text */
     font-weight: 600;
-    overflow: hidden; 
-    text-overflow: ellipsis; 
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
@@ -860,8 +884,10 @@ button {
     position: absolute;
     top: 85px;
     right: 15px;
-    bottom: 15px; /* Spans the whole height */
-    width: 420px; /* Slightly wider for comfortable editing */
+    bottom: 15px;
+    /* Spans the whole height */
+    width: 420px;
+    /* Slightly wider for comfortable editing */
     background: var(--glass-white);
     backdrop-filter: var(--glass-blur);
     border: var(--border-light);
@@ -882,7 +908,7 @@ button {
 
 #right-panel-header {
     padding: 15px 20px;
-    border-bottom: 1px solid rgba(0,0,0,0.1);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -908,7 +934,8 @@ button {
 .fite-text input[type="time"].modern-inline-input {
     font-size: 0.7em !important;
     padding: 0 !important;
-    width: 55px; /* Restrict width */
+    width: 55px;
+    /* Restrict width */
 }
 
 .compact-geom-row {
@@ -950,8 +977,10 @@ button {
 
 /* Ensure Smart Route UI is visible and not overlapping */
 .mapboxgl-ctrl-directions {
-    z-index: 105 !important; /* Higher than command-bar (100) */
-    margin-top: 65px !important; /* Push below the command-bar height */
+    z-index: 105 !important;
+    /* Higher than command-bar (100) */
+    margin-top: 65px !important;
+    /* Push below the command-bar height */
     max-width: 320px !important;
     border-radius: 12px !important;
     box-shadow: var(--card-shadow) !important;

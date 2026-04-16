@@ -2,23 +2,26 @@ const KomootEngine = {
     // Added editMeta to state
     state: { intersections: [], segments: [], markers: [], currentFileName: '', isListenerAdded: false, editMeta: null },
 
+    // --- UPDATE in js/route-editor.js ---
     handleGpxUpload: function (file) {
         const reader = new FileReader();
+        // 🔒 GRAB THE ID RIGHT NOW before any panels close
+        const currentTask = AppStore.get('activeTaskId');
+
         reader.onload = async (event) => {
             try {
                 const gpxXml = new DOMParser().parseFromString(event.target.result, "text/xml");
                 const geojson = toGeoJSON.gpx(gpxXml);
                 if (geojson && geojson.features.length > 0) {
                     showToast("Analyzing GPX (Komoot Engine)...", "info");
-                    // New uploads have no editMeta
-                    await this.initFromGpx(geojson.features[0], file.name, null);
-                } else {
-                    alert("Could not extract valid track data.");
+
+                    // Pass the locked Task ID into initFromGpx
+                    await this.initFromGpx(geojson.features[0], file.name, {
+                        lockedTaskId: currentTask
+                    });
                 }
-            } catch (err) {
-                console.error("GPX Parsing Error:", err);
-                alert("Error parsing GPX file.");
-            }
+                // ... rest of error handling ...
+            } catch (err) { console.error(err); }
         };
         reader.readAsText(file);
     },
