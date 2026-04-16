@@ -2277,8 +2277,9 @@
                             </select>
                         </div>
                         <div class="task-actions-modern" onclick="event.stopPropagation()">
-                            <button class="action-btn-modern" onclick="openTaskEditor(${task.task_id})">⚙️</button>
-                            <button class="action-btn-modern del" onclick="deleteTask(${task.task_id})">🗑️</button>
+                            <button class="action-btn-modern" title="Details" onclick="openTaskDetailPanel(AppStore.get('itinerary').find(t => t.task_id === ${task.task_id}))">ℹ️</button>
+                            <button class="action-btn-modern" title="Edit" onclick="openTaskEditor(${task.task_id})">⚙️</button>
+                            <button class="action-btn-modern del" title="Delete" onclick="deleteTask(${task.task_id})">🗑️</button>
                         </div>
                     </div>
                     <div class="task-row-2">
