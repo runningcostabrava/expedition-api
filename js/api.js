@@ -65,7 +65,9 @@ async function refreshData() {
             fetch(`${API_URL}/task_types`)
         ]);
 
-        AppStore.set('itinerary', await itRes.json());
+        const data = await itRes.json();
+        console.log("📡 Itinerary Refreshed. Items found:", data.length);
+        AppStore.set('itinerary', data); // This triggers the map re-render
         AppStore.set('sections', await secRes.json());
         allCategories = await catRes.json();
         allTaskTypes = await typeRes.json();

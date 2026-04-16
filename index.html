@@ -1157,7 +1157,8 @@
             mode: 'overwrite',
             color: '#3498db',
             title: '',
-            isTitleEdited: false
+            isTitleEdited: false,
+            targetTaskId: null
         };
         let globalEditTrackId = null;
 
@@ -1199,6 +1200,10 @@
 
 
         function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, editConfig = null, icon = '📍', color = '#3498db') {
+            // Lock the current active task ID into the save state immediately
+            window.ActiveSaveState.targetTaskId = AppStore.get('activeTaskId');
+            console.log("📍 Save Strategy locked to Task ID:", window.ActiveSaveState.targetTaskId);
+
             if (editConfig && editConfig.id) {
                 globalEditTrackId = editConfig.id;
             }
@@ -1324,12 +1329,13 @@ async function executeDatabaseSync() {
     const isOverwrite = globalEditTrackId && currentMode === 'overwrite';
 
     // 2. BUILD PAYLOAD WITH STRICT TYPE CHECKING
-    const taskId = AppStore.get('activeTaskId');
+    // Use the ID we locked when the popup first opened
+    const taskId = window.ActiveSaveState.targetTaskId;
     
     let payload = {
         title: currentMode === 'section' ? `Detour: ${title}` : title,
         color: chosenColor,
-        // FORCE NULL IF NOT A NUMBER
+        // Use the locked ID, forced to a number
         existing_task_id: (taskId && !isNaN(taskId)) ? parseInt(taskId) : null 
     };
 
@@ -2564,7 +2570,7 @@ async function executeDatabaseSync() {
             if (panel) panel.classList.remove('open');
             // Remove active highlighting from sidebar
             document.querySelectorAll('.task-row, .fite-row').forEach(row => row.classList.remove('active-task'));
-            AppStore.set('activeTaskId', null);
+            // AppStore.set('activeTaskId', null);
         }
 
         initializeApp();
