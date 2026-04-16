@@ -1348,9 +1348,13 @@
                 payload.geojson_data = { type: 'FeatureCollection', features: [featureToSave] };
             }
 
-            // Link to Parent Track for Mode C
+            // FIX: Ensure parent_track_id is ONLY sent if it has a real numeric value
             if (currentMode === 'section' || activeParentTrackId) {
-                payload.parent_track_id = globalEditTrackId || activeParentTrackId;
+                const pId = globalEditTrackId || activeParentTrackId;
+                if (pId && pId !== 'null') {
+                    payload.parent_track_id = parseInt(pId);
+                    console.log(`🔗 Linking to Parent Track ID: ${payload.parent_track_id}`);
+                }
             }
 
             try {
