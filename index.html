@@ -2586,9 +2586,9 @@
                     body: JSON.stringify(updatedData)
                 });
                 if (res.ok) {
-                    closeRightPanel();
-                    refreshData();
-                    showToast("Task updated successfully", "success");
+                    // Do not call closeRightPanel() yet if you want to keep the context
+                    await refreshData();
+                    showToast("Task updated", "success");
                 }
             } catch (err) {
                 showToast("Error updating task", "error");
