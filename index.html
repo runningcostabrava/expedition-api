@@ -105,10 +105,11 @@
     <div id="right-panel" class="hidden">
         <div id="right-panel-header">
             <span id="right-panel-title">Details</span>
-            <button onclick="closeRightPanel()" style="width: auto; background: none; border: none; font-size: 1.2em; cursor: pointer; color: #94a3b8; padding: 0;">✖</button>
+            <button onclick="closeRightPanel()"
+                style="width: auto; background: none; border: none; font-size: 1.2em; cursor: pointer; color: #94a3b8; padding: 0;">✖</button>
         </div>
         <div id="right-panel-content">
-            </div>
+        </div>
     </div>
 
     <div id="map-wrapper">
@@ -1846,21 +1847,112 @@
         function openTaskEditor(taskId) {
             const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
             if (!task) return;
+
+            // Set internal state
             resetForm();
             AppStore.set('activeTaskId', taskId);
-            document.getElementById('wp-title').value = task.task_name || task.task || '';
-            document.getElementById('task-category-id').value = task.category_id || ''; /* CRITICAL FIX */
-            document.getElementById('task-section-id').value = task.section_id || '';
-            document.getElementById('task-type-id').value = task.task_type_id || '';
-            document.getElementById('starts-at').value = task.starts_at ? task.starts_at.substring(0, 16) : '';
-            document.getElementById('responsible').value = task.responsible || '';
-            document.getElementById('is-completed').checked = task.is_completed;
-            if (document.getElementById('is-milestone')) document.getElementById('is-milestone').checked = !!task.is_milestone;
-            document.getElementById('task-comments').value = task.comments || '';
-            document.getElementById('wp-description').value = task.characteristics || ''; // <-- FIX: Loads description!
-            document.getElementById('existing-task').value = taskId;
-            document.getElementById('color-picker-group').style.display = 'none';
-            openModal();
+
+            // Prepare Section and Category Options
+            let sectionOptions = (AppStore.get('sections') || []).map(s =>
+                `<option value="${s.id}" ${task.section_id == s.id ? 'selected' : ''}>${s.title}</option>`
+            ).join('');
+
+            let catOptions = allCategories.map(c =>
+                `<option value="${c.id}" ${task.category_id == c.id ? 'selected' : ''}>${c.icon} ${c.name}</option>`
+            ).join('');
+
+            // Build modern vertical form for the Right Panel
+            const html = `
+                <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" id="edit-task-name" value="${task.task_name || ''}">
+                </div>
+                <div style="display:flex; gap:10px; margin-bottom:15px;">
+                    <div style="flex:1;">
+                        <label>Time</label>
+                        <input type="time" id="edit-task-time" value="${task.starts_at ? task.starts_at.substring(11, 16) : ''}">
+                    </div>
+                    <div style="flex:1;">
+                        <label>Category</label>
+                        <select id="edit-task-cat">${catOptions}</select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Section (Day)</label>
+                    <select id="edit-task-sec">${sectionOptions}</select>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="edit-task-desc" rows="6" style="width:100%; font-family:inherit;">${task.characteristics || ''}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Responsible</label>
+                    <input type="text" id="edit-task-resp" value="${task.responsible || ''}">
+                </div>
+                <div class="form-group" style="background:#f8fafc; padding:10px; border-radius:8px;">
+                    <label style="display:flex; align-items:center; gap:8px;">
+                        <input type="checkbox" id="edit-task-completed" ${task.is_completed ? 'checked' : ''}> Complete
+                    </label>
+                </div>
+                <button onclick="saveTaskFromRightPanel(${taskId})" style="width:100%; padding:14px; background:#27ae60; color:white; border:none; border-radius:8px; font-weight:bold; margin-top:10px;">💾 UPDATE TASK</button>
+            `;
+
+            openRightPanel(`⚙️ Edit Task: ${task.task_id}`, html);
+        }
+
+        async function saveTaskFromRightPanel(taskId) {
+            const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
+            if (!task) return;
+
+            const name = document.getElementById('edit-task-name').value;
+            const time = document.getElementById('edit-task-time').value;
+            const categoryId = document.getElementById('edit-task-cat').value;
+            const sectionId = document.getElementById('edit-task-sec').value;
+            const description = document.getElementById('edit-task-desc').value;
+            const responsible = document.getElementById('edit-task-resp').value;
+            const isCompleted = document.getElementById('edit-task-completed').checked;
+
+            let payload = {
+                ...task,
+                task_name: name,
+                category_id: categoryId || null,
+                section_id: sectionId || null,
+                characteristics: description,
+                responsible: responsible,
+                is_completed: isCompleted
+            };
+
+            // Handle time update correctly
+            if (time) {
+                let datePart;
+                if (task.starts_at) {
+                    datePart = task.starts_at.split('T')[0];
+                } else if (payload.section_id) {
+                    const sec = (AppStore.get('sections') || []).find(s => s.id == payload.section_id);
+                    datePart = (sec && sec.section_date) ? new Date(sec.section_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+                } else {
+                    datePart = new Date().toISOString().split('T')[0];
+                }
+                payload.starts_at = `${datePart}T${time}:00.000Z`;
+            } else {
+                payload.starts_at = null;
+            }
+
+            try {
+                const res = await authFetch(`${API_URL}/tasks/${taskId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) throw new Error("Server Error");
+                
+                closeRightPanel();
+                refreshData();
+                if (typeof showToast !== 'undefined') showToast("Task updated successfully", "success");
+            } catch (e) {
+                console.error("Right Panel Update Failed:", e);
+                alert("Error updating task: " + e.message);
+            }
         }
 
         function exportTaskToGPX(taskId) {
@@ -2459,6 +2551,43 @@
         }
 
         initializeApp();
+
+        async function saveTaskFromRightPanel(taskId) {
+            const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
+
+            // Extract values from the right panel inputs
+            const updatedData = {
+                ...task,
+                task_name: document.getElementById('edit-task-name').value,
+                category_id: document.getElementById('edit-task-cat').value || null,
+                section_id: document.getElementById('edit-task-sec').value || null,
+                characteristics: document.getElementById('edit-task-desc').value,
+                responsible: document.getElementById('edit-task-resp').value,
+                is_completed: document.getElementById('edit-task-completed').checked
+            };
+
+            // Handle Time Update
+            const timeVal = document.getElementById('edit-task-time').value;
+            if (timeVal) {
+                const datePart = task.starts_at ? task.starts_at.split('T')[0] : new Date().toISOString().split('T')[0];
+                updatedData.starts_at = `${datePart}T${timeVal}:00.000Z`;
+            }
+
+            try {
+                const res = await authFetch(`${API_URL}/tasks/${taskId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatedData)
+                });
+                if (res.ok) {
+                    closeRightPanel();
+                    refreshData();
+                    showToast("Task updated successfully", "success");
+                }
+            } catch (err) {
+                showToast("Error updating task", "error");
+            }
+        }
 
     </script>
 </body>
