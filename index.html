@@ -1200,8 +1200,11 @@
 
 
         function showGeometryContextPopup(lngLat, geometry, defaultTitle, statsText, editConfig = null, icon = '📍', color = '#3498db') {
-            // Lock the current active task ID into the save state immediately
-            window.ActiveSaveState.targetTaskId = AppStore.get('activeTaskId');
+
+            // 🔒 Priority: 1. ID locked by Komoot Engine, 2. ID currently in AppStore
+            const idToLock = (editConfig && editConfig.lockedTaskId) ? editConfig.lockedTaskId : AppStore.get('activeTaskId');
+
+            window.ActiveSaveState.targetTaskId = idToLock;
             console.log("📍 Save Strategy locked to Task ID:", window.ActiveSaveState.targetTaskId);
 
             if (editConfig && editConfig.id) {
@@ -1276,114 +1279,127 @@
 
 
 
-async function executeDatabaseSync() {
-    console.group('🚀 DEBUGGING DATABASE SYNC');
-    
-    const title = window.ActiveSaveState.title;
-    const chosenColor = window.ActiveSaveState.color;
-    const currentMode = window.ActiveSaveState.mode;
-    
-    let featureToSave;
+        async function executeDatabaseSync() {
+            console.group('🚀 DEBUGGING DATABASE SYNC');
 
-    // 1. Determine Geometry (Mode C vs Engine vs Current)
-    if (currentMode === 'section') {
-        const origFeat = window.originalGeometryForDiff?.features?.[0];
-        const newGeom = typeof KomootEngine !== 'undefined' ? KomootEngine.getUnifiedGeometry() : window.currentGeometryToSave;
+            const title = window.ActiveSaveState.title;
+            const chosenColor = window.ActiveSaveState.color;
+            const currentMode = window.ActiveSaveState.mode;
 
-        if (origFeat && newGeom.coordinates?.length > 0) {
-            const newCoords = newGeom.coordinates;
-            let firstDiv = -1; let lastDiv = -1;
-            const TOLERANCE_KM = 0.02;
+            let featureToSave;
 
-            for (let i = 0; i < newCoords.length; i++) {
-                const dist = turf.pointToLineDistance(turf.point(newCoords[i]), origFeat);
-                if (dist > TOLERANCE_KM) {
-                    if (firstDiv === -1) firstDiv = i;
-                    lastDiv = i;
+            // 1. Determine Geometry (Mode C vs Engine vs Current)
+            if (currentMode === 'section') {
+                const origFeat = window.originalGeometryForDiff?.features?.[0];
+                const newGeom = typeof KomootEngine !== 'undefined' ? KomootEngine.getUnifiedGeometry() : window.currentGeometryToSave;
+
+                if (origFeat && newGeom.coordinates?.length > 0) {
+                    const newCoords = newGeom.coordinates;
+                    let firstDiv = -1; let lastDiv = -1;
+                    const TOLERANCE_KM = 0.02;
+
+                    for (let i = 0; i < newCoords.length; i++) {
+                        const dist = turf.pointToLineDistance(turf.point(newCoords[i]), origFeat);
+                        if (dist > TOLERANCE_KM) {
+                            if (firstDiv === -1) firstDiv = i;
+                            lastDiv = i;
+                        }
+                    }
+
+                    if (firstDiv !== -1) {
+                        const startIdx = Math.max(0, firstDiv - 3);
+                        const endIdx = Math.min(newCoords.length - 1, lastDiv + 3);
+                        featureToSave = {
+                            type: 'Feature',
+                            geometry: { type: 'LineString', coordinates: newCoords.slice(startIdx, endIdx + 1) },
+                            properties: { route_type: 'smart' }
+                        };
+                    }
+                }
+            } else if (typeof KomootEngine !== 'undefined' && KomootEngine.state.segments?.length > 0) {
+                featureToSave = { type: 'Feature', geometry: KomootEngine.getUnifiedGeometry(), properties: { route_type: 'smart' } };
+            } else {
+                featureToSave = { type: 'Feature', geometry: window.currentGeometryToSave, properties: {} };
+            }
+
+            if (!featureToSave) {
+                console.error("❌ No geometry found to save!");
+                console.groupEnd();
+                return;
+            }
+
+            const isPoint = featureToSave.geometry.type === 'Point';
+            const isOverwrite = globalEditTrackId && currentMode === 'overwrite';
+
+            // 2. BUILD PAYLOAD WITH STRICT TYPE CHECKING
+            // Use the ID we locked when the popup first opened
+            const taskId = window.ActiveSaveState.targetTaskId;
+
+            let payload = {
+                title: currentMode === 'section' ? `Detour: ${title}` : title,
+                color: chosenColor,
+            };
+
+            if (taskId && !isNaN(taskId)) {
+                // ✅ LINK TO EXISTING TASK
+                payload.existing_task_id = parseInt(taskId);
+            } else {
+                // 🆕 ONLY CREATE NEW IF NO TASK SELECTED
+                const openSection = document.querySelector('.asana-section:not(.collapsed)');
+                const openSectionId = openSection ? parseInt(openSection.dataset.sectionId) : null;
+
+                payload.tasks = [{
+                    name: title,
+                    section_id: openSectionId,
+                    characteristics: "Automatically created from GPX"
+                }];
+            }
+
+            if (isPoint) {
+                payload.lat = featureToSave.geometry.coordinates[1];
+                payload.lng = featureToSave.geometry.coordinates[0];
+            } else {
+                payload.geojson_data = { type: 'FeatureCollection', features: [featureToSave] };
+            }
+
+            // 3. FIX PARENT TRACK ID (The likely "null" vs Number culprit)
+            if (currentMode === 'section' || activeParentTrackId) {
+                const pId = globalEditTrackId || activeParentTrackId;
+                // CRITICAL: Only send if it's a real number, otherwise don't include the key at all
+                if (pId && !isNaN(pId) && pId !== 'null') {
+                    payload.parent_track_id = parseInt(pId);
+                } else {
+                    payload.parent_track_id = null;
                 }
             }
 
-            if (firstDiv !== -1) {
-                const startIdx = Math.max(0, firstDiv - 3);
-                const endIdx = Math.min(newCoords.length - 1, lastDiv + 3);
-                featureToSave = {
-                    type: 'Feature',
-                    geometry: { type: 'LineString', coordinates: newCoords.slice(startIdx, endIdx + 1) },
-                    properties: { route_type: 'smart' }
-                };
+            console.log('📦 Final Payload for DB:', payload);
+
+            const endpoint = isPoint ? 'waypoints' : 'tracks';
+            const method = isOverwrite ? 'PUT' : 'POST';
+            const url = isOverwrite ? `${API_URL}/${endpoint}/${globalEditTrackId}` : `${API_URL}/${endpoint}`;
+
+            try {
+                const res = await authFetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    console.log('✅ Save Successful!');
+                    closeGeometryPanel();
+                    refreshData();
+                } else {
+                    const errData = await res.json();
+                    console.error('❌ Server Error Response:', errData);
+                    alert(`Save Failed: ${errData.error || res.status}`);
+                }
+            } catch (err) {
+                console.error('❌ Network Error:', err);
             }
+            console.groupEnd();
         }
-    } else if (typeof KomootEngine !== 'undefined' && KomootEngine.state.segments?.length > 0) {
-        featureToSave = { type: 'Feature', geometry: KomootEngine.getUnifiedGeometry(), properties: { route_type: 'smart' } };
-    } else {
-        featureToSave = { type: 'Feature', geometry: window.currentGeometryToSave, properties: {} };
-    }
-
-    if (!featureToSave) {
-        console.error("❌ No geometry found to save!");
-        console.groupEnd();
-        return;
-    }
-
-    const isPoint = featureToSave.geometry.type === 'Point';
-    const isOverwrite = globalEditTrackId && currentMode === 'overwrite';
-
-    // 2. BUILD PAYLOAD WITH STRICT TYPE CHECKING
-    // Use the ID we locked when the popup first opened
-    const taskId = window.ActiveSaveState.targetTaskId;
-    
-    let payload = {
-        title: currentMode === 'section' ? `Detour: ${title}` : title,
-        color: chosenColor,
-        // Use the locked ID, forced to a number
-        existing_task_id: (taskId && !isNaN(taskId)) ? parseInt(taskId) : null 
-    };
-
-    if (isPoint) {
-        payload.lat = featureToSave.geometry.coordinates[1];
-        payload.lng = featureToSave.geometry.coordinates[0];
-    } else {
-        payload.geojson_data = { type: 'FeatureCollection', features: [featureToSave] };
-    }
-
-    // 3. FIX PARENT TRACK ID (The likely "null" vs Number culprit)
-    if (currentMode === 'section' || activeParentTrackId) {
-        const pId = globalEditTrackId || activeParentTrackId;
-        // CRITICAL: Only send if it's a real number, otherwise don't include the key at all
-        if (pId && !isNaN(pId) && pId !== 'null') {
-            payload.parent_track_id = parseInt(pId);
-        } else {
-            payload.parent_track_id = null;
-        }
-    }
-
-    console.log('📦 Final Payload for DB:', payload);
-
-    const endpoint = isPoint ? 'waypoints' : 'tracks';
-    const method = isOverwrite ? 'PUT' : 'POST';
-    const url = isOverwrite ? `${API_URL}/${endpoint}/${globalEditTrackId}` : `${API_URL}/${endpoint}`;
-
-    try {
-        const res = await authFetch(url, {
-            method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        
-        if (res.ok) {
-            console.log('✅ Save Successful!');
-            closeGeometryPanel();
-            refreshData();
-        } else {
-            const errData = await res.json();
-            console.error('❌ Server Error Response:', errData);
-            alert(`Save Failed: ${errData.error || res.status}`);
-        }
-    } catch (err) {
-        console.error('❌ Network Error:', err);
-    }
-    console.groupEnd();
-}
 
 
         function closeGeometryPanel() {
@@ -1968,7 +1984,7 @@ async function executeDatabaseSync() {
                     body: JSON.stringify(payload)
                 });
                 if (!res.ok) throw new Error("Server Error");
-                
+
                 closeRightPanel();
                 refreshData();
                 if (typeof showToast !== 'undefined') showToast("Task updated successfully", "success");
@@ -2569,7 +2585,7 @@ async function executeDatabaseSync() {
             const panel = document.getElementById('task-detail-panel');
             if (panel) panel.classList.remove('open');
             // Remove active highlighting from sidebar
-            document.querySelectorAll('.task-row, .fite-row').forEach(row => row.classList.remove('active-task'));
+            //document.querySelectorAll('.task-row, .fite-row').forEach(row => row.classList.remove('active-task'));
             // AppStore.set('activeTaskId', null);
         }
 
