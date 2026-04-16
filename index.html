@@ -307,6 +307,16 @@
 
     <script>
 
+        window.createWaypointFromContext = function(lat, lng) {
+            if (isEditingGeometry || isRouting || isAnalyzingSegment) return;
+            draw.deleteAll(); // Clear mapbox draw
+            const feat = { type: 'Feature', geometry: { type: 'Point', coordinates: [lng, lat] } };
+            draw.add(feat);   // Drop the point so the user sees it
+            
+            // Trigger the Right Panel Save Strategy
+            showGeometryContextPopup([lng, lat], feat.geometry, `New Waypoint`, '');
+        };
+
         function openRightPanel(title, htmlContent) {
             // Close the left detail panel if it's open to prevent screen crowding
             closeTaskDetailPanel();
@@ -411,9 +421,11 @@
                                 <div style="font-size: 0.75em; color: #7f8c8d; margin-bottom: 8px; font-family: monospace;">
                                     📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}
                                 </div>
+                                <button class="popup-btn" style="width: 100%; background: #27ae60; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 5px; transition: 0.2s;"
+                                        onclick="createWaypointFromContext(${lat}, ${lng}); this.closest('.mapboxgl-popup').remove();">
+                                    📍 Create Waypoint Here
+                                </button>
                                 <button class="popup-btn" style="width: 100%; background: #f39c12; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s;"
-                                        onmouseover="this.style.background='#e67e22'"
-                                        onmouseout="this.style.background='#f39c12'"
                                         onclick="openStreetView(${lat}, ${lng}); this.closest('.mapboxgl-popup').remove();">
                                     🚶‍♂️ Street View Here
                                 </button>
@@ -1891,52 +1903,67 @@
             resetForm();
             AppStore.set('activeTaskId', taskId);
 
-            // Prepare Section and Category Options
-            let sectionOptions = (AppStore.get('sections') || []).map(s =>
+            // Escape quotes so titles like Task "Name" don't break the HTML input
+            const safeName = (task.task_name || '').replace(/"/g, '"');
+            const safeResp = (task.responsible || '').replace(/"/g, '"');
+
+            // Prepare Section and Category Options (Fix: Added Unscheduled fallback)
+            let sectionOptions = `<option value="">Unscheduled</option>` + 
+                (AppStore.get('sections') || []).map(s =>
                 `<option value="${s.id}" ${task.section_id == s.id ? 'selected' : ''}>${s.title}</option>`
             ).join('');
 
-            let catOptions = allCategories.map(c =>
+            let catOptions = `<option value="">No Category</option>` + 
+                allCategories.map(c =>
                 `<option value="${c.id}" ${task.category_id == c.id ? 'selected' : ''}>${c.icon} ${c.name}</option>`
             ).join('');
 
-            // Build modern vertical form for the Right Panel
+            // Build robust vertical form with hardcoded inline styles to prevent CSS collisions
             const html = `
-                <div class="form-group">
-                    <label>Title</label>
-                    <input type="text" id="edit-task-name" value="${task.task_name || ''}">
-                </div>
-                <div style="display:flex; gap:10px; margin-bottom:15px;">
-                    <div style="flex:1;">
-                        <label>Time</label>
-                        <input type="time" id="edit-task-time" value="${task.starts_at ? task.starts_at.substring(11, 16) : ''}">
+                <div style="display:flex; flex-direction:column; gap:15px;">
+                    <div>
+                        <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Title</label>
+                        <input type="text" id="edit-task-name" value="${safeName}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
                     </div>
-                    <div style="flex:1;">
-                        <label>Category</label>
-                        <select id="edit-task-cat">${catOptions}</select>
+                    
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1;">
+                            <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Time</label>
+                            <input type="time" id="edit-task-time" value="${task.starts_at ? task.starts_at.substring(11, 16) : ''}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
+                        </div>
+                        <div style="flex:1;">
+                            <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Category</label>
+                            <select id="edit-task-cat" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">${catOptions}</select>
+                        </div>
                     </div>
+                    
+                    <div>
+                        <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Section (Day)</label>
+                        <select id="edit-task-sec" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">${sectionOptions}</select>
+                    </div>
+                    
+                    <div>
+                        <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Description / Notes</label>
+                        <textarea id="edit-task-desc" rows="6" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; font-family:inherit; resize:vertical;">${task.characteristics || ''}</textarea>
+                    </div>
+                    
+                    <div>
+                        <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Responsible</label>
+                        <input type="text" id="edit-task-resp" value="${safeResp}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
+                    </div>
+                    
+                    <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0;">
+                        <label style="display:flex; align-items:center; gap:8px; margin:0; cursor:pointer; color:#1e293b; font-weight:bold;">
+                            <input type="checkbox" id="edit-task-completed" ${task.is_completed ? 'checked' : ''} style="width:18px; height:18px; cursor:pointer;"> 
+                            Mark as Completed
+                        </label>
+                    </div>
+                    
+                    <button onclick="saveTaskFromRightPanel(${taskId})" style="width:100%; padding:14px; background:#27ae60; color:white; border:none; border-radius:8px; font-weight:bold; font-size:1.05em; margin-top:5px; cursor:pointer; box-shadow:0 4px 10px rgba(39, 174, 96, 0.3);">💾 UPDATE TASK</button>
                 </div>
-                <div class="form-group">
-                    <label>Section (Day)</label>
-                    <select id="edit-task-sec">${sectionOptions}</select>
-                </div>
-                <div class="form-group">
-                    <label>Description</label>
-                    <textarea id="edit-task-desc" rows="6" style="width:100%; font-family:inherit;">${task.characteristics || ''}</textarea>
-                </div>
-                <div class="form-group">
-                    <label>Responsible</label>
-                    <input type="text" id="edit-task-resp" value="${task.responsible || ''}">
-                </div>
-                <div class="form-group" style="background:#f8fafc; padding:10px; border-radius:8px;">
-                    <label style="display:flex; align-items:center; gap:8px;">
-                        <input type="checkbox" id="edit-task-completed" ${task.is_completed ? 'checked' : ''}> Complete
-                    </label>
-                </div>
-                <button onclick="saveTaskFromRightPanel(${taskId})" style="width:100%; padding:14px; background:#27ae60; color:white; border:none; border-radius:8px; font-weight:bold; margin-top:10px;">💾 UPDATE TASK</button>
             `;
 
-            openRightPanel(`⚙️ Edit Task: ${task.task_id}`, html);
+            openRightPanel(`⚙️ Edit Task`, html);
         }
 
         async function saveTaskFromRightPanel(taskId) {
