@@ -2401,8 +2401,10 @@
                     <span class="section-toggle-icon collapsed" style="flex-shrink: 0; font-size: 0.8em; color: #94a3b8; transition: transform 0.2s;">▼</span>
                     ${section.id ? `<input type="date" value="${dateVal}" class="inline-edit-input" style="width: 115px; padding:0; border:none; background:transparent; font-size:0.9em; color:#64748b; font-weight:bold; flex-shrink: 0;" onchange="updateSectionMetadata(${section.id}, 'section_date', this.value)" onclick="event.stopPropagation()">` : ''}
                     <span class="inline-edit section-title-text" contenteditable="true" style="font-weight: bold; flex-shrink: 0; font-size: 0.95em; color: #1e293b;" onblur="updateSectionMetadata(${section.id}, 'title', this.innerText)" onclick="event.stopPropagation()">${sectionTitle}</span>
-                    <div style="display:flex; gap:2px; margin-left:auto; flex-shrink: 0;" onclick="event.stopPropagation()">
-                        ${section.id ? `<button class="delete-btn" title="Delete Section" onclick="event.stopPropagation(); deleteSection(${section.id}, '${sectionTitle.replace(/'/g, "\\'")}')">🗑️</button>` : ''}
+                    
+                    <div class="task-actions-modern" style="display:flex; gap:2px; margin-left:auto; flex-shrink: 0; opacity: 1;" onclick="event.stopPropagation()">
+                        ${section.id ? `<button class="action-btn-modern" title="Section Details" onclick="event.stopPropagation(); openSectionEditor(${section.id})">ℹ️</button>` : ''}
+                        ${section.id ? `<button class="action-btn-modern del" title="Delete Section" onclick="event.stopPropagation(); deleteSection(${section.id}, '${sectionTitle.replace(/'/g, "\\'")}')">🗑️</button>` : ''}
                     </div>
                 </div>
                 <div class="section-content collapsed"></div>
@@ -2614,8 +2616,9 @@
                                 <div class="geom-stats">${statsHtml || 'No stats recorded'}</div>
                             </div>
                             <div style="display:flex; gap:6px;">
+                                <button class="action-btn-modern" title="Details & Metadata" onclick="event.stopPropagation(); openGeomEditor('${g.kind}', ${g.waypoint_id || g.track_id})">ℹ️</button>
                                 <button class="action-btn-modern" title="Show/Hide" onclick="event.stopPropagation(); toggleGeomVisibility('${g.kind}', '${g.track_id || g.anchor_id}', this)">👁️</button>
-                                <button class="action-btn-modern" title="Edit" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})">⚙️</button>
+                                <button class="action-btn-modern" title="Edit Geometry" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})">⚙️</button>
                             </div>
                         </div>
                     `;
@@ -2634,6 +2637,130 @@
             // Remove active highlighting from sidebar
             //document.querySelectorAll('.task-row, .fite-row').forEach(row => row.classList.remove('active-task'));
             // AppStore.set('activeTaskId', null);
+        }
+
+        // --- 📅 SECTION METADATA EDITOR ---
+        function openSectionEditor(sectionId) {
+            const section = AppStore.get('sections').find(s => s.id === sectionId);
+            if (!section) return;
+
+            const dateVal = section.section_date ? new Date(section.section_date).toISOString().split('T')[0] : '';
+            const safeTitle = (section.title || '').replace(/"/g, '"');
+            const safeDesc = (section.description || '').replace(/"/g, '"');
+
+            const html = `
+                <div style="display:flex; flex-direction:column; gap:15px;">
+                    <div>
+                        <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Section Title</label>
+                        <input type="text" id="edit-sec-title" value="${safeTitle}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Date</label>
+                        <input type="date" id="edit-sec-date" value="${dateVal}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Day Description / Notes</label>
+                        <textarea id="edit-sec-desc" rows="6" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; font-family:inherit; resize:vertical;">${safeDesc}</textarea>
+                    </div>
+                    <button onclick="saveSectionFromRightPanel(${section.id})" style="width:100%; padding:14px; background:#27ae60; color:white; border:none; border-radius:8px; font-weight:bold; font-size:1.05em; margin-top:5px; cursor:pointer; box-shadow:0 4px 10px rgba(39, 174, 96, 0.3);">💾 UPDATE SECTION</button>
+                </div>
+            `;
+            openRightPanel(`📅 Edit Section`, html);
+        }
+
+        async function saveSectionFromRightPanel(sectionId) {
+            const payload = {
+                title: document.getElementById('edit-sec-title').value,
+                section_date: document.getElementById('edit-sec-date').value || null,
+                description: document.getElementById('edit-sec-desc').value
+            };
+            try {
+                await authFetch(`${API_URL}/sections/${sectionId}`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+                });
+                closeRightPanel();
+                refreshData();
+                if (typeof showToast !== 'undefined') showToast("Section updated", "success");
+            } catch (err) { alert("Error: " + err.message); }
+        }
+
+        // --- 📍 GEOMETRY METADATA EDITOR ---
+        function openGeomEditor(kind, id) {
+            let geom = null;
+            AppStore.get('itinerary').forEach(task => {
+                if (task.geometries) {
+                    const found = task.geometries.find(g => (kind === 'point' ? g.waypoint_id === id : g.track_id === id));
+                    if (found) geom = found;
+                }
+            });
+            if (!geom) return;
+
+            const safeTitle = (geom.title || '').replace(/"/g, '"');
+            const safeComments = (geom.comments || '').replace(/"/g, '"');
+            const safeAddress = (geom.address || '').replace(/"/g, '"');
+            const safePhone = (geom.phone || '').replace(/"/g, '"');
+            const safeLink = (geom.link || '').replace(/"/g, '"');
+            const safePhoto = (geom.photo_url || '').replace(/"/g, '"');
+
+            const html = `
+                <div style="display:flex; flex-direction:column; gap:15px;">
+                    ${safePhoto ? `<img src="${safePhoto}" style="width:100%; height:140px; object-fit:cover; border-radius:8px;">` : ''}
+                    <div>
+                        <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Location Name</label>
+                        <input type="text" id="edit-geom-title" value="${safeTitle}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
+                    </div>
+                    ${kind === 'point' ? `
+                    <div>
+                        <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Address</label>
+                        <input type="text" id="edit-geom-address" value="${safeAddress}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1;">
+                            <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Phone</label>
+                            <input type="text" id="edit-geom-phone" value="${safePhone}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
+                        </div>
+                        <div style="flex:1;">
+                            <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Photo URL</label>
+                            <input type="text" id="edit-geom-photo" value="${safePhoto}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
+                        </div>
+                    </div>
+                    ` : ''}
+                    <div>
+                        <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Website Link</label>
+                        <input type="text" id="edit-geom-link" value="${safeLink}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Comments / Notes</label>
+                        <textarea id="edit-geom-comments" rows="4" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; font-family:inherit; resize:vertical;">${safeComments}</textarea>
+                    </div>
+                    <button onclick="saveGeomFromRightPanel('${kind}', ${id})" style="width:100%; padding:14px; background:#27ae60; color:white; border:none; border-radius:8px; font-weight:bold; font-size:1.05em; margin-top:5px; cursor:pointer; box-shadow:0 4px 10px rgba(39, 174, 96, 0.3);">💾 UPDATE DETAILS</button>
+                </div>
+            `;
+            openRightPanel(`ℹ️ Location Details`, html);
+        }
+
+        async function saveGeomFromRightPanel(kind, id) {
+            const payload = {
+                title: document.getElementById('edit-geom-title').value,
+                link: document.getElementById('edit-geom-link').value,
+                comments: document.getElementById('edit-geom-comments').value,
+            };
+
+            if (kind === 'point') {
+                payload.address = document.getElementById('edit-geom-address').value;
+                payload.phone = document.getElementById('edit-geom-phone').value;
+                payload.photo_url = document.getElementById('edit-geom-photo').value;
+            }
+
+            const endpoint = kind === 'point' ? `waypoints/${id}` : `tracks/${id}`;
+            try {
+                await authFetch(`${API_URL}/${endpoint}`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+                });
+                closeRightPanel();
+                refreshData();
+                if (typeof showToast !== 'undefined') showToast("Location updated", "success");
+            } catch (err) { alert("Error: " + err.message); }
         }
 
         initializeApp();
