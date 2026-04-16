@@ -52,7 +52,11 @@ async function authFetch(url, options = {}) {
 }
 
 async function refreshData() {
+    // 1. Capture the currently open section before refreshing
+    const openSection = document.querySelector('.asana-section:not(.collapsed)');
+    const openSectionId = openSection ? openSection.dataset.sectionId : null;
     const previousActiveId = AppStore.get('activeTaskId');
+
     try {
         const [itRes, secRes, catRes, typeRes] = await Promise.all([
             fetch(`${API_URL}/itinerary`),
@@ -60,21 +64,34 @@ async function refreshData() {
             fetch(`${API_URL}/categories`),
             fetch(`${API_URL}/task_types`)
         ]);
+
         AppStore.set('itinerary', await itRes.json());
         AppStore.set('sections', await secRes.json());
         allCategories = await catRes.json();
         allTaskTypes = await typeRes.json();
 
+        // 2. Re-render the UI
         renderSectionPills();
         updateCategoryDropdowns();
         updateSectionDropdowns();
         updateTaskTypeDropdowns();
         renderCategoryList();
         renderTaskTypeList();
-
-        if (previousActiveId) AppStore.set('activeTaskId', previousActiveId);
         renderProjectView();
         renderMapGeometries();
+
+        // 3. FORCE the previously open section to expand again
+        if (openSectionId) {
+            const targetSection = document.querySelector(`.asana-section[data-section-id="${openSectionId}"]`);
+            if (targetSection) {
+                const content = targetSection.querySelector('.section-content');
+                const icon = targetSection.querySelector('.section-toggle-icon');
+                if (content) content.classList.remove('collapsed');
+                if (icon) icon.classList.remove('collapsed');
+            }
+        }
+
+        if (previousActiveId) AppStore.set('activeTaskId', previousActiveId);
     } catch (err) {
         console.error("Critical Sync Failure:", err);
     }
