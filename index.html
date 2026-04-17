@@ -707,6 +707,7 @@
         };
 
         function renderDiscoverySidebar(places) {
+            closeTaskDetailPanel();
             const container = document.getElementById('asana-container');
 
             // 1. Build the Sidebar Header
@@ -744,7 +745,7 @@
                 row.style.cssText = 'display:flex; padding:12px; gap:15px; border-bottom:1px solid #eee; cursor:pointer; align-items:flex-start; margin-bottom:12px; background:white;';
 
                 // Fly to location on map click
-                row.onclick = () => map.flyTo({ center: coords, zoom: 17 });
+                row.onclick = () => map.flyTo({ center: coords, zoom: 17, padding: { left: 420 } });
 
                 // --- HOVER HIGHLIGHT LOGIC ---
                 row.addEventListener('mouseenter', () => {
@@ -868,7 +869,7 @@
                     </div>
                 `;
 
-                map.flyTo({ center: coords, zoom: 17 });
+                map.flyTo({ center: coords, zoom: 17, padding: { left: 420 } });
                 draw.deleteAll();
                 draw.add({ type: 'Feature', geometry: { type: 'Point', coordinates: coords }, properties: { photo: photoUrl } });
 
@@ -880,7 +881,7 @@
             // 4. Zoom map to perfectly fit all 10 results
             if (mapFeatures.length > 0) {
                 const bbox = turf.bbox(turf.featureCollection(mapFeatures));
-                map.fitBounds(bbox, { padding: 80, maxZoom: 16 });
+                map.fitBounds(bbox, { padding: { top: 80, bottom: 80, left: 420, right: 80 }, maxZoom: 16 });
             }
         }
 
