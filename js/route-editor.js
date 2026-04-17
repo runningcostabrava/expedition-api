@@ -34,7 +34,7 @@ const KomootEngine = {
         this.cleanup();
         this.state.currentFileName = fileName || 'Edited Route';
         this.state.editMeta = editMeta; // Save the ID for the update!
-        const simplified = turf.simplify(feature, { tolerance: 0.005, highQuality: true });
+        const simplified = turf.simplify(feature, { tolerance: 0.001, highQuality: true });
         const coords = simplified.geometry.coordinates;
         this.state.intersections = coords.map((c, i) => ({ id: Date.now() + i, lngLat: [c[0], c[1]] }));
         this.state.segments = [];
@@ -117,7 +117,7 @@ const KomootEngine = {
     autoDetectType: async function (start, end) {
         // Optimization: Default to manual to prevent Mapbox API rate-limiting during initialization.
         // Users can toggle segments to 'smart' individually in the UI.
-        return 'manual';
+        return 'smart';
     },
 
     refreshAllSegments: async function () {
