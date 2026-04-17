@@ -2091,7 +2091,6 @@
                 AppStore.set('activeTaskId', task.task_id);
                 if (isEditingGeometry) return;
                 openTaskDetailPanel(task);
-                openTaskEditor(task.task_id);
 
                 // Fly to geom
                 if (task.geometries && task.geometries.length > 0) {
