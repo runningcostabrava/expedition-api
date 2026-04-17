@@ -95,6 +95,29 @@ async function refreshData() {
         }
 
         if (previousActiveId) AppStore.set('activeTaskId', previousActiveId);
+
+        // --- STATE RECOVERY BREADCRUMB ---
+        const returnTaskId = sessionStorage.getItem('return_to_task');
+        if (returnTaskId) {
+            sessionStorage.removeItem('return_to_task');
+            setTimeout(() => {
+                const tId = parseInt(returnTaskId);
+                focusTaskInSidebar(tId);
+                const task = AppStore.get('itinerary').find(t => t.task_id === tId);
+                if (task) {
+                    openTaskDetailPanel(task);
+                    const features = [];
+                    task.geometries.forEach(g => {
+                        if (g.kind === 'point' && g.lat) features.push(turf.point([g.lng, g.lat]));
+                        else if (g.geojson) features.push(...g.geojson.features);
+                    });
+                    if (features.length > 0) {
+                        const bbox = turf.bbox(turf.featureCollection(features));
+                        map.fitBounds(bbox, { padding: 80, maxZoom: 16, duration: 1200 });
+                    }
+                }
+            }, 600); // Slight delay allows map and UI to finish rendering first
+        }
     } catch (err) {
         console.error("Critical Sync Failure:", err);
     }
