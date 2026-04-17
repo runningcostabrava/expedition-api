@@ -1414,23 +1414,27 @@
 
         function updateCategoryDropdowns() {
             const catSelect = document.getElementById('task-category-id');
-            const filterSelect = document.getElementById('category-filter');
-            if (!catSelect || !filterSelect) return;
+            const filterCatSelect = document.getElementById('category-filter');
+            if (!catSelect) return;
 
             const currentVal = catSelect.value;
-            const currentFilterVal = filterSelect.value;
-
             catSelect.innerHTML = '<option value="">No Category</option>';
-            filterSelect.innerHTML = '<option value="">All Categories</option>';
-
-            allCategories.forEach(cat => {
-                const opt = `<option value="${cat.id}">${cat.icon || '🏷️'} ${cat.name}</option>`;
-                catSelect.insertAdjacentHTML('beforeend', opt);
-                filterSelect.insertAdjacentHTML('beforeend', opt);
-            });
-
+            
+            if (filterCatSelect) {
+                const currentFilterCat = filterCatSelect.value;
+                filterCatSelect.innerHTML = '<option value="">All Categories</option>';
+                allCategories.forEach(cat => {
+                    const opt = `<option value="${cat.id}">${cat.icon || '🏷️'} ${cat.name}</option>`;
+                    catSelect.insertAdjacentHTML('beforeend', opt);
+                    filterCatSelect.insertAdjacentHTML('beforeend', opt);
+                });
+                filterCatSelect.value = currentFilterCat;
+            } else {
+                allCategories.forEach(cat => {
+                    catSelect.insertAdjacentHTML('beforeend', `<option value="${cat.id}">${cat.icon || '🏷️'} ${cat.name}</option>`);
+                });
+            }
             catSelect.value = currentVal;
-            filterSelect.value = currentFilterVal;
         }
 
         function updateResponsibleDropdown() {
