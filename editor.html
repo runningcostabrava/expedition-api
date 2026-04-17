@@ -274,6 +274,75 @@
         // Start the sequence
         initEditor();
 
+        async function executeSave() {
+            const saveBtn = document.querySelector('.btn-save');
+            saveBtn.innerText = '💾 Saving...';
+            saveBtn.disabled = true;
+
+            try {
+                // 1. Get the newly edited geometry from the engine
+                const geometry = KomootEngine.getUnifiedGeometry();
+                const geojson_data = {
+                    type: "FeatureCollection",
+                    features: [{
+                        type: "Feature",
+                        geometry: geometry,
+                        properties: { route_type: 'smart' }
+                    }]
+                };
+
+                // 2. Gather UI selections
+                const title = document.getElementById('track-title').value;
+                const color = document.getElementById('track-color').value;
+                const strategy = document.querySelector('input[name="save-mode"]:checked').value;
+
+                // 3. Build the payload (Linking to the original task)
+                const payload = {
+                    title: title,
+                    color: color,
+                    geojson_data: geojson_data,
+                    existing_task_id: editContext.taskId
+                };
+
+                // 4. Execute the chosen strategy
+                if (strategy === 'overwrite') {
+                    await authFetch(`${API_URL}/tracks/${editContext.trackId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } else if (strategy === 'new') {
+                    await authFetch(`${API_URL}/tracks`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } else if (strategy === 'child') {
+                    payload.parent_track_id = editContext.trackId;
+                    await authFetch(`${API_URL}/tracks`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
+
+                // 5. Cleanup and redirect
+                sessionStorage.removeItem('expedition_edit_context');
+                window.location.href = 'index.html';
+
+            } catch (error) {
+                console.error("Save Error:", error);
+                alert("Error saving track: " + error.message);
+                saveBtn.innerText = '💾 Execute Save';
+                saveBtn.disabled = false;
+            }
+        }
+
+        function goBack() {
+            sessionStorage.removeItem('expedition_edit_context');
+            window.location.href = 'index.html';
+        }
+
     </script>
 </body>
 
