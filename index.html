@@ -2431,7 +2431,7 @@
                     if (elevLoss) statsHtml += `<span style="color:#dc2626;">▼ -${Math.abs(parseFloat(elevLoss)).toFixed(0)}m</span>`;
 
                     // Check if it's a child track to indent it
-                    const isChild = g.parent_track_id ? 'margin-left: 20px; border-left: 2px solid #cbd5e0;' : '';
+                    const isChild = g.parent_track_id ? 'margin-left: 20px; border-left: 4px solid #94a3b8; background: #f8fafc; border-radius: 0 8px 8px 0;' : '';
 
                     html += `
                         <div class="compact-geom-row" style="${isChild}" onclick="flyToGeometry(${g.lng}, ${g.lat}, '${g.kind}', '${layerId}'); openGeomEditor('${g.kind}', ${g.waypoint_id || g.track_id});">
