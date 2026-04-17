@@ -318,9 +318,6 @@
         };
 
         function openRightPanel(title, htmlContent) {
-            // Close the left detail panel if it's open to prevent screen crowding
-            closeTaskDetailPanel();
-
             document.getElementById('right-panel-title').innerHTML = title;
             document.getElementById('right-panel-content').innerHTML = htmlContent;
             document.getElementById('right-panel').classList.remove('hidden');
@@ -921,10 +918,12 @@
                             e.stopPropagation();
                             if (isEditingGeometry) return;
                             focusTaskInSidebar(task.task_id);
+                            openTaskDetailPanel(task);
 
                             const html = `
                                 ${geom.photo_url ? `<img src="${geom.photo_url}" style="width:100%; height:180px; object-fit:cover; border-radius:8px; margin-bottom:15px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">` : ''}
                                 <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                                    <p style="margin: 0 0 5px 0; font-size: 0.85em; color: #94a3b8; font-weight: bold;">Section: ${task.section_id ? (AppStore.get('sections').find(s => s.id === task.section_id)?.title || 'Unknown') : 'Unscheduled'}</p>
                                     <p style="margin: 0 0 10px 0; font-size: 0.9em; color: #64748b; font-weight: bold;">Parent Task: ${task.task_name || 'Unnamed Task'}</p>
                                     ${geom.address ? `<div style="font-size:0.9em; margin-bottom:8px; color:#334155;">📍 ${geom.address}</div>` : ''}
                                     ${geom.phone ? `<div style="font-size:0.9em; margin-bottom:8px; color:#334155;">📞 ${geom.phone}</div>` : ''}
@@ -971,6 +970,7 @@
 
                             AppStore.set('activeTaskId', task.task_id);
                             focusTaskInSidebar(task.task_id);
+                            openTaskDetailPanel(task);
                             const dist = turf.length(geom.geojson, { units: 'kilometers' }).toFixed(2);
 
                             let gain = 0, loss = 0;
@@ -983,6 +983,7 @@
 
                             const html = `
                                 <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                                    <p style="margin: 0 0 5px 0; font-size: 0.85em; color: #94a3b8; font-weight: bold;">Section: ${task.section_id ? (AppStore.get('sections').find(s => s.id === task.section_id)?.title || 'Unknown') : 'Unscheduled'}</p>
                                     <p style="margin: 0 0 10px 0; font-size: 0.9em; color: #64748b; font-weight: bold;">Parent Task: ${task.task_name || 'Unnamed Task'}</p>
                                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: center;">
                                         <div style="background: white; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
