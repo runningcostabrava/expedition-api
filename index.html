@@ -66,16 +66,20 @@
                     style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid #ddd;">
             </div>
 
-            <div style="display: flex; gap: 8px; font-size: 0.8em;">
-                <select id="group-filter" onchange="renderProjectView()"
-                    style="flex: 1; padding: 4px; border-radius: 4px; border: 1px solid #ddd;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.8em; margin-bottom: 10px;">
+                <select id="category-filter" onchange="renderProjectView()" style="padding: 6px; border-radius: 4px; border: 1px solid #ddd; background: white; color: #334155;">
+                    <option value="">All Categories</option>
+                </select>
+                <select id="responsible-filter" onchange="renderProjectView()" style="padding: 6px; border-radius: 4px; border: 1px solid #ddd; background: white; color: #334155;">
+                    <option value="">Anyone (Responsible)</option>
+                </select>
+                <select id="group-filter" onchange="renderProjectView()" style="padding: 6px; border-radius: 4px; border: 1px solid #ddd; background: white; color: #334155;">
                     <option value="">All Groups</option>
                     <option value="Staff">Staff</option>
                     <option value="Hikers">Hikers</option>
                     <option value="Runners">Runners</option>
                 </select>
-                <select id="type-filter" onchange="renderProjectView()"
-                    style="flex: 1; padding: 4px; border-radius: 4px; border: 1px solid #ddd;">
+                <select id="type-filter" onchange="renderProjectView()" style="padding: 6px; border-radius: 4px; border: 1px solid #ddd; background: white; color: #334155;">
                     <option value="">All Types</option>
                 </select>
             </div>
@@ -1410,16 +1414,23 @@
 
         function updateCategoryDropdowns() {
             const catSelect = document.getElementById('task-category-id');
-            if (!catSelect) return;
+            const filterSelect = document.getElementById('category-filter');
+            if (!catSelect || !filterSelect) return;
+
             const currentVal = catSelect.value;
+            const currentFilterVal = filterSelect.value;
+
             catSelect.innerHTML = '<option value="">No Category</option>';
+            filterSelect.innerHTML = '<option value="">All Categories</option>';
+
             allCategories.forEach(cat => {
-                const opt = document.createElement('option');
-                opt.value = cat.id;
-                opt.textContent = `${cat.icon || '🏷️'} ${cat.name}`;
-                catSelect.appendChild(opt);
+                const opt = `<option value="${cat.id}">${cat.icon || '🏷️'} ${cat.name}</option>`;
+                catSelect.insertAdjacentHTML('beforeend', opt);
+                filterSelect.insertAdjacentHTML('beforeend', opt);
             });
+
             catSelect.value = currentVal;
+            filterSelect.value = currentFilterVal;
         }
 
         function updateSectionDropdowns() {
@@ -2006,6 +2017,8 @@
         function renderProjectView() {
             const container = document.getElementById('asana-container');
             const searchTerm = document.getElementById('search-filter').value.toLowerCase();
+            const categoryFilter = document.getElementById('category-filter').value;
+            const responsibleFilter = document.getElementById('responsible-filter').value;
             const groupFilter = document.getElementById('group-filter').value;
             const typeFilter = document.getElementById('type-filter').value;
             container.innerHTML = '';
@@ -2029,9 +2042,11 @@
             let filtered = AppStore.get('itinerary').filter(t => {
                 const name = t.task_name || t.task || "";
                 const matchSearch = name.toLowerCase().includes(searchTerm);
+                const matchCategory = !categoryFilter || t.category_id == categoryFilter;
+                const matchResponsible = !responsibleFilter || t.responsible === responsibleFilter;
                 const matchGroup = !groupFilter || t.target_group === groupFilter;
                 const matchType = !typeFilter || t.task_type_id == typeFilter;
-                return matchSearch && matchGroup && matchType;
+                return matchSearch && matchCategory && matchResponsible && matchGroup && matchType;
             });
 
             // Auto-sort tasks chronologically strictly by time (ignoring corrupted dates)

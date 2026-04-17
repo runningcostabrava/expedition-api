@@ -64,36 +64,47 @@ async function authFetch(url, options = {}) {
     return response;
 }
 
-async function refreshData() {
-    // 1. Capture the currently open section before refreshing
-    const openSection = document.querySelector('.asana-section:not(.collapsed)');
-    const openSectionId = openSection ? openSection.dataset.sectionId : null;
-    const previousActiveId = AppStore.get('activeTaskId');
+        async function refreshData() {
+            // 1. Capture the currently open section before refreshing
+            const openSection = document.querySelector('.asana-section:not(.collapsed)');
+            const openSectionId = openSection ? openSection.dataset.sectionId : null;
+            const previousActiveId = AppStore.get('activeTaskId');
 
-    try {
-        const [itRes, secRes, catRes, typeRes] = await Promise.all([
-            fetch(`${API_URL}/itinerary`),
-            fetch(`${API_URL}/sections`),
-            fetch(`${API_URL}/categories`),
-            fetch(`${API_URL}/task_types`)
-        ]);
+            try {
+                const [itRes, secRes, catRes, typeRes] = await Promise.all([
+                    fetch(`${API_URL}/itinerary`),
+                    fetch(`${API_URL}/sections`),
+                    fetch(`${API_URL}/categories`),
+                    fetch(`${API_URL}/task_types`)
+                ]);
 
-        const data = await itRes.json();
-        console.log("📡 Itinerary Refreshed. Items found:", data.length);
-        AppStore.set('itinerary', data); // This triggers the map re-render
-        AppStore.set('sections', await secRes.json());
-        allCategories = await catRes.json();
-        allTaskTypes = await typeRes.json();
+                const data = await itRes.json();
+                console.log("📡 Itinerary Refreshed. Items found:", data.length);
+                AppStore.set('itinerary', data); // This triggers the map re-render
+                AppStore.set('sections', await secRes.json());
+                allCategories = await catRes.json();
+                allTaskTypes = await typeRes.json();
 
-        // 2. Re-render the UI
-        renderSectionPills();
-        updateCategoryDropdowns();
-        updateSectionDropdowns();
-        updateTaskTypeDropdowns();
-        renderCategoryList();
-        renderTaskTypeList();
-        renderProjectView();
-        renderMapGeometries();
+                // 2. Re-render the UI
+                renderSectionPills();
+                updateCategoryDropdowns();
+                updateSectionDropdowns();
+                updateTaskTypeDropdowns();
+
+                // Update Responsible Filter
+                const respFilter = document.getElementById('responsible-filter');
+                if (respFilter) {
+                    const currentVal = respFilter.value;
+                    const people = [...new Set(data.map(t => t.responsible).filter(r => r && r.trim() !== ""))].sort();
+                    respFilter.innerHTML = '<option value="">Anyone (Responsible)</option>' +
+                        people.map(p => `<option value="${p}">${p}</option>`).join('');
+                    respFilter.value = currentVal;
+                }
+
+                renderCategoryList();
+                renderTaskTypeList();
+                renderProjectView();
+                renderMapGeometries();
 
         // 3. FORCE the previously open section to expand again
         if (openSectionId) {
