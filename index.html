@@ -1107,6 +1107,32 @@
             }
         }
 
+        function showAllSectionsOnMap() {
+            currentSectionFilter = 'all';
+            renderMapGeometries();
+
+            // Fly to encompass all items
+            const features = [];
+            AppStore.get('itinerary').forEach(task => {
+                if (task.geometries) {
+                    task.geometries.forEach(g => {
+                        if (g.kind === 'point' && g.lat) features.push(turf.point([g.lng, g.lat]));
+                        else if (g.geojson) features.push(...g.geojson.features);
+                    });
+                }
+            });
+            if (features.length > 0) {
+                const bbox = turf.bbox(turf.featureCollection(features));
+                map.fitBounds(bbox, { padding: 50, duration: 1500 });
+            }
+
+            // Close all accordions
+            document.querySelectorAll('.asana-section').forEach(sec => {
+                sec.querySelector('.section-content').classList.add('collapsed');
+                sec.querySelector('.section-toggle-icon').classList.add('collapsed');
+            });
+        }
+
         function toggleInlineEdit(elementId) {
             const row = document.getElementById(elementId);
             if (!row) return;
@@ -1161,6 +1187,52 @@
                     const bbox = turf.bbox(source._data);
                     map.fitBounds(bbox, { padding: 80, duration: 1500 });
                 }
+            }
+        }
+
+        function triggerGeomInfo(taskId, kind, id) {
+            const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
+            if (!task) return;
+            const geom = task.geometries.find(g => (kind === 'point' ? g.waypoint_id === id : g.track_id === id));
+            if (!geom) return;
+
+            const layerId = `layer-${id}`;
+            flyToGeometry(geom.lng, geom.lat, kind, layerId);
+            openGeomEditor(kind, id);
+
+            if (kind === 'line' && geom.geojson) {
+                // Highlight track temporarily
+                if (map.getLayer(layerId)) {
+                    const origWidth = map.getPaintProperty(layerId, 'line-width') || 4;
+                    map.setPaintProperty(layerId, 'line-width', 9); // Thicken to highlight
+                    setTimeout(() => {
+                        if (map.getLayer(layerId)) map.setPaintProperty(layerId, 'line-width', origWidth);
+                    }, 2500); // Reset after 2.5 seconds
+                }
+
+                // Gather stats and open elevation profile
+                let dist = geom.distance;
+                if (!dist || dist == 0) dist = turf.length(geom.geojson, { units: 'kilometers' }).toFixed(2);
+
+                let gain = geom.gain, loss = geom.loss;
+                if (!gain && !loss) {
+                    let cg = 0, cl = 0;
+                    const coords = geom.geojson.features[0].geometry.type === 'Polygon' ? geom.geojson.features[0].geometry.coordinates[0] : geom.geojson.features[0].geometry.coordinates;
+                    for (let i = 1; i < coords.length; i++) {
+                        const diff = (coords[i][2] || 0) - (coords[i - 1][2] || 0);
+                        if (diff > 0) cg += diff; else cl -= diff;
+                    }
+                    gain = cg.toFixed(0);
+                    loss = cl.toFixed(0);
+                }
+
+                const props = geom.geojson.features[0].properties || {};
+                showElevationProfile(geom.geojson, geom.title, {
+                    distance: dist,
+                    duration: props.duration,
+                    gain: gain,
+                    loss: loss
+                }, geom.track_id);
             }
         }
 
@@ -2459,14 +2531,14 @@
                     const isChild = g.parent_track_id ? 'margin-left: 20px; border-left: 4px solid #94a3b8; background: #f8fafc; border-radius: 0 8px 8px 0;' : '';
 
                     html += `
-                        <div class="compact-geom-row" style="${isChild}" onclick="flyToGeometry(${g.lng}, ${g.lat}, '${g.kind}', '${layerId}'); openGeomEditor('${g.kind}', ${g.waypoint_id || g.track_id});">
+                        <div class="compact-geom-row" style="${isChild}" onclick="triggerGeomInfo(${task.task_id}, '${g.kind}', ${g.waypoint_id || g.track_id})">
                             <span style="font-size: 1.4em;">${icon}</span>
                             <div class="geom-info">
                                 <div class="geom-title">${title}</div>
                                 <div class="geom-stats">${statsHtml || 'No stats recorded'}</div>
                             </div>
                             <div style="display:flex; gap:6px;">
-                                <button class="action-btn-modern" title="Details & Metadata" onclick="event.stopPropagation(); openGeomEditor('${g.kind}', ${g.waypoint_id || g.track_id})">ℹ️</button>
+                                <button class="action-btn-modern" title="Details & Metadata" onclick="event.stopPropagation(); triggerGeomInfo(${task.task_id}, '${g.kind}', ${g.waypoint_id || g.track_id})">ℹ️</button>
                                 <button class="action-btn-modern" title="Show/Hide" onclick="event.stopPropagation(); toggleGeomVisibility('${g.kind}', '${g.track_id || g.anchor_id}', this)">👁️</button>
                                 <button class="action-btn-modern" title="Edit Geometry" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})">⚙️</button>
                                 <button class="action-btn-modern del" title="Delete" onclick="event.stopPropagation(); deleteGeometry('${g.kind}', ${g.waypoint_id || g.track_id})">🗑️</button>
@@ -2614,12 +2686,6 @@
             } catch (err) { alert("Error: " + err.message); }
         }
 
-        function showAllSectionsOnMap() {
-            currentSectionFilter = 'all';
-            const filterEl = document.getElementById('map-section-filter');
-            if (filterEl) filterEl.value = 'all';
-            renderMapGeometries();
-        }
 
         initializeApp();
 
