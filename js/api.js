@@ -28,8 +28,8 @@ function showToast(message, type = 'success') {
 
 async function authFetch(url, options = {}) {
     if (!AUTH_TOKEN) {
-        const pass = prompt("Enter Admin Password:");
-        if (!pass) return;
+        const pass = prompt("Session expired or missing. Enter Admin Password:");
+        if (!pass) return new Response(null, { status: 401 }); // Safely abort if user cancels
         const res = await fetch(`${API_URL}/api/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -41,14 +41,27 @@ async function authFetch(url, options = {}) {
             sessionStorage.setItem('expedition_token', AUTH_TOKEN);
         } else {
             alert("Unauthorized: Incorrect Password");
-            return;
+            return new Response(null, { status: 401 });
         }
     }
+
     options.headers = {
         ...options.headers,
         'Authorization': `Bearer ${AUTH_TOKEN}`
     };
-    return fetch(url, options);
+
+    const response = await fetch(url, options);
+
+    // --- NEW: Auto-Recovery for Expired Tokens (403) ---
+    if (response.status === 403) {
+        console.warn("Token expired. Requesting re-authentication...");
+        AUTH_TOKEN = null;
+        sessionStorage.removeItem('expedition_token');
+        // Recursively call authFetch to prompt password and retry the exact same request
+        return authFetch(url, options);
+    }
+
+    return response;
 }
 
 async function refreshData() {
