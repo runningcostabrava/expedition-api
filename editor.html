@@ -290,29 +290,34 @@
                         editContext.geojson.features[0].geometry.coordinates;
                     const newCoords = geometry.coordinates;
 
-                    let startMatch = 0;
-                    // Find where the routes diverge
-                    while (startMatch < origCoords.length && startMatch < newCoords.length) {
-                        if (turf.distance(turf.point(origCoords[startMatch]), turf.point(newCoords[startMatch])) < 0.005) startMatch++;
-                        else break;
+                    const origLine = turf.lineString(origCoords);
+                    let divergeStart = -1;
+                    let divergeEnd = -1;
+                    const TOLERANCE_KM = 0.05; // 50 meters tolerance for snapping variations
+
+                    // Find where the new route diverges from the original line
+                    for (let i = 0; i < newCoords.length; i++) {
+                        const dist = turf.pointToLineDistance(turf.point(newCoords[i]), origLine);
+                        if (dist > TOLERANCE_KM) { divergeStart = i; break; }
                     }
 
-                    let endMatchOrig = origCoords.length - 1;
-                    let endMatchNew = newCoords.length - 1;
-                    // Find where the routes rejoin
-                    while (endMatchOrig >= startMatch && endMatchNew >= startMatch) {
-                        if (turf.distance(turf.point(origCoords[endMatchOrig]), turf.point(newCoords[endMatchNew])) < 0.005) {
-                            endMatchOrig--; endMatchNew--;
-                        } else break;
+                    // Find where it rejoins (searching backwards)
+                    for (let i = newCoords.length - 1; i >= 0; i--) {
+                        const dist = turf.pointToLineDistance(turf.point(newCoords[i]), origLine);
+                        if (dist > TOLERANCE_KM) { divergeEnd = i; break; }
                     }
 
-                    // Slice out ONLY the new middle section (overlapping by 1 point on each end to connect)
-                    let sliceStart = Math.max(0, startMatch - 1);
-                    let sliceEnd = Math.min(newCoords.length, endMatchNew + 2);
-                    const divergentCoords = newCoords.slice(sliceStart, sliceEnd);
+                    if (divergeStart !== -1 && divergeEnd !== -1) {
+                        // Slice out ONLY the divergent section (overlapping by 1 point to connect seamlessly)
+                        let sliceStart = Math.max(0, divergeStart - 1);
+                        let sliceEnd = Math.min(newCoords.length, divergeEnd + 2);
+                        const divergentCoords = newCoords.slice(sliceStart, sliceEnd);
 
-                    if (divergentCoords.length >= 2) {
-                        geometry = { type: 'LineString', coordinates: divergentCoords };
+                        if (divergentCoords.length >= 2) {
+                            geometry = { type: 'LineString', coordinates: divergentCoords };
+                        }
+                    } else {
+                        console.log("DEBUG: No significant divergence found beyond 50m tolerance.");
                     }
                 }
                 // ----------------------------------------------
