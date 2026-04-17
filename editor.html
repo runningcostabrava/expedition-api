@@ -282,12 +282,28 @@
             try {
                 // 1. Get the newly edited geometry from the engine
                 const geometry = KomootEngine.getUnifiedGeometry();
+
+                // Calculate new Distance, Gain, and Loss from 3D coords
+                const dist = turf.length(geometry, { units: 'kilometers' }).toFixed(2);
+                let gain = 0, loss = 0;
+                const coords = geometry.coordinates;
+                for (let i = 1; i < coords.length; i++) {
+                    const diff = (coords[i][2] || 0) - (coords[i - 1][2] || 0);
+                    if (diff > 0) gain += diff;
+                    else loss -= diff;
+                }
+
                 const geojson_data = {
                     type: "FeatureCollection",
                     features: [{
                         type: "Feature",
                         geometry: geometry,
-                        properties: { route_type: 'smart' }
+                        properties: {
+                            route_type: 'smart',
+                            distance: parseFloat(dist),
+                            gain: Math.round(gain),
+                            loss: Math.round(loss)
+                        }
                     }]
                 };
 
@@ -302,7 +318,10 @@
                     color: color,
                     geojson_data: geojson_data,
                     existing_task_id: editContext.taskId,
-                    parent_track_id: strategy === 'child' ? editContext.trackId : null
+                    parent_track_id: strategy === 'child' ? editContext.trackId : null,
+                    distance: dist,
+                    gain: gain.toFixed(0),
+                    loss: loss.toFixed(0)
                 };
 
                 // 4. Execute the chosen strategy

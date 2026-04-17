@@ -463,6 +463,19 @@
                             return;
                         }
 
+                        // Inject 3D Elevation Data into the 2D Mapbox Route
+                        let newGain = 0, newLoss = 0;
+                        const coords3D = validGeoJSONGeometry.coordinates;
+                        for (let i = 0; i < coords3D.length; i++) {
+                            const z = map.queryTerrainElevation(coords3D[i]) || 0;
+                            coords3D[i] = [coords3D[i][0], coords3D[i][1], z];
+                            if (i > 0) {
+                                const diff = coords3D[i][2] - coords3D[i - 1][2];
+                                if (diff > 0) newGain += diff;
+                                else newLoss -= Math.abs(diff);
+                            }
+                        }
+
                         // Clean up map and transfer the line to our custom Drawing tool
                         draw.deleteAll();
 
@@ -473,8 +486,10 @@
                                 route_type: 'smart',
                                 profile: activeProfile,
                                 stops: routePoints,
-                                distance: distKm,
+                                distance: parseFloat(distKm),
                                 duration: durationMins,
+                                gain: Math.round(newGain),
+                                loss: Math.round(Math.abs(newLoss)),
                                 title: `Smart Route (${distKm}km)`
                             }
                         };

@@ -179,10 +179,11 @@ app.get('/tracks/:id/waypoints', async (req, res) => {
 
 app.post('/tracks', adminAuth, async (req, res) => {
   console.log("DEBUG POST /tracks payload:", req.body);
-  const { title, geojson_data, color, target_group, tasks, existing_task_id, distance, duration, comments, link, parent_track_id, section_id } = req.body;
+  const { title, geojson_data, color, target_group, tasks, existing_task_id, distance, duration, comments, link, parent_track_id, section_id, gain, loss } = req.body;
+
   try {
-    const result = await pool.query('INSERT INTO tracks (title, geojson_data, color, target_group, distance, duration, comments, link, parent_track_id, section_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id',
-      [title, geojson_data, color || '#3498db', target_group, distance, duration, comments, link, parent_track_id, section_id]);
+    const result = await pool.query('INSERT INTO tracks (title, geojson_data, color, target_group, distance, duration, comments, link, parent_track_id, section_id, gain, loss) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id',
+      [title, geojson_data, color || '#3498db', target_group, distance, duration, comments, link, parent_track_id, section_id, gain, loss]);
     const trackId = result.rows[0].id;
 
     const geometryType = geojson_data.features[0].geometry.type;
@@ -211,10 +212,19 @@ app.post('/tracks', adminAuth, async (req, res) => {
 app.put('/tracks/:id', adminAuth, async (req, res) => {
   const { id } = req.params;
   const { geojson_data, title, color, target_group, tasks, existing_task_id, link, comments, distance, duration, gain, loss, parent_track_id, section_id } = req.body;
+
+  // Extract gain/loss from geojson_data if provided by modern frontend
+  let finalGain = gain;
+  let finalLoss = loss;
+  if (geojson_data && geojson_data.features && geojson_data.features[0].properties) {
+      const props = geojson_data.features[0].properties;
+      if (props.gain !== undefined) finalGain = props.gain;
+      if (props.loss !== undefined) finalLoss = props.loss;
+  }
   try {
     await pool.query(
       'UPDATE tracks SET geojson_data = COALESCE($1, geojson_data), title = COALESCE($2, title), color = COALESCE($3, color), target_group = COALESCE($4, target_group), link = COALESCE($6, link), comments = COALESCE($7, comments), distance = COALESCE($8, distance), gain = COALESCE($9, gain), loss = COALESCE($10, loss), parent_track_id = COALESCE($11, parent_track_id), duration = COALESCE($12, duration), section_id = COALESCE($13, section_id) WHERE id = $5',
-      [geojson_data, title, color, target_group, id, link, comments, distance, gain, loss, parent_track_id, duration, section_id]
+      [geojson_data, title, color, target_group, id, link, comments, distance, finalGain, finalLoss, parent_track_id, duration, section_id]
     );
 
     let anchorId;
