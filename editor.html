@@ -190,6 +190,7 @@
     <script src="js/route-editor.js"></script>
 
     <script>
+
         let editContext = null;
 
         async function initEditor() {
@@ -202,116 +203,77 @@
             }
             editContext = JSON.parse(stored);
 
-            // 2. Setup Map
-            const res = await fetch(`${API_URL}/api/config`);
-            const config = await res.json();
-            mapboxgl.accessToken = config.MAPBOX_TOKEN;
-
-            window.map = new mapboxgl.Map({
-                container: 'map',
-                style: 'mapbox://styles/mapbox/outdoors-v12',
-                center: editContext.geojson.features[0].geometry.coordinates[0] || [12.5928, 38.0662],
-                zoom: 14
-            });
-
-            // 3. Populate the UI with context data
-            document.getElementById('track-title').value = editContext.title || 'Edited Route';
-            document.getElementById('track-color').value = editContext.color || '#3498db';
-
-            map.on('load', async () => {
-                map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
-                map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
-
-                // 4. Initialize Komoot Engine using your existing logic
-                await KomootEngine.initFromGpx(editContext.geojson.features[0], editContext.title);
-
-                // Zoom to fit the loaded route
-                const bbox = turf.bbox(editContext.geojson);
-                map.fitBounds(bbox, { padding: 50 });
-            });
-
-            // 5. Override KomootEngine's updateSavePopup to refresh our local segment list instead
-            // (We don't want it opening popups on this dedicated page)
-            KomootEngine.updateSavePopup = function () {
-                const list = document.getElementById('segment-list');
-                list.innerHTML = '';
-                this.state.segments.forEach((seg, idx) => {
-                    const div = document.createElement('div');
-                    div.className = `segment ${seg.type}`;
-                    div.innerHTML = `
-                        <strong>Seg ${seg.startIdx + 1}-${seg.endIdx + 1}</strong>
-                        <button class="btn-mode" onclick="KomootEngine.toggleSegmentMode(${idx}); KomootEngine.updateSavePopup();">${seg.type === 'smart' ? 'SMART 🚗' : 'MANUAL 📏'}</button>
-                    `;
-                    list.appendChild(div);
-                });
-            };
-        }
-
-        async function executeSave() {
-            const mode = document.querySelector('input[name="save-mode"]:checked').value;
-            const title = document.getElementById('track-title').value;
-            const color = document.getElementById('track-color').value;
-            const newGeom = KomootEngine.getUnifiedGeometry();
-            const newGeojson = { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: newGeom }] };
-
-            const btn = document.querySelector('.btn-save');
-            btn.innerText = "Saving to Database...";
-            btn.disabled = true;
-
-            let payload = {
-                title: title,
-                color: color,
-                geojson_data: newGeojson
-            };
-
+            // 2. Setup Map and Config
             try {
-                if (mode === 'overwrite') {
-                    // MODE A: Update original track
-                    await authFetch(`${API_URL}/tracks/${editContext.trackId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                }
-                else if (mode === 'new') {
-                    // MODE B: Save entirely new track, link to active task
-                    payload.existing_task_id = editContext.taskId;
-                    await authFetch(`${API_URL}/tracks`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                }
-                else if (mode === 'child') {
-                    // MODE C: Save as child of the original track, link to active task
-                    payload.existing_task_id = editContext.taskId;
-                    payload.parent_track_id = editContext.trackId; // Links it hierarchically
-                    await authFetch(`${API_URL}/tracks`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                }
+                const res = await fetch(`${API_URL}/api/config`);
+                const config = await res.json();
+                mapboxgl.accessToken = config.MAPBOX_TOKEN;
 
-                // Clear memory and return to dashboard
-                sessionStorage.removeItem('expedition_edit_context');
-                window.location.href = 'index.html';
+                // Initialize map and assign to window immediately
+                const map = new mapboxgl.Map({
+                    container: 'map',
+                    style: 'mapbox://styles/mapbox/outdoors-v12',
+                    // Coordinates: Longitude, Latitude
+                    center: editContext.geojson.features[0].geometry.coordinates[0] || [12.5928, 38.0662],
+                    zoom: 14
+                });
+
+                window.map = map;
+
+                // 3. Populate UI
+                document.getElementById('track-title').value = editContext.title || 'Edited Route';
+                document.getElementById('track-color').value = editContext.color || '#3498db';
+
+                // 4. Wait for Load to trigger Engine
+                map.on('load', async () => {
+                    console.log("Editor Map Loaded. Initializing KomootEngine...");
+
+                    map.addSource('mapbox-dem', {
+                        'type': 'raster-dem',
+                        'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
+                        'tileSize': 512
+                    });
+                    map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
+
+                    // Initialize Komoot Engine using the GeoJSON feature from context
+                    // Note: initFromGpx expects (feature, fileName, editMeta)
+                    await KomootEngine.initFromGpx(
+                        editContext.geojson.features[0],
+                        editContext.title,
+                        { config: editContext, color: editContext.color }
+                    );
+
+                    // Zoom to fit the loaded route
+                    const bbox = turf.bbox(editContext.geojson);
+                    map.fitBounds(bbox, { padding: 50 });
+                });
+
+                // 5. Override KomootEngine UI for the dedicated page
+                KomootEngine.updateSavePopup = function () {
+                    const list = document.getElementById('segment-list');
+                    if (!list) return;
+                    list.innerHTML = '';
+                    this.state.segments.forEach((seg, idx) => {
+                        const div = document.createElement('div');
+                        div.className = `segment ${seg.type}`;
+                        div.innerHTML = `
+                    <strong>Seg ${seg.startIdx + 1}-${seg.endIdx + 1}</strong>
+                    <button class="btn-mode" onclick="KomootEngine.toggleSegmentMode(${idx}); KomootEngine.updateSavePopup();">
+                        ${seg.type === 'smart' ? 'SMART 🚗' : 'MANUAL 📏'}
+                    </button>
+                `;
+                        list.appendChild(div);
+                    });
+                };
 
             } catch (err) {
-                alert("Error saving: " + err.message);
-                btn.innerText = "💾 Execute Save";
-                btn.disabled = false;
+                console.error("Initialization Error:", err);
             }
         }
 
-        function goBack() {
-            if (confirm("Discard changes and return to dashboard?")) {
-                sessionStorage.removeItem('expedition_edit_context');
-                window.location.href = 'index.html';
-            }
-        }
-
+        // Start the sequence
         initEditor();
+
     </script>
 </body>
 
