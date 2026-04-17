@@ -85,6 +85,15 @@
                 <input type="checkbox" id="col-time" checked>
                 <input type="checkbox" id="col-group" checked>
             </div>
+            <!-- --- MAP FILTER --- -->
+            <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <select id="map-section-filter" onchange="currentSectionFilter = this.value; renderMapGeometries();"
+                    style="flex: 1; padding: 6px; border-radius: 6px; border: 1px solid #ddd; font-size: 0.85em; font-weight: bold; color: #1e293b; background: #f8fafc; cursor: pointer;">
+                    <option value="all">🌍 Show All on Map</option>
+                </select>
+                <button onclick="document.getElementById('map-section-filter').value = 'all'; currentSectionFilter = 'all'; renderMapGeometries();"
+                    style="padding: 6px 12px; border-radius: 6px; border: 1px solid #ddd; background: white; cursor: pointer; font-size: 0.8em; font-weight: bold; color: #64748b;">🔄</button>
+            </div>
         </div>
         <div id="asana-container"></div>
     </div>
@@ -330,6 +339,7 @@
         let elevationChart = null;
         let directionsControl = null; // Holds the Mapbox Directions UI
         let currentSmartProfile = 'driving'; // Safely tracks the active routing mode
+        let currentSectionFilter = 'all';
         // --- RESTORED MAP STATE VARIABLES ---
         let activeAnchorId = null, activeWaypointId = null, activeTrackId = null;
         let isEditingGeometry = false, isRouting = false, isAnalyzingSegment = false;
@@ -888,6 +898,10 @@
             }
 
             AppStore.get('itinerary').forEach(task => {
+                if (currentSectionFilter !== 'all') {
+                    const sId = task.section_id ? String(task.section_id) : 'null';
+                    if (sId !== String(currentSectionFilter)) return;
+                }
                 if (!task.geometries) return;
                 task.geometries.forEach(geom => {
                     // Deduplicate geometries tied to multiple tasks
@@ -1304,17 +1318,34 @@
 
         function updateSectionDropdowns() {
             const secSelect = document.getElementById('task-section-id');
+            const mapFilter = document.getElementById('map-section-filter');
             if (!secSelect) return;
+
             const currentVal = secSelect.value;
+            const currentMapVal = mapFilter ? mapFilter.value : 'all';
+
             secSelect.innerHTML = '<option value="">Unscheduled</option>';
+            if (mapFilter) mapFilter.innerHTML = '<option value="all">🌍 Show All on Map</option><option value="null">📅 Unscheduled</option>';
+
             (AppStore.get('sections') || []).forEach(sec => {
+                const dateStr = sec.section_date ? new Date(sec.section_date).toISOString().split('T')[0] : '';
+                const title = `${dateStr} ${sec.title || ''}`;
+
                 const opt = document.createElement('option');
                 opt.value = sec.id;
-                const dateStr = sec.section_date ? new Date(sec.section_date).toISOString().split('T')[0] : '';
-                opt.textContent = `${dateStr} ${sec.title || ''}`;
+                opt.textContent = title;
                 secSelect.appendChild(opt);
+
+                if (mapFilter) {
+                    const mapOpt = document.createElement('option');
+                    mapOpt.value = sec.id;
+                    mapOpt.textContent = `📍 ${title}`;
+                    mapFilter.appendChild(mapOpt);
+                }
             });
+
             secSelect.value = currentVal;
+            if (mapFilter) mapFilter.value = currentMapVal;
         }
 
         function renderCategoryList() {
