@@ -2045,17 +2045,17 @@
             const taskEl = document.createElement('div');
             taskEl.id = `task-row-${task.task_id}`;
 
-            if (isFite) {
-                // COMPACT FITE
-                taskEl.className = 'fite-row';
-                taskEl.innerHTML = `
-                    <div class="fite-dot" style="border-color: ${catColor}"></div>
-                    <div class="fite-text">
-                        <input type="time" class="modern-inline-input" value="${timeValue}" disabled onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)">
-                        <span class="inline-edit"
-                              style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
-                              onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }"
-                              onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())">${task.task_name || 'Milestone'}</span>
+    if (isFite) {
+        // COMPACT FITE
+        taskEl.className = 'fite-row';
+        taskEl.innerHTML = `
+            <div class="fite-dot" style="border-color: ${catColor}"></div>
+            <div class="fite-text">
+                <input type="time" class="modern-inline-input" value="${timeValue}" disabled onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="if(this.closest('.is-editing')) event.stopPropagation();">
+                <span class="inline-edit"
+                      style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+                      onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }"
+                      onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())" onclick="if(this.closest('.is-editing')) event.stopPropagation();">${task.task_name || 'Milestone'}</span>
                         <div class="task-actions-modern" onclick="event.stopPropagation()">
                             <button class="action-btn-modern" title="Edit Inline" onclick="toggleInlineEdit('task-row-${task.task_id}')">✏️</button>
                             <button class="action-btn-modern" title="Details" onclick="openTaskDetailPanel(AppStore.get('itinerary').find(t => t.task_id === ${task.task_id}))">ℹ️</button>
@@ -2076,28 +2076,28 @@
                     catOptions += `<option value="${c.id}" ${sel}>${c.icon} ${c.name}</option>`;
                 });
 
-                taskEl.innerHTML = `
-                    <div class="task-row-1">
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            <input type="time" class="modern-inline-input" value="${timeValue}" disabled onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)">
-                            <select class="modern-inline-input" disabled onchange="updateTaskInline(${task.task_id}, 'category_id', this.value)">
-                                ${catOptions}
-                            </select>
-                        </div>
-                        <div class="task-actions-modern" onclick="event.stopPropagation()">
-                            <button class="action-btn-modern" title="Edit Inline" onclick="toggleInlineEdit('task-row-${task.task_id}')">✏️</button>
-                            <button class="action-btn-modern" title="Details" onclick="openTaskDetailPanel(AppStore.get('itinerary').find(t => t.task_id === ${task.task_id}))">ℹ️</button>
-                            <button class="action-btn-modern" title="Edit" onclick="openTaskEditor(${task.task_id})">⚙️</button>
-                            <button class="action-btn-modern del" title="Delete" onclick="deleteTask(${task.task_id})">🗑️</button>
-                        </div>
-                    </div>
-                    <div class="task-row-2">
-                        ${task.is_completed ? '<span style="margin-right:4px;">✅</span>' : ''}
-                        <span class="inline-edit" style="flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
-                              onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }"
-                              onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())">${task.task_name || 'Unnamed Task'}</span>
-                    </div>
-                `;
+        taskEl.innerHTML = `
+            <div class="task-row-1">
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <input type="time" class="modern-inline-input" value="${timeValue}" disabled onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="if(this.closest('.is-editing')) event.stopPropagation();">
+                    <select class="modern-inline-input" disabled onchange="updateTaskInline(${task.task_id}, 'category_id', this.value)" onclick="if(this.closest('.is-editing')) event.stopPropagation();">
+                        ${catOptions}
+                    </select>
+                </div>
+                <div class="task-actions-modern" onclick="event.stopPropagation()">
+                    <button class="action-btn-modern" title="Edit Inline" onclick="toggleInlineEdit('task-row-${task.task_id}')">✏️</button>
+                    <button class="action-btn-modern" title="Details" onclick="openTaskDetailPanel(AppStore.get('itinerary').find(t => t.task_id === ${task.task_id}))">ℹ️</button>
+                    <button class="action-btn-modern" title="Edit" onclick="openTaskEditor(${task.task_id})">⚙️</button>
+                    <button class="action-btn-modern del" title="Delete" onclick="deleteTask(${task.task_id})">🗑️</button>
+                </div>
+            </div>
+            <div class="task-row-2">
+                ${task.is_completed ? '<span style="margin-right:4px;">✅</span>' : ''}
+                <span class="inline-edit" style="flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+                      onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }"
+                      onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())" onclick="if(this.closest('.is-editing')) event.stopPropagation();">${task.task_name || 'Unnamed Task'}</span>
+            </div>
+        `;
             }
 
             // Click to open Detail Panel
@@ -2210,8 +2210,8 @@
                 <div class="asana-header" style="display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #eee; padding-bottom: 6px; margin-bottom: 8px; cursor: pointer;"
                      onclick="if(document.getElementById('section-${section.id || 'null'}').classList.contains('is-editing')) return; flyToSection(${section.id || 'null'}); ${section.id ? `openSectionEditor(${section.id});` : ''}">
                     <span class="section-toggle-icon collapsed" style="flex-shrink: 0; font-size: 0.8em; color: #94a3b8; transition: transform 0.2s;">▼</span>
-                    ${section.id ? `<input type="date" value="${dateVal}" class="modern-inline-input" disabled style="width: 115px; padding:0; border:none; background:transparent; font-size:0.9em; color:#64748b; font-weight:bold; flex-shrink: 0;" onchange="updateSectionMetadata(${section.id}, 'section_date', this.value)">` : ''}
-                    <span class="inline-edit section-title-text" style="font-weight: bold; flex-shrink: 0; font-size: 0.95em; color: #1e293b;" onblur="updateSectionMetadata(${section.id}, 'title', this.innerText)">${sectionTitle}</span>
+                    ${section.id ? `<input type="date" value="${dateVal}" class="modern-inline-input" disabled style="width: 115px; padding:0; border:none; background:transparent; font-size:0.9em; color:#64748b; font-weight:bold; flex-shrink: 0;" onchange="updateSectionMetadata(${section.id}, 'section_date', this.value)" onclick="if(this.closest('.is-editing')) event.stopPropagation();">` : ''}
+                    <span class="inline-edit section-title-text" style="font-weight: bold; flex-shrink: 0; font-size: 0.95em; color: #1e293b;" onblur="updateSectionMetadata(${section.id}, 'title', this.innerText)" onclick="if(this.closest('.is-editing')) event.stopPropagation();">${sectionTitle}</span>
                     
                     <div class="task-actions-modern" style="display:flex; gap:2px; margin-left:auto; flex-shrink: 0; opacity: 1;" onclick="event.stopPropagation()">
                         <button class="action-btn-modern" title="Edit Inline" onclick="event.stopPropagation(); toggleInlineEdit('section-${section.id || 'null'}')">✏️</button>
