@@ -113,16 +113,8 @@ const KomootEngine = {
     },
 
     autoDetectType: async function (start, end) {
-        try {
-            const url = `https://api.mapbox.com/directions/v5/mapbox/walking/${start.join(',')};${end.join(',')}?geometries=geojson&access_token=${mapboxgl.accessToken}`;
-            const res = await fetch(url);
-            const data = await res.json();
-            if (data.routes?.[0]) {
-                const routedDist = data.routes[0].distance / 1000;
-                const directDist = turf.distance(start, end);
-                return routedDist < directDist * 1.4 ? 'smart' : 'manual';
-            }
-        } catch (e) { }
+        // Optimization: Default to manual to prevent Mapbox API rate-limiting during initialization.
+        // Users can toggle segments to 'smart' individually in the UI.
         return 'manual';
     },
 
