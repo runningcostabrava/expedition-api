@@ -2191,7 +2191,7 @@
             // FIX: Expanded the date input width to 115px so the date is actually visible!
             sectionDiv.innerHTML = `
                 <div class="asana-header" style="display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #eee; padding-bottom: 6px; margin-bottom: 8px; cursor: pointer;"
-                     onclick="toggleSectionAccordion('${section.id || 'null'}'); flyToSection(${section.id || 'null'}); ${section.id ? `openSectionEditor(${section.id});` : ''}">
+                     onclick="flyToSection(${section.id || 'null'}); ${section.id ? `openSectionEditor(${section.id});` : ''}">
                     <span class="section-toggle-icon collapsed" style="flex-shrink: 0; font-size: 0.8em; color: #94a3b8; transition: transform 0.2s;">▼</span>
                     ${section.id ? `<input type="date" value="${dateVal}" class="modern-inline-input" disabled style="width: 115px; padding:0; border:none; background:transparent; font-size:0.9em; color:#64748b; font-weight:bold; flex-shrink: 0;" onchange="updateSectionMetadata(${section.id}, 'section_date', this.value)">` : ''}
                     <span class="inline-edit section-title-text" style="font-weight: bold; flex-shrink: 0; font-size: 0.95em; color: #1e293b;" onblur="updateSectionMetadata(${section.id}, 'title', this.innerText)">${sectionTitle}</span>
