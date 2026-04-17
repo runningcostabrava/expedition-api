@@ -60,6 +60,7 @@
 
     <div id="left-panel">
         <div id="panel-header" style="padding: 15px; border-bottom: 1px solid rgba(0,0,0,0.1);">
+            <button onclick="showAllSectionsOnMap()" style="width:100%; margin-bottom:12px; background:#34495e; color:white; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">🌍 Show All Sections on Map</button>
             <div class="search-container" style="display: flex; gap: 10px; margin-bottom: 10px;">
                 <input type="text" id="search-filter" placeholder="🔍 Search tasks..." oninput="renderProjectView()"
                     style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid #ddd;">
@@ -1079,6 +1080,9 @@
 
         function flyToSection(sectionId) {
             if (isEditingGeometry) return;
+
+            currentSectionFilter = sectionId || 'null';
+            renderMapGeometries();
 
             // 1. Manage the Accordion Sidebar
             toggleSectionAccordion(sectionId || 'null');
@@ -2608,6 +2612,13 @@
                 refreshData();
                 if (typeof showToast !== 'undefined') showToast("Location updated", "success");
             } catch (err) { alert("Error: " + err.message); }
+        }
+
+        function showAllSectionsOnMap() {
+            currentSectionFilter = 'all';
+            const filterEl = document.getElementById('map-section-filter');
+            if (filterEl) filterEl.value = 'all';
+            renderMapGeometries();
         }
 
         initializeApp();
