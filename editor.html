@@ -280,17 +280,50 @@
             saveBtn.disabled = true;
 
             try {
-                // 1. Get the newly edited geometry from the engine
-                const geometry = KomootEngine.getUnifiedGeometry();
+                const strategy = document.querySelector('input[name="save-mode"]:checked').value;
+                let geometry = KomootEngine.getUnifiedGeometry();
 
-                // Calculate new Distance, Gain, and Loss from 3D coords
+                // --- GEOMETRIC DELTA LOGIC FOR STRATEGY (C) ---
+                if (strategy === 'child') {
+                    const origCoords = editContext.geojson.features[0].geometry.type === 'Polygon' ?
+                        editContext.geojson.features[0].geometry.coordinates[0] :
+                        editContext.geojson.features[0].geometry.coordinates;
+                    const newCoords = geometry.coordinates;
+
+                    let startMatch = 0;
+                    // Find where the routes diverge
+                    while (startMatch < origCoords.length && startMatch < newCoords.length) {
+                        if (turf.distance(turf.point(origCoords[startMatch]), turf.point(newCoords[startMatch])) < 0.005) startMatch++;
+                        else break;
+                    }
+
+                    let endMatchOrig = origCoords.length - 1;
+                    let endMatchNew = newCoords.length - 1;
+                    // Find where the routes rejoin
+                    while (endMatchOrig >= startMatch && endMatchNew >= startMatch) {
+                        if (turf.distance(turf.point(origCoords[endMatchOrig]), turf.point(newCoords[endMatchNew])) < 0.005) {
+                            endMatchOrig--; endMatchNew--;
+                        } else break;
+                    }
+
+                    // Slice out ONLY the new middle section (overlapping by 1 point on each end to connect)
+                    let sliceStart = Math.max(0, startMatch - 1);
+                    let sliceEnd = Math.min(newCoords.length, endMatchNew + 2);
+                    const divergentCoords = newCoords.slice(sliceStart, sliceEnd);
+
+                    if (divergentCoords.length >= 2) {
+                        geometry = { type: 'LineString', coordinates: divergentCoords };
+                    }
+                }
+                // ----------------------------------------------
+
+                // Calculate Stats on the FINAL geometry
                 const dist = turf.length(geometry, { units: 'kilometers' }).toFixed(2);
                 let gain = 0, loss = 0;
                 const coords = geometry.coordinates;
                 for (let i = 1; i < coords.length; i++) {
                     const diff = (coords[i][2] || 0) - (coords[i - 1][2] || 0);
-                    if (diff > 0) gain += diff;
-                    else loss -= diff;
+                    if (diff > 0) gain += diff; else loss -= diff;
                 }
 
                 const geojson_data = {
@@ -298,21 +331,13 @@
                     features: [{
                         type: "Feature",
                         geometry: geometry,
-                        properties: {
-                            route_type: 'smart',
-                            distance: parseFloat(dist),
-                            gain: Math.round(gain),
-                            loss: Math.round(loss)
-                        }
+                        properties: { route_type: 'smart', distance: parseFloat(dist), gain: Math.round(gain), loss: Math.round(loss) }
                     }]
                 };
 
-                // 2. Gather UI selections
                 const title = document.getElementById('track-title').value;
                 const color = document.getElementById('track-color').value;
-                const strategy = document.querySelector('input[name="save-mode"]:checked').value;
 
-                // 3. Build the payload explicitly
                 const payload = {
                     title: title,
                     color: color,
@@ -324,23 +349,26 @@
                     loss: loss.toFixed(0)
                 };
 
-                // 4. Execute the chosen strategy
+                // --- DEBUGGING LOGS ---
+                console.log("=== DEBUG: SAVE EXECUTED ===");
+                console.log("Strategy:", strategy);
+                console.log("Final Coord Count:", geometry.coordinates.length);
+                console.log("Payload:", payload);
+                console.log("============================");
+
                 if (strategy === 'overwrite') {
                     await authFetch(`${API_URL}/tracks/${editContext.trackId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
                     });
                 } else {
-                    // Both 'new' (B) and 'child' (C) use POST. The payload already contains the parent_track_id if it's a child.
                     await authFetch(`${API_URL}/tracks`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
                     });
                 }
 
-                // 5. Cleanup and redirect
+                // Leave a breadcrumb for the dashboard to catch
+                sessionStorage.setItem('return_to_task', editContext.taskId);
+
                 sessionStorage.removeItem('expedition_edit_context');
                 window.location.href = 'index.html';
 
