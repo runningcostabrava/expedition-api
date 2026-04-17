@@ -996,6 +996,7 @@
                                     </div>
                                 </div>
                                 <div style="display: flex; flex-direction: column; gap: 10px;">
+                                    <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="width:100%; background:#f59e0b; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; margin-bottom: 10px;">🗺️ Edit Route Geometry</button>
                                     <button onclick="openGeomEditor('${geom.kind}', ${geom.waypoint_id || geom.track_id})" style="width:100%; background:#0ea5e9; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">✏️ Edit Metadata</button>
                                     ${geom.kind === 'line' ? `<button onclick="startSegmentAnalysis(${task.task_id}, ${geom.track_id})" style="width:100%; background:#8b5cf6; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">✂️ Slice Segment (Analyzer)</button>` : ''}
                                     <button onclick="deleteGeometry('${geom.kind}', ${geom.track_id})" style="width:100%; background:#fee2e2; color:#ef4444; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🗑️ Delete Track</button>
