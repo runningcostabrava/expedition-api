@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Route Editor - Expedition</title>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
+            background: #0f172a;
+            overflow: hidden;
+        }
+
+        #map {
+            position: absolute;
+            inset: 0;
+            right: 350px;
+        }
+
+        /* Leave room for right panel */
+
+        /* The Right Inspector Panel for Editor */
+        #editor-panel {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 350px;
+            background: white;
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        .panel-header {
+            padding: 15px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            font-weight: bold;
+            font-size: 1.2em;
+            color: #0f172a;
+        }
+
+        .panel-content {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .segment {
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #ddd;
+        }
+
+        .smart {
+            background: #dcfce7;
+            border-color: #bbf7d0;
+            color: #166534;
+        }
+
+        .manual {
+            background: #fee2e2;
+            border-color: #fecaca;
+            color: #991b1b;
+        }
+
+        .btn-mode {
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-weight: bold;
+            font-size: 0.8em;
+        }
+
+        /* Save Strategy Styles */
+        .save-card {
+            background: #f0f9ff;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #bae6fd;
+            margin-bottom: 20px;
+        }
+
+        .save-card label {
+            display: block;
+            margin-bottom: 12px;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: bold;
+            color: #0369a1;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-sizing: border-box;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        button.action-btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 10px;
+            font-size: 1.05em;
+            transition: 0.2s;
+        }
+
+        .btn-save {
+            background: #0ea5e9;
+            color: white;
+            box-shadow: 0 4px 10px rgba(14, 165, 233, 0.3);
+        }
+
+        .btn-save:hover {
+            background: #0284c7;
+        }
+
+        .btn-cancel {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+
+        .btn-cancel:hover {
+            background: #cbd5e0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="map"></div>
+
+    <div id="editor-panel">
+        <div class="panel-header">
+            🏔️ Route Editor
+            <div style="font-size: 0.7em; color: #64748b; font-weight: normal; margin-top: 8px; line-height: 1.4;">
+                • <b>Click line</b> to add stops.<br>
+                • <b>Drag dots</b> to move route.<br>
+                • <b>Right-click dots</b> to delete.
+            </div>
+        </div>
+
+        <div class="panel-content">
+            <h4 style="margin-top:0; color: #1e293b;">1. Route Segments</h4>
+            <div id="segment-list"
+                style="max-height: 250px; overflow-y: auto; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+            </div>
+
+            <h4 style="margin-top:0; color: #1e293b;">2. Save Strategy</h4>
+            <div class="save-card">
+                <label><input type="radio" name="save-mode" value="overwrite" checked> (A) Update Original Track</label>
+                <label><input type="radio" name="save-mode" value="new"> (B) Save as New Independent Track</label>
+                <label><input type="radio" name="save-mode" value="child"> (C) Save as Alternative / Child</label>
+            </div>
+
+            <label style="font-size: 0.85em; font-weight: bold; color: #334155;">Track Title</label>
+            <input type="text" id="track-title" placeholder="Route Name">
+
+            <label style="font-size: 0.85em; font-weight: bold; color: #334155;">Track Color</label>
+            <input type="color" id="track-color"
+                style="width:100%; height:42px; border:none; padding:0; cursor:pointer; border-radius: 6px; margin-bottom:20px;">
+
+            <button class="action-btn btn-save" onclick="executeSave()">💾 Execute Save</button>
+            <button class="action-btn btn-cancel" onclick="goBack()">Cancel & Return</button>
+        </div>
+    </div>
+
+    <script src="js/store.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/route-editor.js"></script>
+
+    <script>
+        let editContext = null;
+
+        async function initEditor() {
+            // 1. Open the Briefcase
+            const stored = sessionStorage.getItem('expedition_edit_context');
+            if (!stored) {
+                alert("No edit context found. Returning to dashboard.");
+                window.location.href = 'index.html';
+                return;
+            }
+            editContext = JSON.parse(stored);
+
+            // 2. Setup Map
+            const res = await fetch(`${API_URL}/api/config`);
+            const config = await res.json();
+            mapboxgl.accessToken = config.MAPBOX_TOKEN;
+
+            window.map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/outdoors-v12',
+                center: editContext.geojson.features[0].geometry.coordinates[0] || [12.5928, 38.0662],
+                zoom: 14
+            });
+
+            // 3. Populate the UI with context data
+            document.getElementById('track-title').value = editContext.title || 'Edited Route';
+            document.getElementById('track-color').value = editContext.color || '#3498db';
+
+            map.on('load', async () => {
+                map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
+                map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
+
+                // 4. Initialize Komoot Engine using your existing logic
+                await KomootEngine.initFromGpx(editContext.geojson.features[0], editContext.title);
+
+                // Zoom to fit the loaded route
+                const bbox = turf.bbox(editContext.geojson);
+                map.fitBounds(bbox, { padding: 50 });
+            });
+
+            // 5. Override KomootEngine's updateSavePopup to refresh our local segment list instead
+            // (We don't want it opening popups on this dedicated page)
+            KomootEngine.updateSavePopup = function () {
+                const list = document.getElementById('segment-list');
+                list.innerHTML = '';
+                this.state.segments.forEach((seg, idx) => {
+                    const div = document.createElement('div');
+                    div.className = `segment ${seg.type}`;
+                    div.innerHTML = `
+                        <strong>Seg ${seg.startIdx + 1}-${seg.endIdx + 1}</strong>
+                        <button class="btn-mode" onclick="KomootEngine.toggleSegmentMode(${idx}); KomootEngine.updateSavePopup();">${seg.type === 'smart' ? 'SMART 🚗' : 'MANUAL 📏'}</button>
+                    `;
+                    list.appendChild(div);
+                });
+            };
+        }
+
+        async function executeSave() {
+            const mode = document.querySelector('input[name="save-mode"]:checked').value;
+            const title = document.getElementById('track-title').value;
+            const color = document.getElementById('track-color').value;
+            const newGeom = KomootEngine.getUnifiedGeometry();
+            const newGeojson = { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: newGeom }] };
+
+            const btn = document.querySelector('.btn-save');
+            btn.innerText = "Saving to Database...";
+            btn.disabled = true;
+
+            let payload = {
+                title: title,
+                color: color,
+                geojson_data: newGeojson
+            };
+
+            try {
+                if (mode === 'overwrite') {
+                    // MODE A: Update original track
+                    await authFetch(`${API_URL}/tracks/${editContext.trackId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
+                else if (mode === 'new') {
+                    // MODE B: Save entirely new track, link to active task
+                    payload.existing_task_id = editContext.taskId;
+                    await authFetch(`${API_URL}/tracks`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
+                else if (mode === 'child') {
+                    // MODE C: Save as child of the original track, link to active task
+                    payload.existing_task_id = editContext.taskId;
+                    payload.parent_track_id = editContext.trackId; // Links it hierarchically
+                    await authFetch(`${API_URL}/tracks`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
+
+                // Clear memory and return to dashboard
+                sessionStorage.removeItem('expedition_edit_context');
+                window.location.href = 'index.html';
+
+            } catch (err) {
+                alert("Error saving: " + err.message);
+                btn.innerText = "💾 Execute Save";
+                btn.disabled = false;
+            }
+        }
+
+        function goBack() {
+            if (confirm("Discard changes and return to dashboard?")) {
+                sessionStorage.removeItem('expedition_edit_context');
+                window.location.href = 'index.html';
+            }
+        }
+
+        initEditor();
+    </script>
+</body>
+
+</html>

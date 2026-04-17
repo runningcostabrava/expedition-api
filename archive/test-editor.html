@@ -360,12 +360,12 @@
                 });
             }
 
-            window.toggleMode = function(idx) {
+            window.toggleMode = function (idx) {
                 state.segments[idx].type = state.segments[idx].type === 'smart' ? 'manual' : 'smart';
                 refreshAllSegments();
             };
 
-            window.openStreetView = function(lat, lng) {
+            window.openStreetView = function (lat, lng) {
                 // Official Google Maps URL for Street View at specific coordinates
                 const svUrl = `https://www.google.com/maps?q=&layer=c&cbll=${lat},${lng}`;
                 window.open(svUrl, '_blank');
