@@ -5,7 +5,6 @@ const KomootEngine = {
     // --- UPDATE in js/route-editor.js ---
     handleGpxUpload: function (file) {
         const reader = new FileReader();
-        // 🔒 GRAB THE ID RIGHT NOW before any panels close
         const currentTask = AppStore.get('activeTaskId');
 
         reader.onload = async (event) => {
@@ -13,15 +12,30 @@ const KomootEngine = {
                 const gpxXml = new DOMParser().parseFromString(event.target.result, "text/xml");
                 const geojson = toGeoJSON.gpx(gpxXml);
                 if (geojson && geojson.features.length > 0) {
-                    showToast("Analyzing GPX (Komoot Engine)...", "info");
+                    showToast("Packaging GPX for Editor...", "info");
 
-                    // Pass the locked Task ID into initFromGpx
-                    await this.initFromGpx(geojson.features[0], file.name, {
-                        lockedTaskId: currentTask
-                    });
+                    // 1. Package it as a brand new track
+                    const editContext = {
+                        taskId: currentTask,
+                        trackId: null, // Signals it is a new track
+                        title: file.name.replace('.gpx', ''),
+                        color: '#8e44ad', // Distinct color for uploaded tracks
+                        geojson: geojson,
+                        parentTrackId: null
+                    };
+
+                    // 2. Put in short-term memory
+                    sessionStorage.setItem('expedition_edit_context', JSON.stringify(editContext));
+
+                    // 3. Redirect to the editor to process and save it
+                    window.location.href = 'editor.html';
+                } else {
+                    alert("No valid route data found in GPX file.");
                 }
-                // ... rest of error handling ...
-            } catch (err) { console.error(err); }
+            } catch (err) {
+                console.error(err);
+                alert("Failed to parse GPX file.");
+            }
         };
         reader.readAsText(file);
     },
