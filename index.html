@@ -1433,6 +1433,25 @@
             filterSelect.value = currentFilterVal;
         }
 
+        function updateResponsibleDropdown() {
+            const respFilter = document.getElementById('responsible-filter');
+            if (!respFilter) return;
+            const currentVal = respFilter.value;
+
+            const responsibles = new Set();
+            AppStore.get('itinerary').forEach(t => {
+                if (t.responsible && t.responsible.trim() !== '') {
+                    responsibles.add(t.responsible.trim());
+                }
+            });
+
+            respFilter.innerHTML = '<option value="">Anyone (Responsible)</option>';
+            Array.from(responsibles).sort().forEach(r => {
+                respFilter.insertAdjacentHTML('beforeend', `<option value="${r.replace(/"/g, '"')}">${r}</option>`);
+            });
+            respFilter.value = currentVal;
+        }
+
         function updateSectionDropdowns() {
             const secSelect = document.getElementById('task-section-id');
             const mapFilter = document.getElementById('map-section-filter');

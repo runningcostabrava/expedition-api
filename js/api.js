@@ -91,15 +91,7 @@ async function authFetch(url, options = {}) {
                 updateSectionDropdowns();
                 updateTaskTypeDropdowns();
 
-                // Update Responsible Filter
-                const respFilter = document.getElementById('responsible-filter');
-                if (respFilter) {
-                    const currentVal = respFilter.value;
-                    const people = [...new Set(data.map(t => t.responsible).filter(r => r && r.trim() !== ""))].sort();
-                    respFilter.innerHTML = '<option value="">Anyone (Responsible)</option>' +
-                        people.map(p => `<option value="${p}">${p}</option>`).join('');
-                    respFilter.value = currentVal;
-                }
+                updateResponsibleDropdown();
 
                 renderCategoryList();
                 renderTaskTypeList();
