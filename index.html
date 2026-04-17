@@ -1203,13 +1203,14 @@
 
         function flyToGeometry(lng, lat, kind, layerId) {
             if (isEditingGeometry) return; // 🚫 Block camera jump
+            const uiPadding = { top: 80, bottom: 80, left: 420, right: 80 };
             if (kind === 'point') {
-                map.flyTo({ center: [lng, lat], zoom: 16 });
+                map.flyTo({ center: [lng, lat], zoom: 16, padding: uiPadding });
             } else {
                 const source = map.getSource(layerId.replace('layer-', 'track-'));
                 if (source && source._data) {
                     const bbox = turf.bbox(source._data);
-                    map.fitBounds(bbox, { padding: 80, duration: 1500 });
+                    map.fitBounds(bbox, { padding: uiPadding, duration: 1500 });
                 }
             }
         }
