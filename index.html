@@ -644,7 +644,7 @@
 
                         html += `
                             <div style="padding:10px; border-bottom:1px solid #eee; cursor:pointer; display:flex; flex-direction:column;"
-                                 onclick="map.flyTo({center: [${centerLng}, ${centerLat}], zoom: 16}); document.getElementById('internal-search-results').style.display='none'; document.getElementById('internal-map-search').value='';">
+                                 onclick="map.flyTo({center: [${centerLng}, ${centerLat}], zoom: 16, padding: {left: 420}}); document.getElementById('internal-search-results').style.display='none'; document.getElementById('internal-map-search').value='';">
                                 <div style="font-weight:bold; font-size:0.95em; color:#2c3e50;">${icon} ${g.title || 'Unnamed Shape'}</div>
                                 ${g.comments ? `<div style="font-size:0.8em; color:#7f8c8d; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${g.comments}</div>` : ''}
                                 <button onclick="event.stopPropagation(); quickLinkToActiveTask(${g.anchor_id})" style="margin-top:8px; background:#27ae60; color:white; border:none; padding:6px 8px; border-radius:4px; font-size:0.85em; cursor:pointer; font-weight:bold;">🔗 Attach to Active Task</button>
