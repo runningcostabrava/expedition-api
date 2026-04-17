@@ -2066,7 +2066,7 @@
                 const name = t.task_name || t.task || "";
                 const matchSearch = name.toLowerCase().includes(searchTerm);
                 const matchCategory = !categoryFilter || t.category_id == categoryFilter;
-                const matchResponsible = !responsibleFilter || t.responsible === responsibleFilter;
+                const matchResponsible = !responsibleFilter || (t.responsible && t.responsible.trim() === responsibleFilter);
                 const matchGroup = !groupFilter || t.target_group === groupFilter;
                 const matchType = !typeFilter || t.task_type_id == typeFilter;
                 return matchSearch && matchCategory && matchResponsible && matchGroup && matchType;
