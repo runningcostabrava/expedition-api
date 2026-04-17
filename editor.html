@@ -296,12 +296,13 @@
                 const color = document.getElementById('track-color').value;
                 const strategy = document.querySelector('input[name="save-mode"]:checked').value;
 
-                // 3. Build the payload (Linking to the original task)
+                // 3. Build the payload explicitly
                 const payload = {
                     title: title,
                     color: color,
                     geojson_data: geojson_data,
-                    existing_task_id: editContext.taskId
+                    existing_task_id: editContext.taskId,
+                    parent_track_id: strategy === 'child' ? editContext.trackId : null
                 };
 
                 // 4. Execute the chosen strategy
@@ -311,14 +312,8 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
-                } else if (strategy === 'new') {
-                    await authFetch(`${API_URL}/tracks`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                } else if (strategy === 'child') {
-                    payload.parent_track_id = editContext.trackId;
+                } else {
+                    // Both 'new' (B) and 'child' (C) use POST. The payload already contains the parent_track_id if it's a child.
                     await authFetch(`${API_URL}/tracks`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
