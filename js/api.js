@@ -98,6 +98,17 @@ async function authFetch(url, options = {}) {
                 renderProjectView();
                 renderMapGeometries();
 
+                // Refresh Task Detail Panel if it is currently open
+                const detailPanel = document.getElementById('task-detail-panel');
+                if (detailPanel && detailPanel.classList.contains('open') && previousActiveId) {
+                    const updatedTask = data.find(t => t.task_id === previousActiveId);
+                    if (updatedTask) {
+                        if (typeof openTaskDetailPanel === 'function') openTaskDetailPanel(updatedTask);
+                    } else {
+                        if (typeof closeTaskDetailPanel === 'function') closeTaskDetailPanel();
+                    }
+                }
+
         // 3. FORCE the previously open section to expand again
         if (openSectionId) {
             const strId = String(openSectionId);
