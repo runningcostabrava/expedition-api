@@ -28,7 +28,9 @@ const KomootEngine = {
 
     // Now accepts editMeta
     initFromGpx: async function (feature, fileName, editMeta = null) {
-        draw.deleteAll();
+        if (typeof draw !== 'undefined' && draw && typeof draw.deleteAll === 'function') {
+            draw.deleteAll();
+        }
         this.cleanup();
         this.state.currentFileName = fileName || 'Edited Route';
         this.state.editMeta = editMeta; // Save the ID for the update!
