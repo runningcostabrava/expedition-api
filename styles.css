@@ -235,18 +235,34 @@ body {
 .modern-inline-input {
     border: 1px solid transparent;
     background: transparent;
-    padding: 0;
+    padding: 2px 4px;
     font-size: 0.75em;
     color: #64748b;
-    cursor: pointer;
+    cursor: default;
     outline: none;
     font-weight: 600;
+    transition: all 0.2s;
+    border-radius: 4px;
 }
 
-.modern-inline-input:hover,
-.modern-inline-input:focus {
-    border-bottom: 1px dashed #cbd5e0;
-    color: #0f172a;
+/* Edit Mode Styling */
+.is-editing .modern-inline-input,
+.is-editing .inline-edit {
+    background: white !important;
+    border: 1px solid var(--accent) !important;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+    cursor: text !important;
+}
+
+.is-editing {
+    background: #f0f9ff !important; /* Light sky blue background when editing */
+    border-color: var(--accent) !important;
+}
+
+.modern-inline-input:disabled {
+    opacity: 1;
+    color: #64748b;
+    cursor: default;
 }
 
 /* Modern Action Buttons - Appear on Hover */
@@ -547,16 +563,10 @@ body {
     border-radius: 4px;
     transition: all 0.2s;
     outline: none;
+    cursor: default;
 }
 
-.inline-edit:hover {
-    border: 1px dashed #ccc;
-    cursor: text;
-}
-
-.inline-edit:focus {
-    border: 1px solid #3498db;
-    background: #fff;
+.inline-edit[contenteditable="true"] {
     cursor: text;
 }
 

@@ -934,7 +934,7 @@
                                     </div>
                                 </div>
                                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                                    <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="flex:1; background:#0ea5e9; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">⚙️ Edit Tool</button>
+                                    <button onclick="openGeomEditor('point', ${geom.waypoint_id || geom.anchor_id})" style="flex:1; background:#0ea5e9; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">✏️ Edit Metadata</button>
                                     <button onclick="deleteGeometry('point', ${geom.waypoint_id || geom.anchor_id})" style="flex:1; background:#fee2e2; color:#ef4444; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🗑️ Delete</button>
                                 </div>
                                 <button style="width: 100%; background: #f59e0b; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold;" onclick="openStreetView(${geom.lat}, ${geom.lng})">
@@ -996,7 +996,7 @@
                                     </div>
                                 </div>
                                 <div style="display: flex; flex-direction: column; gap: 10px;">
-                                    <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="width:100%; background:#0ea5e9; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">⚙️ Edit Route Geometry</button>
+                                    <button onclick="openGeomEditor('${geom.kind}', ${geom.waypoint_id || geom.track_id})" style="width:100%; background:#0ea5e9; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">✏️ Edit Metadata</button>
                                     ${geom.kind === 'line' ? `<button onclick="startSegmentAnalysis(${task.task_id}, ${geom.track_id})" style="width:100%; background:#8b5cf6; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">✂️ Slice Segment (Analyzer)</button>` : ''}
                                     <button onclick="deleteGeometry('${geom.kind}', ${geom.track_id})" style="width:100%; background:#fee2e2; color:#ef4444; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🗑️ Delete Track</button>
                                 </div>
@@ -1068,6 +1068,28 @@
             if (features.length > 0) {
                 const bbox = turf.bbox(turf.featureCollection(features));
                 map.fitBounds(bbox, { padding: 50, maxZoom: 15, duration: 1500 });
+            }
+        }
+
+        function toggleInlineEdit(elementId) {
+            const row = document.getElementById(elementId);
+            if (!row) return;
+
+            const isEditing = row.classList.toggle('is-editing');
+            const inputs = row.querySelectorAll('.modern-inline-input');
+            const spans = row.querySelectorAll('.inline-edit');
+
+            inputs.forEach(input => {
+                input.disabled = !isEditing;
+            });
+
+            spans.forEach(span => {
+                span.contentEditable = isEditing;
+            });
+
+            // If we just turned on editing, focus the first editable span
+            if (isEditing && spans.length > 0) {
+                spans[0].focus();
             }
         }
 
@@ -2012,13 +2034,14 @@
                 taskEl.innerHTML = `
                     <div class="fite-dot" style="border-color: ${catColor}"></div>
                     <div class="fite-text">
-                        <input type="time" class="modern-inline-input" value="${timeValue}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()">
-                        <span class="inline-edit" contenteditable="true"
+                        <input type="time" class="modern-inline-input" value="${timeValue}" disabled onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()">
+                        <span class="inline-edit"
                               style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
                               onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }"
                               onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())"
                               onclick="event.stopPropagation()">${task.task_name || 'Milestone'}</span>
                         <div class="task-actions-modern" onclick="event.stopPropagation()">
+                            <button class="action-btn-modern" title="Edit Inline" onclick="toggleInlineEdit('task-row-${task.task_id}')">✏️</button>
                             <button class="action-btn-modern" title="Details" onclick="openTaskDetailPanel(AppStore.get('itinerary').find(t => t.task_id === ${task.task_id}))">ℹ️</button>
                             <button class="action-btn-modern" title="Edit" onclick="openTaskEditor(${task.task_id})">⚙️</button>
                             <button class="action-btn-modern del" onclick="deleteTask(${task.task_id})">🗑️</button>
@@ -2040,12 +2063,13 @@
                 taskEl.innerHTML = `
                     <div class="task-row-1">
                         <div style="display:flex; gap:8px; align-items:center;">
-                            <input type="time" class="modern-inline-input" value="${timeValue}" onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()">
-                            <select class="modern-inline-input" onchange="updateTaskInline(${task.task_id}, 'category_id', this.value)" onclick="event.stopPropagation()">
+                            <input type="time" class="modern-inline-input" value="${timeValue}" disabled onchange="updateTaskInline(${task.task_id}, 'starts_at', this.value)" onclick="event.stopPropagation()">
+                            <select class="modern-inline-input" disabled onchange="updateTaskInline(${task.task_id}, 'category_id', this.value)" onclick="event.stopPropagation()">
                                 ${catOptions}
                             </select>
                         </div>
                         <div class="task-actions-modern" onclick="event.stopPropagation()">
+                            <button class="action-btn-modern" title="Edit Inline" onclick="toggleInlineEdit('task-row-${task.task_id}')">✏️</button>
                             <button class="action-btn-modern" title="Details" onclick="openTaskDetailPanel(AppStore.get('itinerary').find(t => t.task_id === ${task.task_id}))">ℹ️</button>
                             <button class="action-btn-modern" title="Edit" onclick="openTaskEditor(${task.task_id})">⚙️</button>
                             <button class="action-btn-modern del" title="Delete" onclick="deleteTask(${task.task_id})">🗑️</button>
@@ -2053,7 +2077,7 @@
                     </div>
                     <div class="task-row-2">
                         ${task.is_completed ? '<span style="margin-right:4px;">✅</span>' : ''}
-                        <span class="inline-edit" contenteditable="true" style="flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+                        <span class="inline-edit" style="flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
                               onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }"
                               onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())"
                               onclick="event.stopPropagation()">${task.task_name || 'Unnamed Task'}</span>
@@ -2163,15 +2187,17 @@
             const dateVal = section.section_date ? new Date(section.section_date).toISOString().split('T')[0] : '';
             const sectionTitle = section.title || 'Unscheduled';
 
+            sectionDiv.id = `section-${section.id || 'null'}`;
             // FIX: Expanded the date input width to 115px so the date is actually visible!
             sectionDiv.innerHTML = `
                 <div class="asana-header" style="display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #eee; padding-bottom: 6px; margin-bottom: 8px; cursor: pointer;"
                      onclick="toggleSectionAccordion('${section.id || 'null'}')">
                     <span class="section-toggle-icon collapsed" style="flex-shrink: 0; font-size: 0.8em; color: #94a3b8; transition: transform 0.2s;">▼</span>
-                    ${section.id ? `<input type="date" value="${dateVal}" class="inline-edit-input" style="width: 115px; padding:0; border:none; background:transparent; font-size:0.9em; color:#64748b; font-weight:bold; flex-shrink: 0;" onchange="updateSectionMetadata(${section.id}, 'section_date', this.value)" onclick="event.stopPropagation()">` : ''}
-                    <span class="inline-edit section-title-text" contenteditable="true" style="font-weight: bold; flex-shrink: 0; font-size: 0.95em; color: #1e293b;" onblur="updateSectionMetadata(${section.id}, 'title', this.innerText)" onclick="event.stopPropagation()">${sectionTitle}</span>
+                    ${section.id ? `<input type="date" value="${dateVal}" class="modern-inline-input" disabled style="width: 115px; padding:0; border:none; background:transparent; font-size:0.9em; color:#64748b; font-weight:bold; flex-shrink: 0;" onchange="updateSectionMetadata(${section.id}, 'section_date', this.value)" onclick="event.stopPropagation()">` : ''}
+                    <span class="inline-edit section-title-text" style="font-weight: bold; flex-shrink: 0; font-size: 0.95em; color: #1e293b;" onblur="updateSectionMetadata(${section.id}, 'title', this.innerText)" onclick="event.stopPropagation()">${sectionTitle}</span>
                     
                     <div class="task-actions-modern" style="display:flex; gap:2px; margin-left:auto; flex-shrink: 0; opacity: 1;" onclick="event.stopPropagation()">
+                        <button class="action-btn-modern" title="Edit Inline" onclick="event.stopPropagation(); toggleInlineEdit('section-${section.id || 'null'}')">✏️</button>
                         ${section.id ? `<button class="action-btn-modern" title="Section Details" onclick="event.stopPropagation(); openSectionEditor(${section.id})">ℹ️</button>` : ''}
                         ${section.id ? `<button class="action-btn-modern del" title="Delete Section" onclick="event.stopPropagation(); deleteSection(${section.id}, '${sectionTitle.replace(/'/g, "\\'")}')">🗑️</button>` : ''}
                     </div>

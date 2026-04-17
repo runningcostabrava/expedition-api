@@ -210,7 +210,7 @@
                 mapboxgl.accessToken = config.MAPBOX_TOKEN;
 
                 // Initialize map and assign to window immediately
-                const map = new mapboxgl.Map({
+                map = new mapboxgl.Map({
                     container: 'map',
                     style: 'mapbox://styles/mapbox/outdoors-v12',
                     // Coordinates: Longitude, Latitude
@@ -218,7 +218,7 @@
                     zoom: 14
                 });
 
-                window.map = map;
+
 
                 // 3. Populate UI
                 document.getElementById('track-title').value = editContext.title || 'Edited Route';
