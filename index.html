@@ -2384,12 +2384,25 @@
                 </div>
                 ${task.characteristics ? `<div style="font-size: 0.95em; line-height: 1.6; color: #334155; margin-bottom: 30px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">${task.characteristics}</div>` : ''}
 
-                <h3 style="font-size: 1.1em; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px;">Route & Waypoints</h3>
-            `;
+            <h3 style="font-size: 1.1em; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px;">Route & Waypoints</h3>
+        `;
 
-            if (task.geometries && task.geometries.length > 0) {
-                task.geometries.forEach(g => {
-                    const icon = g.kind === 'point' ? (g.icon || '📍') : (g.kind === 'polygon' ? '🛑' : '📈');
+        if (task.geometries && task.geometries.length > 0) {
+            // SORT: Parents first, then their children immediately following
+            const sortedGeoms = [];
+            const parents = task.geometries.filter(g => !g.parent_track_id);
+            parents.forEach(p => {
+                sortedGeoms.push(p);
+                const children = task.geometries.filter(g => g.parent_track_id === p.track_id);
+                sortedGeoms.push(...children);
+            });
+            // Catch any orphans just in case
+            task.geometries.forEach(g => {
+                if (!sortedGeoms.includes(g)) sortedGeoms.push(g);
+            });
+
+            sortedGeoms.forEach(g => {
+                const icon = g.kind === 'point' ? (g.icon || '📍') : (g.kind === 'polygon' ? '🛑' : '📈');
                     const title = g.title || 'Location';
                     const layerId = `layer-${g.track_id}`;
                     let statsHtml = '';
