@@ -958,16 +958,20 @@
                                     <p style="margin: 0 0 10px 0; font-size: 0.9em; color: #64748b; font-weight: bold;">Parent Task: ${task.task_name || 'Unnamed Task'}</p>
                                     ${geom.address ? `<div style="font-size:0.9em; margin-bottom:8px; color:#334155;">📍 ${geom.address}</div>` : ''}
                                     ${geom.phone ? `<div style="font-size:0.9em; margin-bottom:8px; color:#334155;">📞 ${geom.phone}</div>` : ''}
-                                    <div style="display:flex; gap:12px; margin-top: 15px;">
-                                        ${geom.link ? `<a href="${geom.link.startsWith('http') ? geom.link : 'https://' + geom.link}" target="_blank" style="color:#0ea5e9; text-decoration:none; font-weight:bold;">🌐 Website</a>` : ''}
-                                        ${geom.google_maps_url ? `<a href="${geom.google_maps_url}" target="_blank" style="color:#10b981; text-decoration:none; font-weight:bold;">🗺️ Open in Google Maps</a>` : ''}
+
+                                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top: 15px;">
+                                        ${geom.link ? `<button onclick="window.open('${geom.link.startsWith('http') ? geom.link : 'https://' + geom.link}', '_blank')" style="background:#0ea5e9; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; font-size:0.85em; box-shadow: 0 2px 4px rgba(14, 165, 233, 0.2);">🌐 Website</button>` : ''}
+                                        ${geom.google_maps_url ? `<button onclick="window.open('${geom.google_maps_url}', '_blank')" style="background:#10b981; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; font-size:0.85em; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);">🗺️ Open Maps</button>` : ''}
+                                        ${geom.phone ? `<button onclick="window.open('tel:${geom.phone.replace(/[^0-9+]/g, '')}', '_self')" style="background:#8b5cf6; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; font-size:0.85em; box-shadow: 0 2px 4px rgba(139, 92, 246, 0.2);">📞 Call Now</button>` : ''}
                                     </div>
+
+                                    ${geom.comments ? `<div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; margin-top: 15px; font-size: 0.85em; color: #475569; line-height: 1.5; white-space: pre-wrap;"><strong>📝 Notes & Info:</strong><br>${geom.comments}</div>` : ''}
                                 </div>
                                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                                    <button onclick="openGeomEditor('point', ${geom.waypoint_id || geom.anchor_id})" style="flex:1; background:#0ea5e9; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">✏️ Edit Metadata</button>
+                                    <button onclick="openGeomEditor('point', ${geom.waypoint_id || geom.anchor_id})" style="flex:1; background:#34495e; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">✏️ Edit Metadata</button>
                                     <button onclick="deleteGeometry('point', ${geom.waypoint_id || geom.anchor_id})" style="flex:1; background:#fee2e2; color:#ef4444; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🗑️ Delete</button>
                                 </div>
-                                <button style="width: 100%; background: #f59e0b; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold;" onclick="openStreetView(${geom.lat}, ${geom.lng})">
+                                <button style="width: 100%; background: #f59e0b; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);" onclick="openStreetView(${geom.lat}, ${geom.lng})">
                                     🚶‍♂️ Drop Street View Here
                                 </button>
                             `;
