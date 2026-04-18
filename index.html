@@ -1622,6 +1622,7 @@
             await authFetch(`${API_URL}/${endpoint}`, {
                 method: 'DELETE'
             });
+            if (typeof closeRightPanel === 'function') closeRightPanel();
             refreshData();
         }
 
