@@ -194,7 +194,7 @@
         let editContext = null;
 
         function openStreetView(lat, lng) {
-            const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+            const svUrl = `https://www.google.com/maps?layer=c&cbll=${lat},${lng}`;
             window.open(svUrl, '_blank');
         }
 
@@ -273,11 +273,16 @@
                     list.innerHTML = '';
                     this.state.segments.forEach((seg, idx) => {
                         const div = document.createElement('div');
-                        div.className = `segment ${seg.type}`;
+                        div.className = `segment ${seg.type === 'imported' ? 'smart' : seg.type}`;
+                        
+                        let btnText = 'MANUAL 📏';
+                        if (seg.type === 'smart') btnText = 'SMART 🚗';
+                        if (seg.type === 'imported') btnText = 'EXACT GPX 📍';
+
                         div.innerHTML = `
                     <strong>Seg ${seg.startIdx + 1}-${seg.endIdx + 1}</strong>
                     <button class="btn-mode" onclick="KomootEngine.toggleSegmentMode(${idx}); KomootEngine.updateSavePopup();">
-                        ${seg.type === 'smart' ? 'SMART 🚗' : 'MANUAL 📏'}
+                        ${btnText}
                     </button>
                 `;
                         list.appendChild(div);

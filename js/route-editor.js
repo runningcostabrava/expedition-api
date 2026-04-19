@@ -47,21 +47,48 @@ const KomootEngine = {
         }
         this.cleanup();
         this.state.currentFileName = fileName || 'Edited Route';
-        this.state.editMeta = editMeta; // Save the ID for the update!
-        const simplified = turf.simplify(feature, { tolerance: 0.001, highQuality: true });
-        const coords = simplified.geometry.coordinates;
+        this.state.editMeta = editMeta; 
+
+        // Lowered tolerance (0.0005) gives more control points for off-road tracks
+        const simplified = turf.simplify(feature, { tolerance: 0.0005, highQuality: true });
+        let coords = simplified.geometry.coordinates;
+        if (feature.geometry.type === 'Polygon') coords = coords[0];
+        
         this.state.intersections = coords.map((c, i) => ({ id: Date.now() + i, lngLat: [c[0], c[1]] }));
         this.state.segments = [];
 
+        const origCoords = feature.geometry.type === 'Polygon' ? feature.geometry.coordinates[0] : feature.geometry.coordinates;
+        const origLine = turf.lineString(origCoords);
+
         for (let i = 0; i < this.state.intersections.length - 1; i++) {
-            const type = await this.autoDetectType(this.state.intersections[i].lngLat, this.state.intersections[i + 1].lngLat);
-            this.state.segments.push({ id: Date.now() + i + 100, type, startIdx: i, endIdx: i + 1, geometry: null });
+            const startPt = turf.point(this.state.intersections[i].lngLat);
+            const endPt = turf.point(this.state.intersections[i + 1].lngLat);
+            
+            // Slice the EXACT original geometry between the simplified points
+            let slicedGeometry;
+            try {
+                const snappedStart = turf.nearestPointOnLine(origLine, startPt);
+                const snappedEnd = turf.nearestPointOnLine(origLine, endPt);
+                slicedGeometry = turf.lineSlice(snappedStart, snappedEnd, origLine).geometry;
+            } catch(e) {
+                slicedGeometry = turf.lineString([startPt.geometry.coordinates, endPt.geometry.coordinates]).geometry;
+            }
+
+            this.state.segments.push({ 
+                id: Date.now() + i + 100, 
+                type: 'imported', // Locks the exact GPX shape
+                startIdx: i, 
+                endIdx: i + 1, 
+                geometry: slicedGeometry
+            });
         }
+        
         await this.refreshAllSegments();
-
-        // const bbox = turf.bbox(feature);
-        //map.fitBounds(bbox, { padding: 50 });
-
+        
+        // Re-center map to the imported route
+        const bbox = turf.bbox(feature);
+        map.fitBounds(bbox, { padding: 50 });
+        
         this.updateSavePopup();
         this.setupMapListeners();
     },
@@ -140,7 +167,9 @@ const KomootEngine = {
             const start = this.state.intersections[seg.startIdx].lngLat;
             const end = this.state.intersections[seg.endIdx].lngLat;
 
-            if (seg.type === 'smart') {
+            if (seg.type === 'imported' && seg.geometry) {
+                // Keep exact GPX geometry, no Mapbox API call needed
+            } else if (seg.type === 'smart') {
                 try {
                     const url = `https://api.mapbox.com/directions/v5/mapbox/walking/${start.join(',')};${end.join(',')}?geometries=geojson&access_token=${mapboxgl.accessToken}`;
                     const res = await fetch(url);
@@ -151,14 +180,18 @@ const KomootEngine = {
                 seg.geometry = turf.lineString([start, end]).geometry;
             }
 
-            const coords = seg.geometry.coordinates;
-            for (let i = 0; i < coords.length; i++) {
-                const z = map.queryTerrainElevation(coords[i]) || 0;
-                coords[i] = [coords[i][0], coords[i][1], z];
-
-                if (i > 0) {
-                    const diff = coords[i][2] - coords[i - 1][2];
-                    if (diff > 0) totalGain += diff; else totalLoss += Math.abs(diff);
+            if (seg.geometry && seg.geometry.coordinates) {
+                const coords = seg.geometry.coordinates;
+                for (let i = 0; i < coords.length; i++) {
+                    // Ensure Z coordinate (elevation) exists for every point
+                    if (coords[i].length < 3 || !coords[i][2]) {
+                        const z = map.queryTerrainElevation(coords[i]) || 0;
+                        coords[i] = [coords[i][0], coords[i][1], z];
+                    }
+                    if (i > 0) {
+                        const diff = coords[i][2] - coords[i - 1][2];
+                        if (diff > 0) totalGain += diff; else totalLoss += Math.abs(diff);
+                    }
                 }
             }
         }
@@ -183,9 +216,9 @@ const KomootEngine = {
             map.addLayer({
                 id: 'komoot-edit-line', type: 'line', source: 'komoot-edit-route',
                 paint: {
-                    'line-color': ['case', ['==', ['get', 'type'], 'smart'], '#38bdf8', '#94a3b8'],
+                    'line-color': ['match', ['get', 'type'], 'smart', '#38bdf8', 'imported', '#8e44ad', '#94a3b8'],
                     'line-width': 5,
-                    'line-dasharray': ['case', ['==', ['get', 'type'], 'smart'], ['literal', [1, 2]], ['literal', [1, 0]]]
+                    'line-dasharray': ['match', ['get', 'type'], 'smart', ['literal', [1, 2]], 'imported', ['literal', [1, 0]], ['literal', [1, 0]]]
                 }
             });
         }
@@ -198,9 +231,8 @@ const KomootEngine = {
             const popup = new mapboxgl.Popup({ offset: 10 }).setHTML(`
                 <div style="text-align:center; padding:5px;">
                     <strong style="display:block; margin-bottom:8px;">Stop ${i + 1}</strong>
-                    <button onclick="KomootEngine.toggleSegmentMode(${i})" style="margin-bottom:5px; background:#3498db; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; width:100%;">Toggle Smart/Manual</button>
+                    <button onclick="KomootEngine.toggleSegmentMode(${i})" style="margin-bottom:5px; background:#3498db; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; width:100%;">Toggle Mode</button>
                     <button onclick="KomootEngine.deleteStop(${i})" style="margin-bottom:5px; background:#e74c3c; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; width:100%;">🗑️ Delete Stop</button>
-                    <button onclick="openStreetView(${point.lngLat[1]}, ${point.lngLat[0]})" style="background:#e67e22; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; width:100%;">🚶‍♂️ Street View</button>
                 </div>
             `);
 
@@ -212,6 +244,14 @@ const KomootEngine = {
             m.on('dragend', async () => {
                 const pos = m.getLngLat();
                 this.state.intersections[i].lngLat = [pos.lng, pos.lat];
+                
+                // Break lock on adjacent segments if user drags a pin
+                this.state.segments.forEach(seg => {
+                    if (seg.startIdx === i || seg.endIdx === i) {
+                        if (seg.type === 'imported') seg.type = 'smart'; // Auto-switch to smart if dragged
+                    }
+                });
+
                 await this.refreshAllSegments();
                 this.updateSavePopup();
             });
@@ -221,7 +261,12 @@ const KomootEngine = {
 
     toggleSegmentMode: function (index) {
         if (this.state.segments[index]) {
-            this.state.segments[index].type = this.state.segments[index].type === 'smart' ? 'manual' : 'smart';
+            const seg = this.state.segments[index];
+            if (seg.type === 'imported') {
+                seg.type = 'smart'; // Unlocking imported segment
+            } else {
+                seg.type = seg.type === 'smart' ? 'manual' : 'smart';
+            }
             this.refreshAllSegments();
             this.updateSavePopup();
         }
