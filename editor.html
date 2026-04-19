@@ -176,6 +176,9 @@
             <label style="font-size: 0.85em; font-weight: bold; color: #334155;">Track Title</label>
             <input type="text" id="track-title" placeholder="Route Name">
 
+            <label style="font-size: 0.85em; font-weight: bold; color: #334155;">External Link (Komoot, etc.)</label>
+            <input type="text" id="track-link" placeholder="https://...">
+
             <label style="font-size: 0.85em; font-weight: bold; color: #334155;">Track Color</label>
             <input type="color" id="track-color"
                 style="width:100%; height:42px; border:none; padding:0; cursor:pointer; border-radius: 6px; margin-bottom:20px;">
@@ -227,6 +230,7 @@
 
                 // 3. Populate UI
                 document.getElementById('track-title').value = editContext.title || 'Edited Route';
+                document.getElementById('track-link').value = editContext.link || '';
                 document.getElementById('track-color').value = editContext.color || '#3498db';
 
                 // Safely handle brand new GPX uploads
@@ -364,11 +368,13 @@
                 };
 
                 const title = document.getElementById('track-title').value;
+                const linkUrl = document.getElementById('track-link').value;
                 const color = document.getElementById('track-color').value;
 
                 const payload = {
                     title: title,
                     color: color,
+                    link: linkUrl,
                     geojson_data: geojson_data,
                     existing_task_id: editContext.taskId,
                     parent_track_id: strategy === 'child' ? editContext.trackId : null,
