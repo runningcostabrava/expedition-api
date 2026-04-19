@@ -193,11 +193,7 @@
 
         let editContext = null;
 
-        function openStreetView(lat, lng) {
-            const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
-            window.open(svUrl, '_blank');
-        }
-
+        async function initEditor() {
         async function initEditor() {
             // 1. Open the Briefcase
             const stored = sessionStorage.getItem('expedition_edit_context');
