@@ -1235,19 +1235,22 @@
             if (!row) return;
 
             const isEditing = row.classList.toggle('is-editing');
+            window.activeInlineEditId = isEditing ? elementId : null; // Remember what is being edited!
+
             const inputs = row.querySelectorAll('.modern-inline-input');
             const spans = row.querySelectorAll('.inline-edit');
 
-            inputs.forEach(input => {
-                input.disabled = !isEditing;
-            });
+            inputs.forEach(input => { input.disabled = !isEditing; });
+            spans.forEach(span => { span.contentEditable = isEditing; });
 
-            spans.forEach(span => {
-                span.contentEditable = isEditing;
-            });
-
-            // If we just turned on editing, focus the first editable span
             if (isEditing && spans.length > 0) {
+                // Move cursor to the end of the text
+                const range = document.createRange();
+                const sel = window.getSelection();
+                range.selectNodeContents(spans[0]);
+                range.collapse(false);
+                sel.removeAllRanges();
+                sel.addRange(range);
                 spans[0].focus();
             }
         }
@@ -1384,6 +1387,7 @@
         }
 
         let activeParentTrackId = null;
+        window.activeInlineEditId = null;
         function startSegmentAnalysis(taskId, trackId) {
             const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
             const geom = task?.geometries.find(g => g.track_id === trackId);
@@ -2454,7 +2458,7 @@
                      onclick="if(document.getElementById('section-${section.id || 'null'}').classList.contains('is-editing')) return; flyToSection(${section.id || 'null'}); ${section.id ? `openSectionEditor(${section.id});` : ''}">
                     <span class="section-toggle-icon collapsed" style="flex-shrink: 0; font-size: 0.8em; color: #94a3b8; transition: transform 0.2s;">▼</span>
                     ${section.id ? `<input type="date" value="${dateVal}" class="modern-inline-input" disabled style="width: 115px; padding:0; border:none; background:transparent; font-size:0.9em; color:#64748b; font-weight:bold; flex-shrink: 0;" onchange="updateSectionMetadata(${section.id}, 'section_date', this.value)" onclick="if(this.closest('.is-editing')) event.stopPropagation();">` : ''}
-                    <span class="inline-edit section-title-text" style="font-weight: bold; flex-shrink: 0; font-size: 0.95em; color: #1e293b;" onblur="updateSectionMetadata(${section.id}, 'title', this.innerText)" onclick="if(this.closest('.is-editing')) event.stopPropagation();">${sectionTitle}</span>
+                    <span class="inline-edit section-title-text" style="font-weight: bold; flex-shrink: 0; font-size: 0.95em; color: #1e293b;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }" onblur="updateSectionMetadata(${section.id}, 'title', this.innerText)" onclick="if(this.closest('.is-editing')) event.stopPropagation();">${sectionTitle}</span>
                     
                     <div class="task-actions-modern" style="display:flex; gap:2px; margin-left:auto; flex-shrink: 0; opacity: 1;" onclick="event.stopPropagation()">
                         <button class="action-btn-modern" title="Edit Inline" onclick="event.stopPropagation(); toggleInlineEdit('section-${section.id || 'null'}')">✏️</button>
