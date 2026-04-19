@@ -194,7 +194,7 @@
         let editContext = null;
 
         function openStreetView(lat, lng) {
-            const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+            const svUrl = `https://maps.google.com/?cbll=${lat},${lng}`;
             window.open(svUrl, '_blank');
         }
 

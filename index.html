@@ -373,8 +373,8 @@
             document.getElementById('btn-save-new-geom').onclick = async () => {
                 const btn = document.getElementById('btn-save-new-geom'); btn.innerText = 'Saving...'; btn.disabled = true;
                 const payload = { title: document.getElementById('new-geom-title').value || 'Unnamed', comments: document.getElementById('new-geom-notes').value || '', color: defaultColor, existing_task_id: activeTask || null };
-                if (kind === 'point') { payload.lat = geometry.coordinates[1]; payload.lng = geometry.coordinates[0]; payload.icon = defaultIcon; if (googleData) { payload.address = googleData.address; payload.phone = googleData.phone; payload.photo_url = googleData.photoUrl; payload.google_maps_url = googleData.googleMapsUri; } if (defaultLink) payload.link = defaultLink; } else { const coords = geometry.type === 'Polygon' ? geometry.coordinates[0] : geometry.coordinates; payload.distance = turf.length(geometry, {units: 'kilometers'}).toFixed(2); let gain = 0, loss = 0; for (let i = 1; i < coords.length; i++) { const diff = (coords[i][2] || 0) - (coords[i - 1][2] || 0); if (diff > 0) gain += diff; else loss -= diff; } payload.gain = gain.toFixed(0); payload.loss = loss.toFixed(0); payload.geojson_data = { type: "FeatureCollection", features: [{ type: "Feature", geometry: geometry, properties: { route_type: 'smart' } }] }; }
-                try { const res = await authFetch(`${API_URL}/${kind === 'point' ? 'waypoints' : 'tracks'}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }); if (!res.ok) throw new Error("Failed to save to database"); closeRightPanel(); if (typeof draw !== 'undefined') draw.deleteAll(); refreshData(); if (typeof showToast !== 'undefined') showToast("Saved successfully!", "success"); } catch(e) { alert("Error saving: " + e.message); btn.innerText = '💾 SAVE TO DATABASE'; btn.disabled = false; }
+                if (kind === 'point') { payload.lat = geometry.coordinates[1]; payload.lng = geometry.coordinates[0]; payload.icon = defaultIcon; if (googleData) { payload.address = googleData.address; payload.phone = googleData.phone; payload.photo_url = googleData.photoUrl; payload.google_maps_url = googleData.googleMapsUri; } if (defaultLink) payload.link = defaultLink; if (typeof activeParentTrackId !== 'undefined' && activeParentTrackId) payload.parent_track_id = activeParentTrackId; } else { const coords = geometry.type === 'Polygon' ? geometry.coordinates[0] : geometry.coordinates; payload.distance = turf.length(geometry, {units: 'kilometers'}).toFixed(2); let gain = 0, loss = 0; for (let i = 1; i < coords.length; i++) { const diff = (coords[i][2] || 0) - (coords[i - 1][2] || 0); if (diff > 0) gain += diff; else loss -= diff; } payload.gain = gain.toFixed(0); payload.loss = loss.toFixed(0); payload.geojson_data = { type: "FeatureCollection", features: [{ type: "Feature", geometry: geometry, properties: { route_type: 'smart' } }] }; }
+                try { const res = await authFetch(`${API_URL}/${kind === 'point' ? 'waypoints' : 'tracks'}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }); if (!res.ok) throw new Error("Failed to save to database"); closeRightPanel(); if (typeof activeParentTrackId !== 'undefined') activeParentTrackId = null; if (typeof draw !== 'undefined') draw.deleteAll(); refreshData(); if (typeof showToast !== 'undefined') showToast("Saved successfully!", "success"); } catch(e) { alert("Error saving: " + e.message); btn.innerText = '💾 SAVE TO DATABASE'; btn.disabled = false; }
             };
         };
 
@@ -2436,7 +2436,7 @@
         }
 
         function openStreetView(lat, lng) {
-            const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+            const svUrl = `https://maps.google.com/?cbll=${lat},${lng}`;
             window.open(svUrl, '_blank');
         }
 
