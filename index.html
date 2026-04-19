@@ -1975,12 +1975,6 @@
             const svUrl = `https://www.google.com/maps?layer=c&cbll=${lat},${lng}`;
             window.open(svUrl, '_blank');
         }
-            window.open(svUrl, '_blank');
-        }
-        function openStreetView(lat, lng) {
-            const svUrl = `https://www.google.com/maps?layer=c&cbll=${lat},${lng}`;
-            window.open(svUrl, '_blank');
-        }
 
         function openTaskEditor(taskId = null) {
             const task = taskId ? AppStore.get('itinerary').find(t => t.task_id === taskId) : null;
@@ -2454,11 +2448,6 @@
                 inputElement.disabled = false;
             }
         }
-
-            window.open(svUrl, '_blank');
-        }
-
-
 
         function renderSectionUI(section, tasks, gridCols) {
             const container = document.getElementById('asana-container');
