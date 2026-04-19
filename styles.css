@@ -601,11 +601,6 @@ body {
 
 /* --- MAP STYLE SWITCHER INTEGRATION --- */
 #style-switcher {
-    position: absolute;
-    top: 15px;
-    /* Moved to top */
-    right: 50px;
-    /* Nestled next to the navigation controls */
     z-index: 100;
     background: transparent;
     box-shadow: none;

@@ -99,8 +99,15 @@ async function authFetch(url, options = {}) {
                 renderProjectView();
                 renderMapGeometries();
 
-                // 2.5 Restore Editing State if applicable
-                if (editingRowId) toggleInlineEdit(editingRowId);
+                // RESTORE INLINE EDIT STATE
+                if (window.activeInlineEditId) {
+                    const row = document.getElementById(window.activeInlineEditId);
+                    if (row) {
+                        row.classList.add('is-editing');
+                        row.querySelectorAll('.modern-inline-input').forEach(inp => (inp.disabled = false));
+                        row.querySelectorAll('.inline-edit').forEach(sp => (sp.contentEditable = true));
+                    }
+                }
 
                 // Refresh Task Detail Panel if it is currently open
                 const detailPanel = document.getElementById('task-detail-panel');

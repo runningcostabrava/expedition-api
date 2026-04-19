@@ -42,6 +42,16 @@
         <div id="section-pills"
             style="display:flex; gap:8px; flex: 1; margin-left: 10px; overflow-x: auto; min-width: 0;"></div>
 
+        <div id="style-switcher">
+            <select onchange="changeMapStyle(this.value)"
+                style="padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); font-weight: bold; cursor: pointer; outline: none; background: rgba(255,255,255,0.1); color: white; margin-right: 10px;">
+                <option value="mapbox://styles/mapbox/outdoors-v12">⛰️ Outdoors (Hiking)</option>
+                <option value="mapbox://styles/mapbox/satellite-streets-v12">🌍 Satellite 3D</option>
+                <option value="mapbox://styles/mapbox/dark-v11">🌙 Dark Mode</option>
+                <option value="mapbox://styles/mapbox/streets-v12">🛣️ Standard</option>
+            </select>
+        </div>
+
         <div style="display: flex; gap: 8px; align-items: center; flex-shrink: 0;">
             <div id="google-search-container" style="position: relative;"></div>
 
@@ -133,16 +143,6 @@
         </div>
 
         <div id="map"></div>
-
-        <div id="style-switcher">
-            <select onchange="changeMapStyle(this.value)"
-                style="padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); font-weight: bold; cursor: pointer; outline: none; background: var(--glass-dark); color: white; backdrop-filter: var(--glass-blur); box-shadow: var(--card-shadow); border-bottom: 2px solid var(--accent);">
-                <option value="mapbox://styles/mapbox/outdoors-v12">⛰️ Outdoors (Hiking)</option>
-                <option value="mapbox://styles/mapbox/satellite-streets-v12">🌍 Satellite 3D</option>
-                <option value="mapbox://styles/mapbox/dark-v11">🌙 Dark Mode</option>
-                <option value="mapbox://styles/mapbox/streets-v12">🛣️ Standard</option>
-            </select>
-        </div>
 
         <div id="elevation-panel">
             <span id="close-elevation"
