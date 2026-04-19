@@ -1348,28 +1348,36 @@
         }
 
         function focusTaskInSidebar(taskId) {
-            // 1. Find the task data to know which section it lives in
             const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
             if (!task) return;
 
-            // 2. Open that specific section's accordion (handles 'null' for Unscheduled)
             const sectionIdStr = task.section_id ? String(task.section_id) : 'null';
-            toggleSectionAccordion(sectionIdStr);
 
-            // 3. Wait a tiny fraction of a second for the CSS accordion to open, then scroll
+            // 1. Force close other sections, but KEEP this one open
+            document.querySelectorAll('.asana-section').forEach(sec => {
+                if (sec.dataset.sectionId !== sectionIdStr) {
+                    sec.querySelector('.section-content').classList.add('collapsed');
+                    sec.querySelector('.section-toggle-icon').classList.add('collapsed');
+                }
+            });
+
+            // 2. Ensure target section is open without toggling it
+            const targetSection = document.querySelector(`.asana-section[data-section-id="${sectionIdStr}"]`);
+            if (targetSection) {
+                targetSection.querySelector('.section-content').classList.remove('collapsed');
+                targetSection.querySelector('.section-toggle-icon').classList.remove('collapsed');
+            }
+
+            // 3. Wait a tiny fraction of a second for CSS, then highlight and scroll
             setTimeout(() => {
-                // Clear any existing highlights
                 document.querySelectorAll('.task-row, .fite-row').forEach(row => {
                     row.classList.remove('active-task');
                 });
 
-                // Find the DOM element, highlight it, and scroll it perfectly into the center
                 const row = document.getElementById(`task-row-${taskId}`);
                 if (row) {
                     row.classList.add('active-task');
                     row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    
-                    // Set it as the globally active task for editing/adding
                     AppStore.set('activeTaskId', taskId);
                 }
             }, 150); 
@@ -1969,6 +1977,7 @@
             const safeResp = task ? (task.responsible || '').replace(/"/g, '"') : '';
             const timeVal = task && task.starts_at ? task.starts_at.substring(11, 16) : '';
             const isCompleted = task && task.is_completed ? 'checked' : '';
+            const isMilestone = task && task.is_milestone ? 'checked' : '';
             const desc = task ? (task.characteristics || '') : '';
             const secId = task ? task.section_id : '';
             const catId = task ? task.category_id : '';
@@ -2007,10 +2016,14 @@
                         <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Responsible</label>
                         <input type="text" id="edit-task-resp" value="${safeResp}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
                     </div>
-                    <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0;">
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0;">
                         <label style="display:flex; align-items:center; gap:8px; margin:0; cursor:pointer; color:#1e293b; font-weight:bold;">
                             <input type="checkbox" id="edit-task-completed" ${isCompleted} style="width:18px; height:18px; cursor:pointer;"> 
-                            Mark as Completed
+                            Completed
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; margin:0; cursor:pointer; color:#1e293b; font-weight:bold;">
+                            <input type="checkbox" id="edit-task-milestone" ${isMilestone} style="width:18px; height:18px; cursor:pointer;"> 
+                            📍 Fite
                         </label>
                     </div>
                     <button onclick="saveTaskFromRightPanel(${taskId})" style="width:100%; padding:14px; background:#27ae60; color:white; border:none; border-radius:8px; font-weight:bold; font-size:1.05em; margin-top:5px; cursor:pointer; box-shadow:0 4px 10px rgba(39, 174, 96, 0.3);">${taskId ? '💾 UPDATE TASK' : '✨ CREATE TASK'}</button>
@@ -2832,7 +2845,8 @@
                 section_id: document.getElementById('edit-task-sec').value || null,
                 characteristics: document.getElementById('edit-task-desc').value,
                 responsible: document.getElementById('edit-task-resp').value,
-                is_completed: document.getElementById('edit-task-completed').checked
+                is_completed: document.getElementById('edit-task-completed').checked,
+                is_milestone: document.getElementById('edit-task-milestone').checked
             };
 
             const timeVal = document.getElementById('edit-task-time').value;
