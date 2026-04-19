@@ -229,6 +229,19 @@
                 document.getElementById('track-title').value = editContext.title || 'Edited Route';
                 document.getElementById('track-color').value = editContext.color || '#3498db';
 
+                // Safely handle brand new GPX uploads
+                if (!editContext.trackId) {
+                    const overwriteLabel = document.querySelector('input[value="overwrite"]').parentElement;
+                    const childLabel = document.querySelector('input[value="child"]').parentElement;
+                    const newRadio = document.querySelector('input[value="new"]');
+
+                    overwriteLabel.style.display = 'none';
+                    childLabel.style.display = 'none';
+                    newRadio.checked = true;
+
+                    document.getElementById('track-title').value = editContext.title ? `${editContext.title} (Imported)` : 'New GPX Route';
+                }
+
                 // 4. Wait for Load to trigger Engine
                 map.on('load', async () => {
                     console.log("Editor Map Loaded. Initializing KomootEngine...");
