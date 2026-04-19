@@ -1972,7 +1972,11 @@
         }
 
         function openStreetView(lat, lng) {
-            const svUrl = `https://www.google.com/maps?layer=c&cbll=${lat},${lng}`;
+            const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+            window.open(svUrl, '_blank');
+        }
+        function openStreetView(lat, lng) {
+            const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
             window.open(svUrl, '_blank');
         }
 
@@ -2654,7 +2658,7 @@
             const parents = task.geometries.filter(g => !g.parent_track_id);
             parents.forEach(p => {
                 sortedGeoms.push(p);
-                const children = task.geometries.filter(g => g.parent_track_id === p.track_id);
+                const children = p.track_id ? task.geometries.filter(g => g.parent_track_id === p.track_id) : [];
                 sortedGeoms.push(...children);
             });
             // Catch any orphans just in case

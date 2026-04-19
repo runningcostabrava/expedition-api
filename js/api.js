@@ -96,6 +96,7 @@ async function authFetch(url, options = {}) {
 
                 renderCategoryList();
                 renderTaskTypeList();
+                updateResponsibleDropdown();
                 renderProjectView();
                 renderMapGeometries();
 
