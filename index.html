@@ -1971,6 +1971,11 @@
             }
         }
 
+        function openStreetView(lat, lng) {
+            const svUrl = `https://www.google.com/maps?layer=c&cbll=${lat},${lng}`;
+            window.open(svUrl, '_blank');
+        }
+
         function openTaskEditor(taskId = null) {
             const task = taskId ? AppStore.get('itinerary').find(t => t.task_id === taskId) : null;
 
@@ -1985,12 +1990,15 @@
             const desc = task ? (task.characteristics || '') : '';
             const secId = task ? task.section_id : '';
             const catId = task ? task.category_id : '';
+            const typeId = task ? task.task_type_id : '';
 
             let sectionOptions = `<option value="">Unscheduled</option>` +
                 (AppStore.get('sections') || []).map(s => `<option value="${s.id}" ${secId == s.id ? 'selected' : ''}>${s.title}</option>`).join('');
 
             let catOptions = `<option value="">No Category</option>` +
                 allCategories.map(c => `<option value="${c.id}" ${catId == c.id ? 'selected' : ''}>${c.icon} ${c.name}</option>`).join('');
+
+            let typeOptions = `<option value="">No Type</option>` + allTaskTypes.map(t => `<option value="${t.id}" ${typeId == t.id ? 'selected' : ''}>${t.icon} ${t.name}</option>`).join('');
 
             const html = `
                 <div style="display:flex; flex-direction:column; gap:15px;">
@@ -2008,9 +2016,15 @@
                             <select id="edit-task-cat" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">${catOptions}</select>
                         </div>
                     </div>
-                    <div>
-                        <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Section (Day)</label>
-                        <select id="edit-task-sec" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">${sectionOptions}</select>
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1;">
+                            <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Section (Day)</label>
+                            <select id="edit-task-sec" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">${sectionOptions}</select>
+                        </div>
+                        <div style="flex:1;">
+                            <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Task Type</label>
+                            <select id="edit-task-type" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">${typeOptions}</select>
+                        </div>
                     </div>
                     <div>
                         <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Description / Notes</label>
@@ -2846,6 +2860,7 @@
                 ...task,
                 task_name: document.getElementById('edit-task-name').value || 'Unnamed Task',
                 category_id: document.getElementById('edit-task-cat').value || null,
+                task_type_id: document.getElementById('edit-task-type').value || null,
                 section_id: document.getElementById('edit-task-sec').value || null,
                 characteristics: document.getElementById('edit-task-desc').value,
                 responsible: document.getElementById('edit-task-resp').value,
