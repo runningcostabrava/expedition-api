@@ -342,6 +342,7 @@
         }
 
         let elevationChart = null;
+        let liveTrackers = {};
         let directionsControl = null; // Holds the Mapbox Directions UI
         let currentSmartProfile = 'driving'; // Safely tracks the active routing mode
         let currentSectionFilter = 'all';
@@ -351,6 +352,40 @@
         let routePoints = [], segmentPoints = [], activeAnalysisTrack = null, lastCalculatedRoute = null;
 
         const groupColors = { 'Hikers': '#2ecc71', 'Runners': '#e67e22', 'Staff': '#9b59b6', 'Transport': '#f1c40f' };
+
+        window.showGeometryContextPopup = function(centerPt, geometry, title, subtitle, editConfig = null, defaultIcon = '📍', defaultColor = '#3498db', defaultLink = '', googleData = null) {
+            const isLine = geometry.type === 'LineString' || geometry.type === 'MultiLineString' || geometry.type === 'Polygon';
+            const kind = isLine ? (geometry.type === 'Polygon' ? 'polygon' : 'line') : 'point';
+            const activeTask = AppStore.get('activeTaskId');
+            const html = `
+                <div style="display:flex; flex-direction:column; gap:15px;">
+                    <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:5px;">
+                        <strong style="color:#0f172a; display:block; margin-bottom:5px;">${subtitle || 'New Map Shape'}</strong>
+                        ${activeTask ? `<span style="background:#dcfce7; color:#166534; padding:4px 8px; border-radius:4px; font-size:0.8em; font-weight:bold;">🔗 Will link to active task</span>` : `<span style="background:#fef3c7; color:#b45309; padding:4px 8px; border-radius:4px; font-size:0.8em; font-weight:bold;">⚠️ No active task selected</span>`}
+                    </div>
+                    ${googleData && googleData.photoUrl ? `<img src="${googleData.photoUrl}" style="width:100%; height:140px; object-fit:cover; border-radius:8px;">` : ''}
+                    <div><label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Name</label><input type="text" id="new-geom-title" value="${(title || '').replace(/"/g, '"')}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;"></div>
+                    <div><label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Notes</label><textarea id="new-geom-notes" rows="3" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; resize:vertical;"></textarea></div>
+                    <button id="btn-save-new-geom" style="width:100%; padding:14px; background:#27ae60; color:white; border:none; border-radius:8px; font-weight:bold; font-size:1.05em; margin-top:5px; cursor:pointer; box-shadow:0 4px 10px rgba(39, 174, 96, 0.3);">💾 SAVE TO DATABASE</button>
+                </div>
+            `;
+            openRightPanel(`✨ Save ${kind === 'point' ? 'Location' : 'Route'}`, html);
+            document.getElementById('btn-save-new-geom').onclick = async () => {
+                const btn = document.getElementById('btn-save-new-geom'); btn.innerText = 'Saving...'; btn.disabled = true;
+                const payload = { title: document.getElementById('new-geom-title').value || 'Unnamed', comments: document.getElementById('new-geom-notes').value || '', color: defaultColor, existing_task_id: activeTask || null };
+                if (kind === 'point') { payload.lat = geometry.coordinates[1]; payload.lng = geometry.coordinates[0]; payload.icon = defaultIcon; if (googleData) { payload.address = googleData.address; payload.phone = googleData.phone; payload.photo_url = googleData.photoUrl; payload.google_maps_url = googleData.googleMapsUri; } if (defaultLink) payload.link = defaultLink; } else { const coords = geometry.type === 'Polygon' ? geometry.coordinates[0] : geometry.coordinates; payload.distance = turf.length(geometry, {units: 'kilometers'}).toFixed(2); let gain = 0, loss = 0; for (let i = 1; i < coords.length; i++) { const diff = (coords[i][2] || 0) - (coords[i - 1][2] || 0); if (diff > 0) gain += diff; else loss -= diff; } payload.gain = gain.toFixed(0); payload.loss = loss.toFixed(0); payload.geojson_data = { type: "FeatureCollection", features: [{ type: "Feature", geometry: geometry, properties: { route_type: 'smart' } }] }; }
+                try { const res = await authFetch(`${API_URL}/${kind === 'point' ? 'waypoints' : 'tracks'}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }); if (!res.ok) throw new Error("Failed to save to database"); closeRightPanel(); if (typeof draw !== 'undefined') draw.deleteAll(); refreshData(); if (typeof showToast !== 'undefined') showToast("Saved successfully!", "success"); } catch(e) { alert("Error saving: " + e.message); btn.innerText = '💾 SAVE TO DATABASE'; btn.disabled = false; }
+            };
+        };
+
+        async function unlinkGeometry(taskId, anchorId) {
+            if (!confirm("Remove this location from the current task? (It will remain saved on your map and other tasks)")) return;
+            try {
+                await authFetch(`${API_URL}/tasks/${taskId}/anchors/${anchorId}`, { method: 'DELETE' });
+                if (typeof closeRightPanel === 'function') closeRightPanel();
+                refreshData();
+            } catch (e) { alert("Error unlinking: " + e.message); }
+        }
 
 
         async function initializeApp() {
@@ -534,6 +569,35 @@
                     map.setLight({ anchor: 'map' });
                     map.addLayer({ 'id': 'sky', 'type': 'sky', 'paint': { 'sky-type': 'atmosphere', 'sky-atmosphere-sun-intensity': 15 } });
                     refreshData();
+
+                    // Start Live Tracking Poll
+                    setInterval(async () => {
+                        try {
+                            const res = await fetch(`${API_URL}/api/locations/latest`);
+                            const data = await res.json();
+
+                            data.forEach(guide => {
+                                if (!liveTrackers[guide.guide_id]) {
+                                    const el = document.createElement('div');
+                                    el.className = 'live-tracker-pin';
+                                    el.innerHTML = `<div class="live-tracker-label">${guide.guide_id}</div>`;
+                                    liveTrackers[guide.guide_id] = new mapboxgl.Marker({ element: el })
+                                        .setLngLat([guide.lng, guide.lat])
+                                        .addTo(map);
+                                } else {
+                                    liveTrackers[guide.guide_id].setLngLat([guide.lng, guide.lat]);
+                                }
+                            });
+
+                            const activeIds = data.map(d => d.guide_id);
+                            Object.keys(liveTrackers).forEach(id => {
+                                if (!activeIds.includes(id)) {
+                                    liveTrackers[id].remove();
+                                    delete liveTrackers[id];
+                                }
+                            });
+                        } catch (e) { /* Ignore background network errors */ }
+                    }, 10000);
                 });
 
                 // Engine that dynamically scales and hides map pins based on zoom level

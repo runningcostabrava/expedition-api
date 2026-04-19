@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken'); // 1. Import JWT
 const { Pool } = require('pg');
 const bodyParser = require('body-parser');
 const path = require('path');
+const axios = require('axios'); // Added for Traccar proxy
 
 const app = express();
 app.use(cors());
@@ -591,6 +592,43 @@ app.get('/itinerary', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: "Query failed", details: err.message });
+  }
+});
+
+// --- UNLINK ANCHOR FROM TASK ---
+app.delete('/tasks/:task_id/anchors/:anchor_id', adminAuth, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM task_anchors WHERE task_id = $1 AND anchor_id = $2', [req.params.task_id, req.params.anchor_id]);
+        res.json({ message: "Unlinked successfully" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- TRACCAR PROXY ENDPOINTS ---
+app.get('/api/traccar/positions', async (req, res) => {
+  try {
+    const response = await axios.get(`${process.env.TRACCAR_URL}/api/positions`, {
+      auth: {
+        username: process.env.TRACCAR_USER,
+        password: process.env.TRACCAR_PASSWORD
+      }
+    });
+    res.json(response.data);
+  } catch (err) {
+    res.status(500).json({ error: "Traccar Sync Failed", details: err.message });
+  }
+});
+
+app.get('/api/traccar/devices', async (req, res) => {
+  try {
+    const response = await axios.get(`${process.env.TRACCAR_URL}/api/devices`, {
+      auth: {
+        username: process.env.TRACCAR_USER,
+        password: process.env.TRACCAR_PASSWORD
+      }
+    });
+    res.json(response.data);
+  } catch (err) {
+    res.status(500).json({ error: "Traccar Device Fetch Failed", details: err.message });
   }
 });
 

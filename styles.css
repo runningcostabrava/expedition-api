@@ -41,7 +41,7 @@ body {
     backdrop-filter: var(--glass-blur);
     border: var(--border-light);
     border-radius: 12px;
-    z-index: 100;
+    z-index: 150 important;
     display: flex;
     align-items: center;
     padding: 0 15px;
@@ -86,7 +86,7 @@ body {
     border: var(--border-light);
     border-radius: 16px;
     box-shadow: var(--card-shadow);
-    z-index: 90;
+    z-index: 120;
     display: flex;
     flex-direction: column;
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
@@ -255,7 +255,8 @@ body {
 }
 
 .is-editing {
-    background: #f0f9ff !important; /* Light sky blue background when editing */
+    background: #f0f9ff !important;
+    /* Light sky blue background when editing */
     border-color: var(--accent) !important;
 }
 
@@ -875,7 +876,7 @@ button {
     backdrop-filter: var(--glass-blur);
     border-radius: 16px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-    z-index: 110;
+    z-index: 140;
     display: flex;
     flex-direction: column;
     transform: translateX(-120%);
@@ -903,7 +904,7 @@ button {
     border: var(--border-light);
     border-radius: 16px;
     box-shadow: var(--card-shadow);
-    z-index: 120;
+    z-index: 150;
     display: flex;
     flex-direction: column;
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
@@ -994,4 +995,42 @@ button {
     max-width: 320px !important;
     border-radius: 12px !important;
     box-shadow: var(--card-shadow) !important;
+}
+
+.live-tracker-pin {
+    width: 16px;
+    height: 16px;
+    background: #ef4444;
+    border-radius: 50%;
+    border: 3px solid white;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
+    animation: pulse-ring 2s infinite;
+    display: flex;
+    justify-content: center;
+}
+
+.live-tracker-label {
+    position: absolute;
+    top: -20px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+@keyframes pulse-ring {
+    0% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    }
+
+    70% {
+        box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    }
 }
