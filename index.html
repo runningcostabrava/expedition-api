@@ -1037,7 +1037,7 @@
                                 </div>
                                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                                     <button onclick="openGeomEditor('point', ${geom.waypoint_id || geom.anchor_id})" style="flex:1; background:#34495e; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">✏️ Edit Metadata</button>
-                                    <button onclick="deleteGeometry('point', ${geom.waypoint_id || geom.anchor_id})" style="flex:1; background:#fee2e2; color:#ef4444; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🗑️ Delete</button>
+                                    <button onclick="unlinkGeometry(${task.task_id}, ${geom.anchor_id})" style="flex:1; background:#fee2e2; color:#ef4444; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🗑️ Remove from Task</button>
                                 </div>
                                 <button style="width: 100%; background: #f59e0b; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);" onclick="openStreetView(${geom.lat}, ${geom.lng})">
                                     🚶‍♂️ Drop Street View Here
@@ -1104,7 +1104,7 @@
                                     <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="width:100%; background:#f59e0b; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; margin-bottom: 10px;">🗺️ Edit Route Geometry</button>
                                     <button onclick="openGeomEditor('${geom.kind}', ${geom.waypoint_id || geom.track_id})" style="width:100%; background:#0ea5e9; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">✏️ Edit Metadata</button>
                                     ${geom.kind === 'line' ? `<button onclick="startSegmentAnalysis(${task.task_id}, ${geom.track_id})" style="width:100%; background:#8b5cf6; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">✂️ Slice Segment (Analyzer)</button>` : ''}
-                                    <button onclick="deleteGeometry('${geom.kind}', ${geom.track_id})" style="width:100%; background:#fee2e2; color:#ef4444; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🗑️ Delete Track</button>
+                                    <button onclick="unlinkGeometry(${task.task_id}, ${geom.anchor_id})" style="width:100%; background:#fee2e2; color:#ef4444; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🗑️ Remove from Task</button>
                                 </div>
                             `;
                             openRightPanel(`${geom.kind === 'polygon' ? '🛑' : '📈'} ${geom.title}`, html);
@@ -2674,7 +2674,7 @@
                                 <button class="action-btn-modern" title="Details & Metadata" onclick="event.stopPropagation(); triggerGeomInfo(${task.task_id}, '${g.kind}', ${g.waypoint_id || g.track_id})">ℹ️</button>
                                 <button class="action-btn-modern" title="Show/Hide" onclick="event.stopPropagation(); toggleGeomVisibility('${g.kind}', '${g.track_id || g.anchor_id}', this)">👁️</button>
                                 <button class="action-btn-modern" title="Edit Geometry" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})">⚙️</button>
-                                <button class="action-btn-modern del" title="Delete" onclick="event.stopPropagation(); deleteGeometry('${g.kind}', ${g.waypoint_id || g.track_id})">🗑️</button>
+                                <button class="action-btn-modern del" title="Remove from Task" onclick="event.stopPropagation(); unlinkGeometry(${task.task_id}, ${g.anchor_id})">🗑️</button>
                             </div>
                         </div>
                     `;
