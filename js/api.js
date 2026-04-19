@@ -69,6 +69,7 @@ async function authFetch(url, options = {}) {
             const openSection = document.querySelector('.asana-section:not(.collapsed)');
             const openSectionId = openSection ? openSection.dataset.sectionId : null;
             const previousActiveId = AppStore.get('activeTaskId');
+            const editingRowId = document.querySelector('.is-editing')?.id;
 
             try {
                 const [itRes, secRes, catRes, typeRes] = await Promise.all([
@@ -97,6 +98,9 @@ async function authFetch(url, options = {}) {
                 renderTaskTypeList();
                 renderProjectView();
                 renderMapGeometries();
+
+                // 2.5 Restore Editing State if applicable
+                if (editingRowId) toggleInlineEdit(editingRowId);
 
                 // Refresh Task Detail Panel if it is currently open
                 const detailPanel = document.getElementById('task-detail-panel');
