@@ -1064,7 +1064,7 @@
                     if (geom.comments && typeof geom.comments === 'string' && geom.comments.trim() !== '') {
                         const renderer = new marked.Renderer();
                         renderer.link = function(href, title, text) {
-                            if (text.includes('📎')) {
+                            if (text && typeof text === 'string' && text.includes('📎')) {
                                 return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="display:inline-block; background:#8b5cf6; color:white; padding:4px 10px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:0.9em; margin:2px 0;">${text}</a>`;
                             }
                             return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="color:#3498db; text-decoration:underline;">${text}</a>`;
@@ -1410,8 +1410,8 @@
                 let parsedComments = '';
                 if (geom.comments && typeof geom.comments === 'string' && geom.comments.trim() !== '') {
                     const renderer = new marked.Renderer();
-                    renderer.link = function(href, title, text) {
-                        if (text.includes('📎')) {
+                renderer.link = function(href, title, text) {
+                    if (text && typeof text === 'string' && text.includes('📎')) {
                             return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="display:inline-block; background:#8b5cf6; color:white; padding:4px 10px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:0.9em; margin:2px 0;">${text}</a>`;
                         }
                         return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="color:#3498db; text-decoration:underline;">${text}</a>`;
@@ -2849,7 +2849,7 @@
                 const renderer = new marked.Renderer();
                 renderer.link = function(href, title, text) {
                     // Style links as nice buttons if they contain the attachment emoji
-                    if (text.includes('📎')) {
+                    if (text && typeof text === 'string' && text.includes('📎')) {
                         return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="display:inline-block; background:#8b5cf6; color:white; padding:4px 10px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:0.9em; margin:2px 0;">${text}</a>`;
                     }
                     return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="color:#3498db; text-decoration:underline;">${text}</a>`;
