@@ -3078,7 +3078,7 @@
             
             try {
                 // Bypass authFetch to prevent JSON Content-Type overriding the multipart boundary
-                const res = await fetch('/api/upload', {
+                const res = await fetch(`${API_URL}/api/upload`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` },
                     body: formData
