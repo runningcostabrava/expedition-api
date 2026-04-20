@@ -2794,7 +2794,8 @@
 
             // Configure Marked.js to open links in new tabs safely
             let parsedCharacteristics = '';
-            if (task.characteristics) {
+            // FIX: Ensure characteristics is a valid string before parsing
+            if (task.characteristics && typeof task.characteristics === 'string' && task.characteristics.trim() !== '') {
                 const renderer = new marked.Renderer();
                 renderer.link = function(href, title, text) {
                     // Style links as nice buttons if they contain the attachment emoji
