@@ -149,19 +149,35 @@ app.get('/setup-db', adminAuth, async (req, res) => {
 });
 
 // --- MEDIA UPLOAD (CLOUDINARY) ---
-app.post('/api/upload', adminAuth, upload.single('file'), async (req, res) => {
+app.post('/api/upload', adminAuth, upload.single('file'), (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
-    const b64 = Buffer.from(req.file.buffer).toString('base64');
-    let dataURI = "data:" + req.file.mimetype + ";base64," + b64;
-    const result = await cloudinary.uploader.upload(dataURI, {
-      folder: "expedition_media",
-      resource_type: "auto" 
+
+    // Create a direct upload stream to Cloudinary
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: "expedition_media", resource_type: "auto" },
+      (error, result) => {
+        if (error) {
+          console.error("Cloudinary Stream Error:", error);
+          return res.status(500).json({ error: 'Upload failed', details: error.message });
+        }
+        res.json({ secure_url: result.secure_url });
+      }
+    );
+
+    // Pipe the raw memory buffer byte-by-byte to prevent payload crashes
+    const { Readable } = require('stream');
+    const readableStream = new Readable({
+      read() {
+        this.push(req.file.buffer);
+        this.push(null);
+      }
     });
-    res.json({ secure_url: result.secure_url });
+
+    readableStream.pipe(stream);
   } catch (error) {
-    console.error("Cloudinary Upload Error:", error);
-    res.status(500).json({ error: 'Upload failed', details: error.message });
+    console.error("Server Upload Error:", error);
+    res.status(500).json({ error: 'Server crash', details: error.message });
   }
 });
 
