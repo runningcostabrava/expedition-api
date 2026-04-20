@@ -329,17 +329,14 @@
     <script src="js/elevation.js"></script>
     <script src="js/route-editor.js"></script>
 
-
     <script>
-
-        window.createWaypointFromContext = function(lat, lng) {
+        window.createWaypointFromContext = function (lat, lng) {
             if (isEditingGeometry || isRouting || isAnalyzingSegment) return;
-            draw.deleteAll(); // Clear mapbox draw
-            const feat = { type: 'Feature', geometry: { type: 'Point', coordinates: [lng, lat] } };
-            draw.add(feat);   // Drop the point so the user sees it
-            
-            // Trigger the Right Panel Save Strategy
-            showGeometryContextPopup([lng, lat], feat.geometry, `New Waypoint`, '');
+            if (typeof draw === "undefined") return;
+            draw.deleteAll();
+            const feat = { type: "Feature", geometry: { type: "Point", coordinates: [lng, lat] } };
+            draw.add(feat);
+            showGeometryContextPopup([lng, lat], feat.geometry, "New Waypoint", "");
         };
 
         function openRightPanel(title, htmlContent) {
@@ -1048,12 +1045,11 @@
                 el.style.cursor = 'pointer';
 
                 // focusAfterOpen: false prevents the ARIA warning
-                const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
-                    .setLngLat([geom.lng, geom.lat])
+                const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' });
+                marker.setLngLat([geom.lng, geom.lat])
                     .addTo(map);
 
-                // Route the click to the Right Panel
-                el.addEventListener('click', (e) => {
+                marker.getElement().addEventListener('click', (e) => {
                     e.stopPropagation();
                     if (isEditingGeometry) return;
                     focusTaskInSidebar(task.task_id);
@@ -1061,23 +1057,24 @@
 
                     // Configure Marked.js for geometry comments
                     let parsedComments = '';
-                    if (geom.comments && typeof geom.comments === 'string' && geom.comments.trim() !== '') {
-                        const renderer = new marked.Renderer();
-                        renderer.link = function(href, title, text) {
-                            if (text && typeof text === 'string' && text.includes('📎')) {
-                                return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="display:inline-block; background:#8b5cf6; color:white; padding:4px 10px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:0.9em; margin:2px 0;">${text}</a>`;
-                            }
-                            return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="color:#3498db; text-decoration:underline;">${text}</a>`;
-                        };
-                        renderer.image = function(href, title, text) {
-                            return `<img src="${href}" alt="${text}" style="max-width:100%; max-height:300px; border-radius:8px; display:block; margin:10px 0; box-shadow:0 2px 4px rgba(0,0,0,0.1);">`;
-                        };
-                        parsedComments = marked.parse(geom.comments || '', { renderer: renderer, breaks: true });
+                    try {
+                        if (geom.comments && typeof geom.comments === 'string' && geom.comments.trim() !== '') {
+                            const renderer = new marked.Renderer();
+                            renderer.link = function(href, title, text) {
+                                if (text && typeof text === 'string' && text.includes('📎')) {
+                                    return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="display:inline-block; background:#8b5cf6; color:white; padding:4px 10px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:0.9em; margin:2px 0;">${text}</a>`;
+                                }
+                                return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="color:#3498db; text-decoration:underline;">${text}</a>`;
+                            };
+                            renderer.image = function(href, title, text) {
+                                return `<img src="${href}" alt="${text}" style="max-width:100%; max-height:300px; border-radius:8px; display:block; margin:10px 0; box-shadow:0 2px 4px rgba(0,0,0,0.1);">`;
+                            };
+                            parsedComments = marked.parse(geom.comments || '', { renderer: renderer, breaks: true });
+                        }
+                    } catch (e) {
+                        console.error("Markdown parsing error:", e);
+                        parsedComments = geom.comments || '';
                     }
-                } catch (e) {
-                    console.error("Markdown parsing error:", e);
-                    parsedComments = geom.comments || '';
-                }
 
                     const html = `
                         ${geom.photo_url ? `<img src="${geom.photo_url}" style="width:100%; height:180px; object-fit:cover; border-radius:8px; margin-bottom:15px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">` : ''}
@@ -1095,19 +1092,19 @@
 
                             ${parsedComments ? `<div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; margin-top: 15px; font-size: 0.85em; color: #475569; line-height: 1.5; overflow-wrap: anywhere;"><strong>📝 Notes & Info:</strong><br>${parsedComments}</div>` : ''}
                         </div>
-                                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                                    <button onclick="openGeomEditor('point', ${geom.waypoint_id || geom.anchor_id})" style="flex:1; background:#34495e; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">✏️ Edit Metadata</button>
-                                    <button onclick="unlinkGeometry(${task.task_id}, ${geom.anchor_id})" style="flex:1; background:#fee2e2; color:#ef4444; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🗑️ Remove from Task</button>
-                                </div>
-                                <button style="width: 100%; background: #f59e0b; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);" onclick="openStreetView(${geom.lat}, ${geom.lng})">
-                                    🚶‍♂️ Drop Street View Here
-                                </button>
-                            `;
-                            openRightPanel(`${renderIcon} ${geom.title}`, html);
-                        });
+                        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                            <button onclick="openGeomEditor('point', ${geom.waypoint_id || geom.anchor_id})" style="flex:1; background:#34495e; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">✏️ Edit Metadata</button>
+                            <button onclick="unlinkGeometry(${task.task_id}, ${geom.anchor_id})" style="flex:1; background:#fee2e2; color:#ef4444; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🗑️ Remove from Task</button>
+                        </div>
+                        <button style="width: 100%; background: #f59e0b; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);" onclick="openStreetView(${geom.lat}, ${geom.lng})">
+                            🚶‍♂️ Drop Street View Here
+                        </button>
+                    `;
+                    openRightPanel(`${renderIcon} ${geom.title}`, html);
+                });
 
-                        activeMarkers.push(marker);
-                    } else if (geom.geojson) {
+                activeMarkers.push(marker);
+            } else if (geom.geojson) {
                         // Apply the inherited color to lines/polygons as well
                         const layerId = `layer-${geom.track_id}`;
                         map.addSource(`track-${geom.track_id}`, { type: 'geojson', data: geom.geojson });
@@ -1408,23 +1405,24 @@
 
                 // Configure Marked.js for geometry comments
                 let parsedComments = '';
-                if (geom.comments && typeof geom.comments === 'string' && geom.comments.trim() !== '') {
-                    const renderer = new marked.Renderer();
-                renderer.link = function(href, title, text) {
-                    if (text && typeof text === 'string' && text.includes('📎')) {
-                            return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="display:inline-block; background:#8b5cf6; color:white; padding:4px 10px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:0.9em; margin:2px 0;">${text}</a>`;
-                        }
-                        return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="color:#3498db; text-decoration:underline;">${text}</a>`;
-                    };
-                    renderer.image = function(href, title, text) {
-                        return `<img src="${href}" alt="${text}" style="max-width:100%; max-height:300px; border-radius:8px; display:block; margin:10px 0; box-shadow:0 2px 4px rgba(0,0,0,0.1);">`;
-                    };
-                    parsedComments = marked.parse(geom.comments || '', { renderer: renderer, breaks: true });
+                try {
+                    if (geom.comments && typeof geom.comments === 'string' && geom.comments.trim() !== '') {
+                        const renderer = new marked.Renderer();
+                        renderer.link = function(href, title, text) {
+                            if (text && typeof text === 'string' && text.includes('📎')) {
+                                return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="display:inline-block; background:#8b5cf6; color:white; padding:4px 10px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:0.9em; margin:2px 0;">${text}</a>`;
+                            }
+                            return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="color:#3498db; text-decoration:underline;">${text}</a>`;
+                        };
+                        renderer.image = function(href, title, text) {
+                            return `<img src="${href}" alt="${text}" style="max-width:100%; max-height:300px; border-radius:8px; display:block; margin:10px 0; box-shadow:0 2px 4px rgba(0,0,0,0.1);">`;
+                        };
+                        parsedComments = marked.parse(geom.comments || '', { renderer: renderer, breaks: true });
+                    }
+                } catch (e) {
+                    console.error("Markdown parsing error:", e);
+                    parsedComments = geom.comments || '';
                 }
-            } catch (e) {
-                console.error("Markdown parsing error:", e);
-                parsedComments = geom.comments || '';
-            }
 
                 const html = `
                     <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
@@ -3253,7 +3251,6 @@
             downloadString(kml, `${(task.task_name || 'Task').replace(/[^a-z0-9]/gi, '_')}.kml`, 'application/vnd.google-earth.kml+xml');
             if (typeof showToast !== 'undefined') showToast("KML Downloaded!", "success");
         }
-
     </script>
 </body>
 
