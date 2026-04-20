@@ -971,15 +971,21 @@ button {
     gap: 8px;
 }
 
-/* Ensure Smart Route UI is visible and not overlapping */
+/* Push the Mapbox Top-Left container past the Left Panel */
+.mapboxgl-ctrl-top-left {
+    top: 85px !important;
+    left: 410px !important;
+    z-index: 110 !important;
+}
+
+/* Ensure Smart Route UI is styled properly */
 .mapboxgl-ctrl-directions {
-    z-index: 105 !important;
-    /* Higher than command-bar (100) */
-    margin-top: 65px !important;
-    /* Push below the command-bar height */
     max-width: 320px !important;
     border-radius: 12px !important;
     box-shadow: var(--card-shadow) !important;
+    margin: 0 !important;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
 }
 
 .live-tracker-pin {
