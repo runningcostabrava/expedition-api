@@ -66,8 +66,8 @@ async function authFetch(url, options = {}) {
 
         async function refreshData() {
             // 1. Capture the currently open section before refreshing
-            const openSection = document.querySelector('.asana-section:not(.collapsed)');
-            const openSectionId = openSection ? openSection.dataset.sectionId : null;
+            const openContent = document.querySelector('.section-content:not(.collapsed)');
+            const openSectionId = openContent ? openContent.closest('.asana-section').dataset.sectionId : null;
             const previousActiveId = AppStore.get('activeTaskId');
             const editingRowId = document.querySelector('.is-editing')?.id;
 

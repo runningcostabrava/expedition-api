@@ -365,6 +365,7 @@
                     </div>
                     ${googleData && googleData.photoUrl ? `<img src="${googleData.photoUrl}" style="width:100%; height:140px; object-fit:cover; border-radius:8px;">` : ''}
                     <div><label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Name</label><input type="text" id="new-geom-title" value="${(title || '').replace(/"/g, '"')}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;"></div>
+                    <div><label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">External Link (URL)</label><input type="text" id="new-geom-link" value="${defaultLink || ''}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;"></div>
                     <div><label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Notes</label><textarea id="new-geom-notes" rows="3" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; resize:vertical;"></textarea></div>
                     <button id="btn-save-new-geom" style="width:100%; padding:14px; background:#27ae60; color:white; border:none; border-radius:8px; font-weight:bold; font-size:1.05em; margin-top:5px; cursor:pointer; box-shadow:0 4px 10px rgba(39, 174, 96, 0.3);">💾 SAVE TO DATABASE</button>
                 </div>
@@ -372,8 +373,8 @@
             openRightPanel(`✨ Save ${kind === 'point' ? 'Location' : 'Route'}`, html);
             document.getElementById('btn-save-new-geom').onclick = async () => {
                 const btn = document.getElementById('btn-save-new-geom'); btn.innerText = 'Saving...'; btn.disabled = true;
-                const payload = { title: document.getElementById('new-geom-title').value || 'Unnamed', comments: document.getElementById('new-geom-notes').value || '', color: defaultColor, existing_task_id: activeTask || null };
-                if (kind === 'point') { payload.lat = geometry.coordinates[1]; payload.lng = geometry.coordinates[0]; payload.icon = defaultIcon; if (googleData) { payload.address = googleData.address; payload.phone = googleData.phone; payload.photo_url = googleData.photoUrl; payload.google_maps_url = googleData.googleMapsUri; } if (defaultLink) payload.link = defaultLink; if (typeof activeParentTrackId !== 'undefined' && activeParentTrackId) payload.parent_track_id = activeParentTrackId; } else { const coords = geometry.type === 'Polygon' ? geometry.coordinates[0] : geometry.coordinates; payload.distance = turf.length(geometry, {units: 'kilometers'}).toFixed(2); let gain = 0, loss = 0; for (let i = 1; i < coords.length; i++) { const diff = (coords[i][2] || 0) - (coords[i - 1][2] || 0); if (diff > 0) gain += diff; else loss -= diff; } payload.gain = gain.toFixed(0); payload.loss = loss.toFixed(0); payload.geojson_data = { type: "FeatureCollection", features: [{ type: "Feature", geometry: geometry, properties: { route_type: 'smart' } }] }; }
+                const payload = { title: document.getElementById('new-geom-title').value || 'Unnamed', comments: document.getElementById('new-geom-notes').value || '', link: document.getElementById('new-geom-link').value || '', color: defaultColor, existing_task_id: activeTask || null };
+                if (kind === 'point') { payload.lat = geometry.coordinates[1]; payload.lng = geometry.coordinates[0]; payload.icon = defaultIcon; if (googleData) { payload.address = googleData.address; payload.phone = googleData.phone; payload.photo_url = googleData.photoUrl; payload.google_maps_url = googleData.googleMapsUri; } if (typeof activeParentTrackId !== 'undefined' && activeParentTrackId) payload.parent_track_id = activeParentTrackId; } else { const coords = geometry.type === 'Polygon' ? geometry.coordinates[0] : geometry.coordinates; payload.distance = turf.length(geometry, {units: 'kilometers'}).toFixed(2); let gain = 0, loss = 0; for (let i = 1; i < coords.length; i++) { const diff = (coords[i][2] || 0) - (coords[i - 1][2] || 0); if (diff > 0) gain += diff; else loss -= diff; } payload.gain = gain.toFixed(0); payload.loss = loss.toFixed(0); payload.geojson_data = { type: "FeatureCollection", features: [{ type: "Feature", geometry: geometry, properties: { route_type: 'smart', stops: typeof routePoints !== 'undefined' ? routePoints : [] } }] }; }
                 try { const res = await authFetch(`${API_URL}/${kind === 'point' ? 'waypoints' : 'tracks'}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }); if (!res.ok) throw new Error("Failed to save to database"); closeRightPanel(); if (typeof activeParentTrackId !== 'undefined') activeParentTrackId = null; if (typeof draw !== 'undefined') draw.deleteAll(); refreshData(); if (typeof showToast !== 'undefined') showToast("Saved successfully!", "success"); } catch(e) { alert("Error saving: " + e.message); btn.innerText = '💾 SAVE TO DATABASE'; btn.disabled = false; }
             };
         };
@@ -552,7 +553,24 @@
                         const centerIndex = Math.floor(validGeoJSONGeometry.coordinates.length / 2);
                         const centerPoint = validGeoJSONGeometry.coordinates[centerIndex];
 
-                        showGeometryContextPopup(centerPoint, validGeoJSONGeometry, `Smart Route`, `🚗 Stats: Distance ${distKm}km, Time: ${durationMins}m`);
+                        // --- NEW: Generate Google Maps Directions Link ---
+                        let googleMapsUrl = '';
+                        if (routePoints && routePoints.length >= 2) {
+                            const origin = `${routePoints[0][1]},${routePoints[0][0]}`;
+                            const destination = `${routePoints[routePoints.length - 1][1]},${routePoints[routePoints.length - 1][0]}`;
+                            let waypointsParam = '';
+                            if (routePoints.length > 2) {
+                                // Add intermediate stops using Google's pipe separator
+                                const intermediate = routePoints.slice(1, -1).map(p => `${p[1]},${p[0]}`).join('|');
+                                waypointsParam = `&waypoints=${intermediate}`;
+                            }
+                            const modeMap = { 'driving': 'driving', 'walking': 'walking', 'cycling': 'bicycling' };
+                            const gMode = modeMap[activeProfile] || 'driving';
+                            googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypointsParam}&travelmode=${gMode}`;
+                        }
+
+                        // Pass the generated URL down to the popup as the 'defaultLink'
+                        showGeometryContextPopup(centerPoint, validGeoJSONGeometry, `Smart Route`, `🚗 Stats: Distance ${distKm}km, Time: ${durationMins}m`, null, '📍', '#38bdf8', googleMapsUrl);
                         lastCalculatedRoute = null;
                     } else if (e.key === 'Escape' && isRouting) {
                         isRouting = false;
