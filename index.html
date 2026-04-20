@@ -2782,6 +2782,13 @@
             const safePhone = (geom.phone || '').replace(/"/g, '"');
             const safeLink = (geom.link || '').replace(/"/g, '"');
             const safePhoto = (geom.photo_url || '').replace(/"/g, '"');
+            const safeIcon = geom.icon || '📍';
+            const iconOptions = [
+                '📍 Pin', '🥾 Hike', '🏃‍♂️ Run', '🚲 Bike', '⛺ Camp', '🏨 Hotel', '🍽️ Food', '☕ Cafe', '💧 Water', '🚻 Toilet', '📸 Photo', '⛰️ Peak', '🌲 Nature', '🌳 Forest', '🌻 Garden', '🏖️ Beach', '🚌 Bus', '🚐 Van', '🚗 Car', '🚂 Train', '✈️ Flight', '⛵ Boat', '🏥 Medical', '🛠️ Support', '👥 Group', '⚠️ Alert', 'ℹ️ Info', '🟢 Start', '🛑 Stop', '🏁 Finish', '🚩 Flag', '🔀 Intersection', '🛒 Shop', '⛽ Fuel', '🅿️ Parking', '🏰 Culture', '🌉 Bridge', '🎒 Gear'
+            ].map(opt => {
+                const emoji = opt.split(' ')[0];
+                return `<option value="${emoji}" ${safeIcon === emoji ? 'selected' : ''}>${opt}</option>`;
+            }).join('');
 
             const html = `
                 <div style="display:flex; flex-direction:column; gap:15px;">
@@ -2791,9 +2798,17 @@
                         <input type="text" id="edit-geom-title" value="${safeTitle}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
                     </div>
                     ${kind === 'point' ? `
-                    <div>
-                        <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Address</label>
-                        <input type="text" id="edit-geom-address" value="${safeAddress}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:2;">
+                            <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Address</label>
+                            <input type="text" id="edit-geom-address" value="${safeAddress}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
+                        </div>
+                        <div style="flex:1;">
+                            <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Map Icon</label>
+                            <select id="edit-geom-icon" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; font-size: 1.1em;">
+                                ${iconOptions}
+                            </select>
+                        </div>
                     </div>
                     <div style="display:flex; gap:10px;">
                         <div style="flex:1;">
@@ -2831,6 +2846,7 @@
                 payload.address = document.getElementById('edit-geom-address').value;
                 payload.phone = document.getElementById('edit-geom-phone').value;
                 payload.photo_url = document.getElementById('edit-geom-photo').value;
+                payload.icon = document.getElementById('edit-geom-icon').value;
             }
 
             const endpoint = kind === 'point' ? `waypoints/${id}` : `tracks/${id}`;
