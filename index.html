@@ -366,7 +366,14 @@
                     ${googleData && googleData.photoUrl ? `<img src="${googleData.photoUrl}" style="width:100%; height:140px; object-fit:cover; border-radius:8px;">` : ''}
                     <div><label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Name</label><input type="text" id="new-geom-title" value="${(title || '').replace(/"/g, '"')}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;"></div>
                     <div><label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">External Link (URL)</label><input type="text" id="new-geom-link" value="${defaultLink || ''}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;"></div>
-                    <div><label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Notes</label><textarea id="new-geom-notes" rows="3" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; resize:vertical;"></textarea></div>
+                    <div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                        <label style="font-size:0.85em; font-weight:bold; color:#34495e;">Notes & Attachments</label>
+                        <input type="file" id="upload-new-geom-file" style="display:none;" onchange="uploadMediaFile(this.files[0], 'new-geom-notes', document.getElementById('btn-upload-new-geom'))">
+                        <button id="btn-upload-new-geom" onclick="document.getElementById('upload-new-geom-file').click()" style="background:#8b5cf6; color:white; border:none; border-radius:4px; padding:2px 8px; font-size:0.8em; cursor:pointer; font-weight:bold;">📁 Attach File</button>
+                    </div>
+                    <textarea id="new-geom-notes" rows="3" placeholder="Type notes or paste an image here..." style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; resize:vertical;"></textarea>
+                </div>
                     <button id="btn-save-new-geom" style="width:100%; padding:14px; background:#27ae60; color:white; border:none; border-radius:8px; font-weight:bold; font-size:1.05em; margin-top:5px; cursor:pointer; box-shadow:0 4px 10px rgba(39, 174, 96, 0.3);">💾 SAVE TO DATABASE</button>
                 </div>
             `;
@@ -2167,8 +2174,12 @@
                         </div>
                     </div>
                     <div>
-                        <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Description / Notes</label>
-                        <textarea id="edit-task-desc" rows="6" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; font-family:inherit; resize:vertical;">${desc}</textarea>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                            <label style="font-size:0.85em; font-weight:bold; color:#34495e;">Characteristics & Attachments</label>
+                            <input type="file" id="upload-task-file" style="display:none;" onchange="uploadMediaFile(this.files[0], 'edit-task-desc', document.getElementById('btn-upload-task'))">
+                            <button id="btn-upload-task" onclick="document.getElementById('upload-task-file').click()" style="background:#8b5cf6; color:white; border:none; border-radius:4px; padding:2px 8px; font-size:0.8em; cursor:pointer; font-weight:bold;">📁 Attach File</button>
+                        </div>
+                        <textarea id="edit-task-desc" rows="3" placeholder="Type notes or paste an image here..." style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; resize:vertical;">${desc}</textarea>
                     </div>
                     <div>
                         <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Responsible</label>
@@ -2955,8 +2966,12 @@
                             <input type="text" id="edit-geom-phone" value="${safePhone}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
                         </div>
                         <div style="flex:1;">
-                            <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Photo URL</label>
-                            <input type="text" id="edit-geom-photo" value="${safePhoto}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
+                            <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Photo / File</label>
+                            <div style="display:flex; gap:5px;">
+                                <input type="text" id="edit-geom-photo" value="${safePhoto}" placeholder="URL or paste image..." style="flex:1; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
+                                <input type="file" id="upload-geom-file" style="display:none;" onchange="uploadMediaFile(this.files[0], 'edit-geom-photo', document.getElementById('btn-upload-geom'))">
+                                <button id="btn-upload-geom" onclick="document.getElementById('upload-geom-file').click()" style="background:#8b5cf6; color:white; border:none; border-radius:6px; padding:0 15px; cursor:pointer; font-weight:bold;" title="Upload File">📁</button>
+                            </div>
                         </div>
                     </div>
                     ` : ''}
@@ -3040,6 +3055,66 @@
                 }
             } catch (err) { alert("Error saving task: " + err.message); }
         }
+
+        // --- GLOBAL MEDIA UPLOAD LOGIC ---
+        async function uploadMediaFile(file, targetInputId, btnElement) {
+            if (!file) return;
+            const origText = btnElement ? btnElement.innerText : '📁';
+            if (btnElement) { btnElement.innerText = "⏳"; btnElement.disabled = true; }
+            else if (typeof showToast !== 'undefined') showToast("Uploading pasted file...", "info");
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                // Bypass authFetch to prevent JSON Content-Type overriding the multipart boundary
+                const res = await fetch('/api/upload', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` },
+                    body: formData
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    const targetInput = document.getElementById(targetInputId);
+                    if (targetInput) {
+                        if (targetInput.tagName.toLowerCase() === 'textarea') {
+                            // Append as Markdown for notes/descriptions
+                            const isImage = file.type.startsWith('image/');
+                            const mdLink = isImage ? `\n![${file.name || 'Image'}](${data.secure_url})\n` : `\n[📎 ${file.name || 'Document'}](${data.secure_url})\n`;
+                            targetInput.value += mdLink;
+                        } else {
+                            // Replace value for single-line text inputs
+                            targetInput.value = data.secure_url;
+                        }
+                    }
+                    if (typeof showToast !== 'undefined') showToast("File uploaded successfully!", "success");
+                } else {
+                    alert("Upload failed. Check server logs.");
+                }
+            } catch (e) {
+                alert("Error: " + e.message);
+            } finally {
+                if (btnElement) { btnElement.innerText = origText; btnElement.disabled = false; }
+            }
+        }
+
+        // Intercept Copy-Paste globally for images and documents
+        document.addEventListener('paste', (e) => {
+            const target = e.target;
+            // Only trigger if pasting into a text input or textarea
+            if (target.tagName.toLowerCase() === 'textarea' || target.type === 'text') {
+                const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+                for (let item of items) {
+                    if (item.kind === 'file') {
+                        const file = item.getAsFile();
+                        uploadMediaFile(file, target.id, null);
+                        e.preventDefault(); // Stop the default string paste
+                        break;
+                    }
+                }
+            }
+        });
 
     </script>
 </body>
