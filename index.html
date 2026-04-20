@@ -1121,13 +1121,14 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div style="display: flex; flex-direction: column; gap: 10px;">
-                                    ${geom.link ? `<button onclick="window.open('${geom.link.startsWith('http') ? geom.link : 'https://' + geom.link}', '_blank')" style="width:100%; background:#10b981; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; margin-bottom: 10px;">🔗 Open Track Link</button>` : ''}
-                                    <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="width:100%; background:#f59e0b; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; margin-bottom: 10px;">🗺️ Edit Route Geometry</button>
-                                    <button onclick="openGeomEditor('${geom.kind}', ${geom.waypoint_id || geom.track_id})" style="width:100%; background:#0ea5e9; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">✏️ Edit Metadata</button>
-                                    ${geom.kind === 'line' ? `<button onclick="startSegmentAnalysis(${task.task_id}, ${geom.track_id})" style="width:100%; background:#8b5cf6; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">✂️ Slice Segment (Analyzer)</button>` : ''}
-                                    <button onclick="unlinkGeometry(${task.task_id}, ${geom.anchor_id})" style="width:100%; background:#fee2e2; color:#ef4444; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🗑️ Remove from Task</button>
-                                </div>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        ${geom.link ? `<button onclick="window.open('${geom.link.startsWith('http') ? geom.link : 'https://' + geom.link}', '_blank')" style="width:100%; background:#10b981; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; margin-bottom: 10px;">🔗 Open Track Link</button>` : ''}
+                        <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="width:100%; background:#f59e0b; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; margin-bottom: 10px;">🗺️ Edit Route Geometry</button>
+                        <button onclick="openGeomEditor('${geom.kind}', ${geom.waypoint_id || geom.track_id})" style="width:100%; background:#0ea5e9; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">✏️ Edit Metadata</button>
+                        ${geom.kind === 'line' ? `<button onclick="startSegmentAnalysis(${task.task_id}, ${geom.track_id})" style="width:100%; background:#8b5cf6; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; margin-bottom: 10px;">✂️ Slice Segment (Analyzer)</button>
+                        <button onclick="forceElevationRecalc(${task.task_id}, ${geom.track_id}, event)" style="width:100%; background:#8e44ad; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🏔️ Force Elevation Recalc</button>` : ''}
+                        <button onclick="unlinkGeometry(${task.task_id}, ${geom.anchor_id})" style="width:100%; background:#fee2e2; color:#ef4444; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🗑️ Remove from Task</button>
+                    </div>
                             `;
                             openRightPanel(`${geom.kind === 'polygon' ? '🛑' : '📈'} ${geom.title}`, html);
 
@@ -1386,7 +1387,8 @@
                         ${geom.link ? `<button onclick="window.open('${geom.link.startsWith('http') ? geom.link : 'https://' + geom.link}', '_blank')" style="width:100%; background:#10b981; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; margin-bottom: 10px;">🔗 Open Track Link</button>` : ''}
                         <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="width:100%; background:#f59e0b; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; margin-bottom: 10px;">🗺️ Edit Route Geometry</button>
                         <button onclick="openGeomEditor('${geom.kind}', ${geom.waypoint_id || geom.track_id})" style="width:100%; background:#0ea5e9; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">⚙️ Edit Metadata</button>
-                        ${geom.kind === 'line' ? `<button onclick="startSegmentAnalysis(${task.task_id}, ${geom.track_id})" style="width:100%; background:#8b5cf6; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">✂️ Slice Segment (Analyzer)</button>` : ''}
+                        ${geom.kind === 'line' ? `<button onclick="startSegmentAnalysis(${task.task_id}, ${geom.track_id})" style="width:100%; background:#8b5cf6; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; margin-bottom: 10px;">✂️ Slice Segment (Analyzer)</button>
+                        <button onclick="forceElevationRecalc(${task.task_id}, ${geom.track_id}, event)" style="width:100%; background:#8e44ad; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🏔️ Force Elevation Recalc</button>` : ''}
                         <button onclick="unlinkGeometry(${task.task_id}, ${geom.anchor_id})" style="width:100%; background:#fee2e2; color:#ef4444; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🗑️ Remove from Task</button>
                     </div>
                 `;
@@ -1410,6 +1412,68 @@
                     }, 2500);
                 }
             }
+        }
+
+        async function forceElevationRecalc(taskId, trackId, event) {
+            const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
+            const geom = task?.geometries.find(g => g.track_id === trackId);
+            if (!geom || !geom.geojson) return;
+
+            const btn = event.currentTarget;
+            const origText = btn.innerText;
+            btn.innerText = "⏳ Rendering Terrain... Please wait";
+            btn.disabled = true;
+
+            const coords = geom.geojson.features[0].geometry.type === 'Polygon' ? geom.geojson.features[0].geometry.coordinates[0] : geom.geojson.features[0].geometry.coordinates;
+
+            // Fly to bounds to ensure DEM physically loads onto the screen
+            const bbox = turf.bbox(geom.geojson);
+            map.fitBounds(bbox, { padding: 80, duration: 1500 });
+
+            // Wait for map to settle and load the 3D tiles
+            setTimeout(async () => {
+                btn.innerText = "📈 Resampling Altitude...";
+                let newGain = 0, newLoss = 0;
+                
+                for (let i = 0; i < coords.length; i++) {
+                    const z = map.queryTerrainElevation(coords[i]);
+                    if (z !== null) {
+                        coords[i][2] = z;
+                    } else if (i > 0 && coords[i-1][2]) {
+                        coords[i][2] = coords[i-1][2]; // Interpolation fallback
+                    } else {
+                        coords[i][2] = 0;
+                    }
+
+                    if (i > 0) {
+                        const diff = coords[i][2] - coords[i-1][2];
+                        if (diff > 0) newGain += diff;
+                        else newLoss -= Math.abs(diff);
+                    }
+                }
+
+                geom.gain = newGain.toFixed(0);
+                geom.loss = Math.abs(newLoss).toFixed(0);
+
+                try {
+                    await authFetch(`${API_URL}/tracks/${trackId}`, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            geojson_data: geom.geojson,
+                            gain: geom.gain,
+                            loss: geom.loss
+                        })
+                    });
+                    if (typeof showToast !== 'undefined') showToast("Elevation perfectly recalculated!", "success");
+                    refreshData();
+                } catch (e) {
+                    alert("Failed to save recalculation: " + e.message);
+                } finally {
+                    btn.innerText = origText;
+                    btn.disabled = false;
+                }
+            }, 3000); // 3-second delay gives Mapbox time to fetch high-res DEM tiles over the network
         }
 
         function cycleSidebar() {

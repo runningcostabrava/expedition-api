@@ -59,8 +59,6 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(iconEmoji, 12, 14);
-                    const img = new Image();
-                    img.src = canvas.toDataURL();
 
                     waypointDataset.push({
                         x: distances[nearestIdx],
@@ -70,7 +68,8 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                         lng: g.lng,
                         lat: g.lat
                     });
-                    customPointStyles.push(img);
+                    // Pass the raw canvas directly. Image objects cause race-condition invisible rendering!
+                    customPointStyles.push(canvas); 
                 }
             }
         });

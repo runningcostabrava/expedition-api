@@ -53,9 +53,18 @@ const KomootEngine = {
         let simpCoords = simplified.geometry.coordinates;
         if (feature.geometry.type === 'Polygon') simpCoords = simpCoords[0];
         
-        this.state.intersections = simpCoords.map((c, i) => ({ id: Date.now() + i, lngLat: [c[0], c[1]], z: c[2] || 0 }));
-        
         const origCoords = feature.geometry.type === 'Polygon' ? feature.geometry.coordinates[0] : feature.geometry.coordinates;
+
+        // Explicitly recover the Z-coordinates that Turf.simplify strips out
+        this.state.intersections = simpCoords.map((c, i) => {
+            let closestZ = 0;
+            let minDist = Infinity;
+            for(let oc of origCoords) {
+                const dist = Math.pow(oc[0]-c[0], 2) + Math.pow(oc[1]-c[1], 2);
+                if (dist < minDist) { minDist = dist; closestZ = oc[2] || 0; }
+            }
+            return { id: Date.now() + i, lngLat: [c[0], c[1]], z: closestZ };
+        });
         
         // FIX: Switchback Corruption Bug. 
         // turf.lineSlice snaps to the geometrically closest point, which scrambles switchback trails.
