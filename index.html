@@ -517,7 +517,11 @@
                         let newGain = 0, newLoss = 0;
                         const coords3D = validGeoJSONGeometry.coordinates;
                         for (let i = 0; i < coords3D.length; i++) {
-                            const z = map.queryTerrainElevation(coords3D[i]) || 0;
+                            let z = map.queryTerrainElevation(coords3D[i]);
+                            if (z === null) {
+                                // If Mapbox DEM is not loaded, carry forward the last known elevation to prevent cliffs
+                                z = i > 0 ? coords3D[i-1][2] : 0;
+                            }
                             coords3D[i] = [coords3D[i][0], coords3D[i][1], z];
                             if (i > 0) {
                                 const diff = coords3D[i][2] - coords3D[i - 1][2];

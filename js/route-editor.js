@@ -53,7 +53,7 @@ const KomootEngine = {
         let simpCoords = simplified.geometry.coordinates;
         if (feature.geometry.type === 'Polygon') simpCoords = simpCoords[0];
         
-        this.state.intersections = simpCoords.map((c, i) => ({ id: Date.now() + i, lngLat: [c[0], c[1]] }));
+        this.state.intersections = simpCoords.map((c, i) => ({ id: Date.now() + i, lngLat: [c[0], c[1]], z: c[2] || 0 }));
         
         const origCoords = feature.geometry.type === 'Polygon' ? feature.geometry.coordinates[0] : feature.geometry.coordinates;
         
@@ -198,29 +198,42 @@ const KomootEngine = {
 
     refreshAllSegments: async function () {
         let totalGain = 0; let totalLoss = 0;
-        for (const seg of this.state.segments) {
-            const start = this.state.intersections[seg.startIdx].lngLat;
-            const end = this.state.intersections[seg.endIdx].lngLat;
+        for (let sIdx = 0; sIdx < this.state.segments.length; sIdx++) {
+            const seg = this.state.segments[sIdx];
+            const startNode = this.state.intersections[seg.startIdx];
+            const endNode = this.state.intersections[seg.endIdx];
+            const startLngLat = startNode.lngLat;
+            const endLngLat = endNode.lngLat;
 
             if (seg.type === 'imported' && seg.geometry) {
                 // Keep exact GPX geometry, no Mapbox API call needed
             } else if (seg.type === 'smart') {
                 try {
-                    const url = `https://api.mapbox.com/directions/v5/mapbox/walking/${start.join(',')};${end.join(',')}?geometries=geojson&access_token=${mapboxgl.accessToken}`;
+                    const url = `https://api.mapbox.com/directions/v5/mapbox/walking/${startLngLat.join(',')};${endLngLat.join(',')}?geometries=geojson&access_token=${mapboxgl.accessToken}`;
                     const res = await fetch(url);
                     const data = await res.json();
                     seg.geometry = data.routes[0].geometry;
-                } catch (e) { seg.geometry = turf.lineString([start, end]).geometry; }
+                } catch (e) { seg.geometry = turf.lineString([startLngLat, endLngLat]).geometry; }
             } else {
-                seg.geometry = turf.lineString([start, end]).geometry;
+                seg.geometry = turf.lineString([startLngLat, endLngLat]).geometry;
             }
 
             if (seg.geometry && seg.geometry.coordinates) {
                 const coords = seg.geometry.coordinates;
+                
+                // Pre-calculate start and end Z for interpolation fallback
+                const startZ = startNode.z || (sIdx > 0 ? (this.state.segments[sIdx-1].geometry?.coordinates.slice(-1)[0][2] || 0) : 0);
+                const endZ = endNode.z || startZ;
+
                 for (let i = 0; i < coords.length; i++) {
-                    // Ensure Z coordinate (elevation) exists for every point
-                    if (coords[i].length < 3 || !coords[i][2]) {
-                        const z = map.queryTerrainElevation(coords[i]) || 0;
+                    // Ensure Z coordinate exists. If Mapbox DEM fails (zoomed out/off-screen), interpolate!
+                    if (coords[i].length < 3 || coords[i][2] === undefined || coords[i][2] === null) {
+                        let z = map.queryTerrainElevation(coords[i]);
+                        if (z === null) {
+                            // Interpolate based on index ratio to prevent 0-meter cliffs
+                            const ratio = coords.length > 1 ? (i / (coords.length - 1)) : 0;
+                            z = startZ + (endZ - startZ) * ratio;
+                        }
                         coords[i] = [coords[i][0], coords[i][1], z];
                     }
                     if (i > 0) {
