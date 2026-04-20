@@ -3100,7 +3100,8 @@
                     }
                     if (typeof showToast !== 'undefined') showToast("File uploaded successfully!", "success");
                 } else {
-                    alert("Upload failed. Check server logs.");
+                    const errorData = await res.json().catch(() => ({}));
+                    alert(`Upload failed: ${errorData.details || errorData.error || 'Internal Server Error'}`);
                 }
             } catch (e) {
                 alert("Error: " + e.message);

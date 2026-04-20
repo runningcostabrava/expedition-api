@@ -153,9 +153,13 @@ app.post('/api/upload', adminAuth, upload.single('file'), (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
 
+    // If it's an image, let Cloudinary process it ('auto'). If it's a document/PDF, store it exactly as-is ('raw').
+    const isImage = req.file.mimetype.startsWith('image/');
+    const resType = isImage ? 'auto' : 'raw';
+
     // Create a direct upload stream to Cloudinary
     const stream = cloudinary.uploader.upload_stream(
-      { folder: "expedition_media", resource_type: "auto" },
+      { folder: "expedition_media", resource_type: resType },
       (error, result) => {
         if (error) {
           console.error("Cloudinary Stream Error:", error);
