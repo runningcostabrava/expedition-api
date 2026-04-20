@@ -270,7 +270,7 @@ body {
 .task-actions-modern {
     display: flex;
     gap: 2px;
-    opacity: 0.1;
+    opacity: 1 !important;
     transition: opacity 0.2s;
 }
 
@@ -442,6 +442,7 @@ body {
     align-items: center;
     gap: 4px;
     flex-shrink: 0;
+    opacity: 1 !important;
 }
 
 .action-icon-btn {
@@ -714,6 +715,7 @@ button {
     border-radius: 6px;
     cursor: pointer;
     font-weight: 600;
+    min-height: 44px;
 }
 
 .save-btn {
@@ -1023,5 +1025,38 @@ button {
 
     100% {
         box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    }
+}
+
+@media (max-width: 768px) {
+    #left-panel, #task-detail-panel, #right-panel {
+        width: 100% !important;
+        left: 0 !important;
+        height: 60vh !important;
+        position: fixed !important;
+        top: auto !important;
+        bottom: 0 !important;
+        border-radius: 20px 20px 0 0 !important;
+        transform: translateY(100%) !important;
+        transition: transform 0.3s ease-out !important;
+    }
+
+    #left-panel.open, #task-detail-panel.open, #right-panel:not(.hidden) {
+        transform: translateY(0) !important;
+    }
+
+    /* Override hidden class for mobile bottom sheets */
+    #left-panel.hidden {
+        transform: translateY(100%) !important;
+        opacity: 1 !important;
+    }
+
+    /* Mapbox UI Fix for Mobile Bottom Sheets */
+    .mapboxgl-ctrl-top-left {
+        top: 70px !important;
+        left: 10px !important;
+    }
+    .mapboxgl-ctrl-top-right {
+        top: 70px !important;
     }
 }

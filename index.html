@@ -6,6 +6,7 @@
     <link rel="icon" href="data:,">
     <title>Expedition Ecosystem v2.0 - Logistics Dashboard</title>
     <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link rel="manifest" href="/manifest.json">
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.0/mapbox-gl-draw.css"
         type="text/css">
@@ -29,6 +30,15 @@
 </head>
 
 <body>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Service Worker registered', reg))
+                    .catch(err => console.log('Service Worker registration failed', err));
+            });
+        }
+    </script>
     <div id="command-bar">
         <div style="font-weight: 900; color: #0f172a; margin-right: 10px;">EXPEDITION v2</div>
 
@@ -1064,6 +1074,10 @@
                         };
                         parsedComments = marked.parse(geom.comments || '', { renderer: renderer, breaks: true });
                     }
+                } catch (e) {
+                    console.error("Markdown parsing error:", e);
+                    parsedComments = geom.comments || '';
+                }
 
                     const html = `
                         ${geom.photo_url ? `<img src="${geom.photo_url}" style="width:100%; height:180px; object-fit:cover; border-radius:8px; margin-bottom:15px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">` : ''}
@@ -1407,6 +1421,10 @@
                     };
                     parsedComments = marked.parse(geom.comments || '', { renderer: renderer, breaks: true });
                 }
+            } catch (e) {
+                console.error("Markdown parsing error:", e);
+                parsedComments = geom.comments || '';
+            }
 
                 const html = `
                     <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
