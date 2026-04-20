@@ -2181,6 +2181,16 @@
                         </div>
                         <textarea id="edit-task-desc" rows="3" placeholder="Type notes or paste an image here..." style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; resize:vertical;">${desc}</textarea>
                     </div>
+
+                ${task ? `
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e2e8f0;">
+                    <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:10px; color:#34495e;">🗺️ Export GPS Data</label>
+                    <div style="display:flex; gap:10px;">
+                        <button onclick="exportTaskToGPX(${task.task_id})" style="flex:1; background:#f39c12; color:white; border:none; border-radius:6px; padding:10px; cursor:pointer; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: 0.2s;">📥 Download GPX</button>
+                        <button onclick="exportTaskToKML(${task.task_id})" style="flex:1; background:#3498db; color:white; border:none; border-radius:6px; padding:10px; cursor:pointer; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: 0.2s;">🌍 Download KML</button>
+                    </div>
+                </div>
+                ` : ''}
                     <div>
                         <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Responsible</label>
                         <input type="text" id="edit-task-resp" value="${safeResp}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
@@ -3115,6 +3125,66 @@
                 }
             }
         });
+
+        // --- EXPORT TO GPX / KML LOGIC ---
+        function downloadString(text, fileName, fileType) {
+            let blob = new Blob([text], { type: fileType });
+            let a = document.createElement('a');
+            a.download = fileName;
+            a.href = URL.createObjectURL(blob);
+            a.style.display = "none";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+        }
+
+        async function exportTaskToGPX(taskId) {
+            const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
+            if (!task) return;
+            
+            let gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="ExpeditionApp">\n`;
+            gpx += `  <metadata><name>${(task.task_name || 'Task').replace(/&/g, '&')}</name></metadata>\n`;
+            
+            task.geometries.forEach(g => {
+                if (g.kind === 'point' && g.lat) {
+                    gpx += `  <wpt lat="${g.lat}" lon="${g.lng}">\n    <name>${(g.title || 'Waypoint').replace(/&/g, '&')}</name>\n    <sym>Waypoint</sym>\n  </wpt>\n`;
+                } else if (g.geojson && g.geojson.features && g.geojson.features.length > 0) {
+                    gpx += `  <trk>\n    <name>${(g.title || 'Track').replace(/&/g, '&')}</name>\n    <trkseg>\n`;
+                    const coords = g.geojson.features[0].geometry.type === 'Polygon' ? g.geojson.features[0].geometry.coordinates[0] : g.geojson.features[0].geometry.coordinates;
+                    coords.forEach(c => {
+                        gpx += `      <trkpt lat="${c[1]}" lon="${c[0]}">${c[2] !== undefined ? `<ele>${c[2]}</ele>` : ''}</trkpt>\n`;
+                    });
+                    gpx += `    </trkseg>\n  </trk>\n`;
+                }
+            });
+            gpx += `</gpx>`;
+            
+            downloadString(gpx, `${(task.task_name || 'Task').replace(/[^a-z0-9]/gi, '_')}.gpx`, 'application/gpx+xml');
+            if (typeof showToast !== 'undefined') showToast("GPX Downloaded!", "success");
+        }
+
+        async function exportTaskToKML(taskId) {
+            const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
+            if (!task) return;
+            
+            let kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n  <Document>\n    <name>${(task.task_name || 'Task').replace(/&/g, '&')}</name>\n`;
+            
+            task.geometries.forEach(g => {
+                if (g.kind === 'point' && g.lat) {
+                    kml += `    <Placemark>\n      <name>${(g.title || 'Waypoint').replace(/&/g, '&')}</name>\n      <Point><coordinates>${g.lng},${g.lat},0</coordinates></Point>\n    </Placemark>\n`;
+                } else if (g.geojson && g.geojson.features && g.geojson.features.length > 0) {
+                    kml += `    <Placemark>\n      <name>${(g.title || 'Track').replace(/&/g, '&')}</name>\n      <LineString><coordinates>\n`;
+                    const coords = g.geojson.features[0].geometry.type === 'Polygon' ? g.geojson.features[0].geometry.coordinates[0] : g.geojson.features[0].geometry.coordinates;
+                    kml += coords.map(c => `${c[0]},${c[1]},${c[2] || 0}`).join(' ');
+                    kml += `\n      </coordinates></LineString>\n    </Placemark>\n`;
+                }
+            });
+            kml += `  </Document>\n</kml>`;
+            
+            downloadString(kml, `${(task.task_name || 'Task').replace(/[^a-z0-9]/gi, '_')}.kml`, 'application/vnd.google-earth.kml+xml');
+            if (typeof showToast !== 'undefined') showToast("KML Downloaded!", "success");
+        }
 
     </script>
 </body>
