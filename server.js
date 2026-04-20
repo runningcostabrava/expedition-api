@@ -5,6 +5,19 @@ const { Pool } = require('pg');
 const bodyParser = require('body-parser');
 const path = require('path');
 const axios = require('axios'); // Added for Traccar proxy
+const cloudinary = require('cloudinary').v2;
+const multer = require('multer');
+
+// Configure Cloudinary using the environment variables
+cloudinary.config({ 
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME, 
+  api_key: process.env.CLOUDINARY_API_KEY, 
+  api_secret: process.env.CLOUDINARY_API_SECRET 
+});
+
+// Configure Multer to hold files in memory temporarily before sending to Cloudinary
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 const app = express();
 app.use(cors());
@@ -136,6 +149,31 @@ app.get('/setup-db', adminAuth, async (req, res) => {
   } catch (err) {
     console.error("Setup Error:", err);
     res.status(500).send("Setup Error: " + err.message);
+  }
+});
+
+// --- MEDIA UPLOAD (CLOUDINARY) ---
+app.post('/api/upload', adminAuth, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+
+    // Convert the file buffer to a base64 data URI so Cloudinary can process it directly from memory
+    const b64 = Buffer.from(req.file.buffer).toString('base64');
+    let dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+
+    // Upload to Cloudinary into a dedicated folder
+    const result = await cloudinary.uploader.upload(dataURI, {
+      folder: "expedition_media", // This creates the specific area in your Cloudinary account
+      resource_type: "auto" // 'auto' allows both images (jpg/png) and documents (pdfs)
+    });
+
+    // Return the permanent, public URL
+    res.json({ secure_url: result.secure_url });
+  } catch (error) {
+    console.error("Cloudinary Upload Error:", error);
+    res.status(500).json({ error: 'Upload failed', details: error.message });
   }
 });
 
