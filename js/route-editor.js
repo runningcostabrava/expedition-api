@@ -40,7 +40,6 @@ const KomootEngine = {
         reader.readAsText(file);
     },
 
-    // Now accepts editMeta
     initFromGpx: async function (feature, fileName, editMeta = null) {
         if (typeof draw !== 'undefined' && draw && typeof draw.deleteAll === 'function') {
             draw.deleteAll();
@@ -49,29 +48,66 @@ const KomootEngine = {
         this.state.currentFileName = fileName || 'Edited Route';
         this.state.editMeta = editMeta; 
 
-        // Lowered tolerance (0.0005) gives more control points for off-road tracks
+        // Simplify to get control points for the editor
         const simplified = turf.simplify(feature, { tolerance: 0.0005, highQuality: true });
-        let coords = simplified.geometry.coordinates;
-        if (feature.geometry.type === 'Polygon') coords = coords[0];
+        let simpCoords = simplified.geometry.coordinates;
+        if (feature.geometry.type === 'Polygon') simpCoords = simpCoords[0];
         
-        this.state.intersections = coords.map((c, i) => ({ id: Date.now() + i, lngLat: [c[0], c[1]] }));
-        this.state.segments = [];
-
+        this.state.intersections = simpCoords.map((c, i) => ({ id: Date.now() + i, lngLat: [c[0], c[1]] }));
+        
         const origCoords = feature.geometry.type === 'Polygon' ? feature.geometry.coordinates[0] : feature.geometry.coordinates;
-        const origLine = turf.lineString(origCoords);
-
-        for (let i = 0; i < this.state.intersections.length - 1; i++) {
-            const startPt = turf.point(this.state.intersections[i].lngLat);
-            const endPt = turf.point(this.state.intersections[i + 1].lngLat);
+        
+        // FIX: Switchback Corruption Bug. 
+        // turf.lineSlice snaps to the geometrically closest point, which scrambles switchback trails.
+        // Instead, we find the exact array indices of the simplified points to slice chronologically.
+        let origIdx = 0;
+        const intersectionIndices = [];
+        
+        for (let pt of this.state.intersections) {
+            let found = -1;
+            let minDist = Infinity;
             
-            // Slice the EXACT original geometry between the simplified points
-            let slicedGeometry;
-            try {
-                const snappedStart = turf.nearestPointOnLine(origLine, startPt);
-                const snappedEnd = turf.nearestPointOnLine(origLine, endPt);
-                slicedGeometry = turf.lineSlice(snappedStart, snappedEnd, origLine).geometry;
-            } catch(e) {
-                slicedGeometry = turf.lineString([startPt.geometry.coordinates, endPt.geometry.coordinates]).geometry;
+            // Search forward to maintain strict chronological order
+            for (let i = origIdx; i < origCoords.length; i++) {
+                const dist = Math.pow(origCoords[i][0] - pt.lngLat[0], 2) + Math.pow(origCoords[i][1] - pt.lngLat[1], 2);
+                if (dist < 1e-10) { // Practically identical
+                    found = i;
+                    break;
+                }
+                if (dist < minDist) {
+                    minDist = dist;
+                    found = i;
+                }
+            }
+            
+            // Fallback search if exact sequence was broken
+            if (found === -1 || minDist > 1e-8) {
+                minDist = Infinity;
+                for (let i = 0; i < origCoords.length; i++) {
+                    const dist = Math.pow(origCoords[i][0] - pt.lngLat[0], 2) + Math.pow(origCoords[i][1] - pt.lngLat[1], 2);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        found = i;
+                    }
+                }
+            }
+            
+            intersectionIndices.push(found);
+            if (found !== -1 && found >= origIdx) origIdx = found; 
+        }
+
+        this.state.segments = [];
+        for (let i = 0; i < this.state.intersections.length - 1; i++) {
+            let sliceStart = intersectionIndices[i];
+            let sliceEnd = intersectionIndices[i + 1];
+            
+            let slicedCoords = [];
+            // Slice the array directly to guarantee 100% preservation of 3D Z-coordinates and chronological order
+            if (sliceStart !== -1 && sliceEnd !== -1 && sliceEnd >= sliceStart) {
+                slicedCoords = origCoords.slice(sliceStart, sliceEnd + 1);
+            } else {
+                // Failsafe
+                slicedCoords = [this.state.intersections[i].lngLat, this.state.intersections[i+1].lngLat];
             }
 
             this.state.segments.push({ 
@@ -79,13 +115,12 @@ const KomootEngine = {
                 type: 'imported', // Locks the exact GPX shape
                 startIdx: i, 
                 endIdx: i + 1, 
-                geometry: slicedGeometry
+                geometry: { type: 'LineString', coordinates: slicedCoords }
             });
         }
         
         await this.refreshAllSegments();
         
-        // Re-center map to the imported route
         const bbox = turf.bbox(feature);
         map.fitBounds(bbox, { padding: 50 });
         
