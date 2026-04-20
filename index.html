@@ -2807,7 +2807,7 @@
                 renderer.image = function(href, title, text) {
                     return `<img src="${href}" alt="${text}" style="max-width:100%; max-height:300px; border-radius:8px; display:block; margin:10px 0; box-shadow:0 2px 4px rgba(0,0,0,0.1);">`;
                 };
-                parsedCharacteristics = marked.parse(task.characteristics, { renderer: renderer, breaks: true });
+                parsedCharacteristics = marked.parse(task.characteristics || '', { renderer: renderer, breaks: true });
             }
 
             let html = `
