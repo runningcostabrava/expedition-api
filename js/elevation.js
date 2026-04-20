@@ -37,22 +37,41 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
     // FIND WAYPOINTS: Locate all points belonging to the active task
     const task = AppStore.get('itinerary').find(t => t.task_id === AppStore.get('activeTaskId'));
     const waypointDataset = [];
+    let customPointStyles = [];
+
     if (task && task.geometries && geojson.features[0].geometry.type !== 'Polygon') {
-        const trackFeature = geojson.features[0];
         task.geometries.forEach(g => {
             if (g.kind === 'point' && g.lng && g.lat) {
-                const snapped = turf.nearestPointOnLine(trackFeature, [g.lng, g.lat]);
-                const sliced = turf.lineSlice(coords[0], snapped, trackFeature);
-                const distOnTrack = turf.length(sliced, { units: 'kilometers' });
-
-                waypointDataset.push({
-                    x: distOnTrack.toFixed(2),
-                    y: snapped.geometry.coordinates[2] || 0,
-                    title: g.title,
-                    icon: g.icon || '📍',
-                    lng: g.lng,
-                    lat: g.lat
+                let minDist = Infinity;
+                let nearestIdx = 0;
+                const pt = turf.point([g.lng, g.lat]);
+                coords.forEach((c, idx) => {
+                    const d = turf.distance(pt, turf.point(c));
+                    if (d < minDist) { minDist = d; nearestIdx = idx; }
                 });
+
+                if (minDist < 5) { // Only snap if within 5km
+                    const iconEmoji = (g.icon || '📍').split(' ')[0];
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 24; canvas.height = 24;
+                    const ctx = canvas.getContext('2d');
+                    ctx.font = '18px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(iconEmoji, 12, 14);
+                    const img = new Image();
+                    img.src = canvas.toDataURL();
+
+                    waypointDataset.push({
+                        x: distances[nearestIdx],
+                        y: elevations[nearestIdx], // Exact chart Y value
+                        title: g.title,
+                        icon: g.icon || '📍',
+                        lng: g.lng,
+                        lat: g.lat
+                    });
+                    customPointStyles.push(img);
+                }
             }
         });
     }
@@ -67,11 +86,9 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                     label: 'Waypoints',
                     data: waypointDataset,
                     type: 'scatter',
-                    backgroundColor: '#e67e22',
-                    borderColor: '#fff',
-                    borderWidth: 2,
-                    pointRadius: 6,
-                    pointHoverRadius: 9,
+                    pointStyle: customPointStyles,
+                    backgroundColor: 'transparent',
+                    borderColor: 'transparent',
                     zIndex: 10
                 },
                 { label: title, data: elevations, fill: true, tension: 0.4, borderColor: '#3498db', backgroundColor: 'rgba(52, 152, 219, 0.2)' }

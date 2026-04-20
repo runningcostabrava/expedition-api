@@ -1299,19 +1299,37 @@
 
             const layerId = `layer-${id}`;
             flyToGeometry(geom.lng, geom.lat, kind, layerId);
-            openGeomEditor(kind, id);
+            
+            const markerColor = task.category_color || geom.color || '#3498db';
+            const renderIcon = (geom.icon && geom.icon !== 'marker' && geom.icon.trim() !== '') ? geom.icon : (task.category_icon || '📍');
+            
+            if (kind === 'point') {
+                const html = `
+                    ${geom.photo_url ? `<img src="${geom.photo_url}" style="width:100%; height:180px; object-fit:cover; border-radius:8px; margin-bottom:15px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">` : ''}
+                    <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                        <p style="margin: 0 0 5px 0; font-size: 0.85em; color: #94a3b8; font-weight: bold;">Section: ${task.section_id ? (AppStore.get('sections').find(s => s.id === task.section_id)?.title || 'Unknown') : 'Unscheduled'}</p>
+                        <p style="margin: 0 0 10px 0; font-size: 0.9em; color: #64748b; font-weight: bold;">Parent Task: ${task.task_name || 'Unnamed Task'}</p>
+                        ${geom.address ? `<div style="font-size:0.9em; margin-bottom:8px; color:#334155;">📍 ${geom.address}</div>` : ''}
+                        ${geom.phone ? `<div style="font-size:0.9em; margin-bottom:8px; color:#334155;">📞 ${geom.phone}</div>` : ''}
 
-            if (kind === 'line' && geom.geojson) {
-                // Highlight track temporarily
-                if (map.getLayer(layerId)) {
-                    const origWidth = map.getPaintProperty(layerId, 'line-width') || 4;
-                    map.setPaintProperty(layerId, 'line-width', 9); // Thicken to highlight
-                    setTimeout(() => {
-                        if (map.getLayer(layerId)) map.setPaintProperty(layerId, 'line-width', origWidth);
-                    }, 2500); // Reset after 2.5 seconds
-                }
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top: 15px;">
+                            ${geom.link ? `<button onclick="window.open('${geom.link.startsWith('http') ? geom.link : 'https://' + geom.link}', '_blank')" style="background:#0ea5e9; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; font-size:0.85em; box-shadow: 0 2px 4px rgba(14, 165, 233, 0.2);">🌐 Website</button>` : ''}
+                            ${geom.google_maps_url ? `<button onclick="window.open('${geom.google_maps_url}', '_blank')" style="background:#10b981; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; font-size:0.85em; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);">🗺️ Open Maps</button>` : ''}
+                            ${geom.phone ? `<button onclick="window.open('tel:${geom.phone.replace(/[^0-9+]/g, '')}', '_self')" style="background:#8b5cf6; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; font-size:0.85em; box-shadow: 0 2px 4px rgba(139, 92, 246, 0.2);">📞 Call Now</button>` : ''}
+                        </div>
 
-                // Gather stats and open elevation profile
+                        ${geom.comments ? `<div style="background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; margin-top: 15px; font-size: 0.85em; color: #475569; line-height: 1.5; white-space: pre-wrap;"><strong>📝 Notes & Info:</strong><br>${geom.comments}</div>` : ''}
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        <button onclick="openGeomEditor('point', ${geom.waypoint_id || geom.anchor_id})" style="flex:1; background:#34495e; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">⚙️ Edit Metadata</button>
+                        <button onclick="unlinkGeometry(${task.task_id}, ${geom.anchor_id})" style="flex:1; background:#fee2e2; color:#ef4444; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🗑️ Remove from Task</button>
+                    </div>
+                    <button style="width: 100%; background: #f59e0b; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);" onclick="openStreetView(${geom.lat}, ${geom.lng})">
+                        🚶‍♂️ Drop Street View Here
+                    </button>
+                `;
+                openRightPanel(`${renderIcon} ${geom.title}`, html);
+            } else {
                 let dist = geom.distance;
                 if (!dist || dist == 0) dist = turf.length(geom.geojson, { units: 'kilometers' }).toFixed(2);
 
@@ -1327,6 +1345,31 @@
                     loss = cl.toFixed(0);
                 }
 
+                const html = `
+                    <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                        <p style="margin: 0 0 5px 0; font-size: 0.85em; color: #94a3b8; font-weight: bold;">Section: ${task.section_id ? (AppStore.get('sections').find(s => s.id === task.section_id)?.title || 'Unknown') : 'Unscheduled'}</p>
+                        <p style="margin: 0 0 10px 0; font-size: 0.9em; color: #64748b; font-weight: bold;">Parent Task: ${task.task_name || 'Unnamed Task'}</p>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: center;">
+                            <div style="background: white; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                                <div style="font-size: 0.8em; color: #64748b;">Distance</div>
+                                <div style="font-weight: bold; color: #0f172a;">📏 ${dist} km</div>
+                            </div>
+                            <div style="background: white; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                                <div style="font-size: 0.8em; color: #64748b;">Elevation</div>
+                                <div style="font-weight: bold;"><span style="color:#10b981">▲ ${parseFloat(gain).toFixed(0)}m</span> | <span style="color:#ef4444">▼ ${parseFloat(loss).toFixed(0)}m</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        ${geom.link ? `<button onclick="window.open('${geom.link.startsWith('http') ? geom.link : 'https://' + geom.link}', '_blank')" style="width:100%; background:#10b981; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; margin-bottom: 10px;">🔗 Open Track Link</button>` : ''}
+                        <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="width:100%; background:#f59e0b; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; margin-bottom: 10px;">🗺️ Edit Route Geometry</button>
+                        <button onclick="openGeomEditor('${geom.kind}', ${geom.waypoint_id || geom.track_id})" style="width:100%; background:#0ea5e9; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">⚙️ Edit Metadata</button>
+                        ${geom.kind === 'line' ? `<button onclick="startSegmentAnalysis(${task.task_id}, ${geom.track_id})" style="width:100%; background:#8b5cf6; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">✂️ Slice Segment (Analyzer)</button>` : ''}
+                        <button onclick="unlinkGeometry(${task.task_id}, ${geom.anchor_id})" style="width:100%; background:#fee2e2; color:#ef4444; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🗑️ Remove from Task</button>
+                    </div>
+                `;
+                openRightPanel(`${renderIcon} ${geom.title}`, html);
+
                 const props = geom.geojson.features[0].properties || {};
                 showElevationProfile(geom.geojson, geom.title, {
                     distance: dist,
@@ -1334,6 +1377,16 @@
                     gain: gain,
                     loss: loss
                 }, geom.track_id);
+            }
+
+            if (kind === 'line' && geom.geojson) {
+                if (map.getLayer(layerId)) {
+                    const origWidth = map.getPaintProperty(layerId, 'line-width') || 4;
+                    map.setPaintProperty(layerId, 'line-width', 9);
+                    setTimeout(() => {
+                        if (map.getLayer(layerId)) map.setPaintProperty(layerId, 'line-width', origWidth);
+                    }, 2500);
+                }
             }
         }
 

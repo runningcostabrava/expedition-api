@@ -880,8 +880,8 @@ button {
     position: absolute;
     top: 85px;
     right: 15px;
-    bottom: 15px;
-    /* Spans the whole height */
+    bottom: auto;
+    max-height: calc(100vh - 320px);
     width: 420px;
     /* Slightly wider for comfortable editing */
     background: var(--glass-white);
