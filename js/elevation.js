@@ -7,7 +7,6 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
     const statsHeader = document.getElementById('elevation-stats-header');
     const props = metadata || geojson.features?.[0]?.properties || {};
 
-    // Helper to reset header to track stats
     const resetHeader = () => {
         statsHeader.innerHTML = `
             <span style="color:#000;">🏁 <strong>${title}</strong></span>
@@ -23,6 +22,12 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
     let cumulativeGains = [], currentGain = 0;
     const coords = geojson.features[0].geometry.type === 'Polygon' ? geojson.features[0].geometry.coordinates[0] : geojson.features[0].geometry.coordinates;
 
+    // Parallel arrays for Chart.js safe parsing
+    const waypointData = new Array(coords.length).fill(null);
+    const waypointMeta = new Array(coords.length).fill(null);
+    const customPointStyles = new Array(coords.length).fill('circle');
+    const pointRadii = new Array(coords.length).fill(0); // Hide non-waypoints safely
+
     coords.forEach((c, i) => {
         elevations.push(c[2] || 0);
         if (i > 0) {
@@ -36,8 +41,6 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
 
     // FIND WAYPOINTS: Locate all points belonging to the active task
     const task = AppStore.get('itinerary').find(t => t.task_id === AppStore.get('activeTaskId'));
-    const waypointData = new Array(coords.length).fill(null);
-    let customPointStyles = new Array(coords.length).fill(false);
 
     if (task && task.geometries && geojson.features[0].geometry.type !== 'Polygon') {
         task.geometries.forEach(g => {
@@ -60,54 +63,74 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                     ctx.textBaseline = 'middle';
                     ctx.fillText(iconEmoji, 12, 14);
 
-                    waypointData[nearestIdx] = {
-                        x: distances[nearestIdx],
-                        y: elevations[nearestIdx],
+                    // Strictly separate Chart data (Y-axis) from Metadata
+                    waypointData[nearestIdx] = elevations[nearestIdx];
+                    waypointMeta[nearestIdx] = {
                         title: g.title,
                         icon: g.icon || '📍',
                         lng: g.lng,
-                        lat: g.lat
+                        lat: g.lat,
+                        x: distances[nearestIdx]
                     };
                     customPointStyles[nearestIdx] = canvas;
+                    pointRadii[nearestIdx] = 12; // Make the icon visible
                 }
             }
         });
     }
 
-    if (elevationChart) elevationChart.destroy();
-    elevationChart = new Chart(document.getElementById('elevation-chart'), {
+    // CRITICAL FIX: Aggressively destroy broken canvas instances via Chart registry
+    const existingChart = Chart.getChart('elevation-chart');
+    if (existingChart) {
+        existingChart.destroy();
+    }
+
+    window.elevationChart = new Chart(document.getElementById('elevation-chart'), {
         type: 'line',
         data: {
             labels: distances,
-        datasets: [
-            {
-                label: 'Waypoints',
-                data: waypointData,
-                type: 'line',
-                showLine: false,
-                pointStyle: customPointStyles,
-                backgroundColor: 'transparent',
-                borderColor: 'transparent',
-                zIndex: 10
-            },
-                { label: title, data: elevations, fill: true, tension: 0.4, borderColor: '#3498db', backgroundColor: 'rgba(52, 152, 219, 0.2)' }
+            datasets: [
+                {
+                    label: 'Waypoints',
+                    data: waypointData,
+                    type: 'line',
+                    showLine: false,
+                    pointStyle: customPointStyles,
+                    pointRadius: pointRadii, // Uses array to safely size points
+                    pointHoverRadius: pointRadii,
+                    backgroundColor: 'transparent',
+                    borderColor: 'transparent',
+                    zIndex: 10
+                },
+                {
+                    label: title,
+                    data: elevations,
+                    fill: true,
+                    tension: 0.4,
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.2)'
+                }
             ]
         },
         options: {
-            responsive: true, maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false }, // Improved tracking
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: { display: false },
                 tooltip: {
                     callbacks: {
                         label: (context) => {
-                            if (context.dataset.label === 'Waypoints' && context.raw) return `📍 ${context.raw.title}`;
+                            if (context.dataset.label === 'Waypoints') {
+                                const meta = waypointMeta[context.dataIndex];
+                                if (meta) return `📍 ${meta.title}`;
+                                return null;
+                            }
                             return `Elev: ${context.parsed.y}m`;
                         }
                     }
                 }
             },
-            // RESTORED: Move dot on map when hovering chart
             onHover: (event, activeElements) => {
                 if (activeElements.length > 0) {
                     const index = activeElements[0].index;
@@ -127,26 +150,27 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
             onClick: (e, activeElements) => {
                 if (activeElements.length > 0) {
                     const element = activeElements[0];
-                if (element.datasetIndex === 0) {
-                    // CLICKED EXISTING WAYPOINT
-                    const wp = waypointData[element.index];
-                    if (wp) {
-                        map.flyTo({ center: [wp.lng, wp.lat], zoom: 17 });
-                        statsHeader.innerHTML = `<span style="color:#e67e22;">📍 <strong>${wp.icon} ${wp.title}</strong></span> <span style="margin-left:15px; color:#666;">at ${wp.x}km</span> <button onclick="refreshData()" style="width:auto; padding:2px 8px; margin-left:10px; font-size:10px; background:#95a5a6;">Reset View</button>`;
-                    }
-                } else {
+                    if (element.datasetIndex === 0) {
+                        // CLICKED EXISTING WAYPOINT
+                        const wp = waypointMeta[element.index];
+                        if (wp) {
+                            map.flyTo({ center: [wp.lng, wp.lat], zoom: 17 });
+                            statsHeader.innerHTML = `<span style="color:#e67e22;">📍 <strong>${wp.icon} ${wp.title}</strong></span> <span style="margin-left:15px; color:#666;">at ${wp.x}km</span> <button onclick="refreshData()" style="width:auto; padding:2px 8px; margin-left:10px; font-size:10px; background:#95a5a6;">Reset View</button>`;
+                        }
+                    } else {
                         // CLICKED LINE (CREATE NEW)
                         const index = element.index;
                         const activeCoord = coords[index];
-                        draw.deleteAll();
-                        const feat = { type: 'Feature', geometry: { type: 'Point', coordinates: [activeCoord[0], activeCoord[1]] } };
-                        draw.add(feat);
+                        if (typeof draw !== 'undefined') {
+                            draw.deleteAll();
+                            const feat = { type: 'Feature', geometry: { type: 'Point', coordinates: [activeCoord[0], activeCoord[1]] } };
+                            draw.add(feat);
+                        }
                         map.flyTo({ center: [activeCoord[0], activeCoord[1]], zoom: 15 });
-                        // Correctly passing the pre-calculated stats to the save popup
                         const dist = distances[index];
                         const gain = cumulativeGains[index];
-                        activeParentTrackId = trackId; // LINK IT: Tells the save popup to nest this point
-                        showGeometryContextPopup([activeCoord[0], activeCoord[1]], feat.geometry, `KM ${dist}`, `📏 ${dist}km | 🔺 +${gain}m`, null, '📍');
+                        window.activeParentTrackId = trackId;
+                        showGeometryContextPopup([activeCoord[0], activeCoord[1]], { type: 'Point', coordinates: [activeCoord[0], activeCoord[1]] }, `KM ${dist}`, `📏 ${dist}km | 🔺 +${gain}m`, null, '📍');
                     }
                 }
             },
