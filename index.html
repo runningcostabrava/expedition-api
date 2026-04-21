@@ -375,6 +375,9 @@
         };
 
         function openRightPanel(title, htmlContent) {
+            if (document.body.classList.contains('zen-mode')) {
+                window.toggleZenMode();
+            }
             document.getElementById('right-panel-title').innerHTML = title;
             document.getElementById('right-panel-content').innerHTML = htmlContent;
             document.getElementById('right-panel').classList.remove('hidden');
@@ -1612,6 +1615,11 @@
         }
 
         function cycleSidebar() {
+            // Force exit Zen Mode if it's active so the user can see what they are toggling
+            if (document.body.classList.contains('zen-mode')) {
+                window.toggleZenMode();
+            }
+
             const panel = document.getElementById('left-panel');
             if (window.innerWidth <= 768) {
                 panel.classList.toggle('hidden');
@@ -2918,6 +2926,9 @@
         }
 
         function openTaskDetailPanel(task) {
+            if (document.body.classList.contains('zen-mode')) {
+                window.toggleZenMode();
+            }
             const panel = document.getElementById('task-detail-panel');
             const content = document.getElementById('task-detail-content');
             if (!panel || !content) return;
