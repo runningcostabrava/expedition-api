@@ -2244,8 +2244,8 @@
                             <input type="file" id="upload-task-file" style="display:none;" onchange="uploadMediaFile(this.files[0], 'edit-task-desc', document.getElementById('btn-upload-task'))">
                             <button id="btn-upload-task" onclick="document.getElementById('upload-task-file').click()" style="background:#8b5cf6; color:white; border:none; border-radius:4px; padding:2px 8px; font-size:0.8em; cursor:pointer; font-weight:bold;">📁 Attach File</button>
                         </div>
-                        <textarea id="edit-task-desc" rows="3" placeholder="Type notes or paste an image here..." style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; resize:vertical;" oninput="renderAttachmentManager('edit-task-desc', 'edit-task-attachments')">${desc}</textarea>
-                        <div id="edit-task-attachments" style="display:flex; flex-wrap:wrap; margin-top:5px;"></div>
+                        <textarea id="edit-task-desc" rows="3" placeholder="Type notes or paste an image here..." style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; resize:vertical;" oninput="renderAttachmentManager('edit-task-desc', 'edit-task-attachments-list')">${desc}</textarea>
+                        <div id="edit-task-attachments-list"></div>
                     </div>
 
                 ${task ? `
@@ -2274,8 +2274,8 @@
                     <button onclick="saveTaskFromRightPanel(${taskId})" style="width:100%; padding:14px; background:#27ae60; color:white; border:none; border-radius:8px; font-weight:bold; font-size:1.05em; margin-top:5px; cursor:pointer; box-shadow:0 4px 10px rgba(39, 174, 96, 0.3);">${taskId ? '💾 UPDATE TASK' : '✨ CREATE TASK'}</button>
                 </div>
             `;
+            renderAttachmentManager('edit-task-desc', 'edit-task-attachments-list');
             openRightPanel(taskId ? `⚙️ Edit Task` : `✨ New Task`, html);
-            renderAttachmentManager('edit-task-desc', 'edit-task-attachments');
         }
 
         async function saveTaskFromRightPanel(taskId) {
@@ -3183,8 +3183,7 @@
                             const mdLink = isImage ? `\n![${file.name || 'Image'}](${data.secure_url})\n` : `\n[📎 ${file.name || 'Document'}](${data.secure_url})\n`;
                             targetInput.value += mdLink;
                             // Trigger manager refresh
-                            const containerMap = { 'new-geom-notes': 'new-geom-attachments', 'edit-task-desc': 'edit-task-attachments', 'edit-geom-comments': 'edit-geom-attachments' };
-                            if (containerMap[targetInputId]) renderAttachmentManager(targetInputId, containerMap[targetInputId]);
+                            renderAttachmentManager(targetInputId, targetInputId + '-attachments-list');
                         } else {
                             // Replace value for single-line text inputs
                             targetInput.value = data.secure_url;
