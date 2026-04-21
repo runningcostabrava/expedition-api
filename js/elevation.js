@@ -36,8 +36,8 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
 
     // FIND WAYPOINTS: Locate all points belonging to the active task
     const task = AppStore.get('itinerary').find(t => t.task_id === AppStore.get('activeTaskId'));
-    const waypointDataset = [];
-    let customPointStyles = [];
+    const waypointData = new Array(coords.length).fill(null);
+    let customPointStyles = new Array(coords.length).fill(false);
 
     if (task && task.geometries && geojson.features[0].geometry.type !== 'Polygon') {
         task.geometries.forEach(g => {
@@ -60,16 +60,15 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                     ctx.textBaseline = 'middle';
                     ctx.fillText(iconEmoji, 12, 14);
 
-                    waypointDataset.push({
+                    waypointData[nearestIdx] = {
                         x: distances[nearestIdx],
-                        y: elevations[nearestIdx], // Exact chart Y value
+                        y: elevations[nearestIdx],
                         title: g.title,
                         icon: g.icon || '📍',
                         lng: g.lng,
                         lat: g.lat
-                    });
-                    // Pass the raw canvas directly. Image objects cause race-condition invisible rendering!
-                    customPointStyles.push(canvas); 
+                    };
+                    customPointStyles[nearestIdx] = canvas;
                 }
             }
         });
@@ -80,16 +79,17 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
         type: 'line',
         data: {
             labels: distances,
-            datasets: [
-                {
-                    label: 'Waypoints',
-                    data: waypointDataset,
-                    type: 'scatter',
-                    pointStyle: customPointStyles,
-                    backgroundColor: 'transparent',
-                    borderColor: 'transparent',
-                    zIndex: 10
-                },
+        datasets: [
+            {
+                label: 'Waypoints',
+                data: waypointData,
+                type: 'line',
+                showLine: false,
+                pointStyle: customPointStyles,
+                backgroundColor: 'transparent',
+                borderColor: 'transparent',
+                zIndex: 10
+            },
                 { label: title, data: elevations, fill: true, tension: 0.4, borderColor: '#3498db', backgroundColor: 'rgba(52, 152, 219, 0.2)' }
             ]
         },
@@ -101,7 +101,7 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                 tooltip: {
                     callbacks: {
                         label: (context) => {
-                            if (context.dataset.type === 'scatter') return `📍 ${context.raw.title}`;
+                            if (context.dataset.label === 'Waypoints' && context.raw) return `📍 ${context.raw.title}`;
                             return `Elev: ${context.parsed.y}m`;
                         }
                     }
@@ -127,12 +127,14 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
             onClick: (e, activeElements) => {
                 if (activeElements.length > 0) {
                     const element = activeElements[0];
-                    if (element.datasetIndex === 0) {
-                        // CLICKED EXISTING WAYPOINT
-                        const wp = waypointDataset[element.index];
+                if (element.datasetIndex === 0) {
+                    // CLICKED EXISTING WAYPOINT
+                    const wp = waypointData[element.index];
+                    if (wp) {
                         map.flyTo({ center: [wp.lng, wp.lat], zoom: 17 });
                         statsHeader.innerHTML = `<span style="color:#e67e22;">📍 <strong>${wp.icon} ${wp.title}</strong></span> <span style="margin-left:15px; color:#666;">at ${wp.x}km</span> <button onclick="refreshData()" style="width:auto; padding:2px 8px; margin-left:10px; font-size:10px; background:#95a5a6;">Reset View</button>`;
-                    } else {
+                    }
+                } else {
                         // CLICKED LINE (CREATE NEW)
                         const index = element.index;
                         const activeCoord = coords[index];
