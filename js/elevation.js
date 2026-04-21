@@ -22,11 +22,10 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
     let cumulativeGains = [], currentGain = 0;
     const coords = geojson.features[0].geometry.type === 'Polygon' ? geojson.features[0].geometry.coordinates[0] : geojson.features[0].geometry.coordinates;
 
-    // Parallel arrays for Chart.js safe parsing
     const waypointData = new Array(coords.length).fill(null);
     const waypointMeta = new Array(coords.length).fill(null);
     const customPointStyles = new Array(coords.length).fill('circle');
-    const pointRadii = new Array(coords.length).fill(0); // Hide non-waypoints safely
+    const pointRadii = new Array(coords.length).fill(0);
 
     coords.forEach((c, i) => {
         elevations.push(c[2] || 0);
@@ -39,7 +38,6 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
         cumulativeGains.push(currentGain.toFixed(0));
     });
 
-    // FIND WAYPOINTS: Locate all points belonging to the active task
     const task = AppStore.get('itinerary').find(t => t.task_id === AppStore.get('activeTaskId'));
 
     if (task && task.geometries && geojson.features[0].geometry.type !== 'Polygon') {
@@ -53,7 +51,7 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                     if (d < minDist) { minDist = d; nearestIdx = idx; }
                 });
 
-                if (minDist < 5) { // Only snap if within 5km
+                if (minDist < 5) {
                     const iconEmoji = (g.icon || '📍').split(' ')[0];
                     const canvas = document.createElement('canvas');
                     canvas.width = 24; canvas.height = 24;
@@ -63,7 +61,6 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                     ctx.textBaseline = 'middle';
                     ctx.fillText(iconEmoji, 12, 14);
 
-                    // Strictly separate Chart data (Y-axis) from Metadata
                     waypointData[nearestIdx] = elevations[nearestIdx];
                     waypointMeta[nearestIdx] = {
                         title: g.title,
@@ -73,17 +70,14 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                         x: distances[nearestIdx]
                     };
                     customPointStyles[nearestIdx] = canvas;
-                    pointRadii[nearestIdx] = 12; // Make the icon visible
+                    pointRadii[nearestIdx] = 12;
                 }
             }
         });
     }
 
-    // CRITICAL FIX: Aggressively destroy broken canvas instances via Chart registry
     const existingChart = Chart.getChart('elevation-chart');
-    if (existingChart) {
-        existingChart.destroy();
-    }
+    if (existingChart) existingChart.destroy();
 
     window.elevationChart = new Chart(document.getElementById('elevation-chart'), {
         type: 'line',
@@ -96,7 +90,7 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                     type: 'line',
                     showLine: false,
                     pointStyle: customPointStyles,
-                    pointRadius: pointRadii, // Uses array to safely size points
+                    pointRadius: pointRadii,
                     pointHoverRadius: pointRadii,
                     backgroundColor: 'transparent',
                     borderColor: 'transparent',
@@ -169,7 +163,10 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                         map.flyTo({ center: [activeCoord[0], activeCoord[1]], zoom: 15 });
                         const dist = distances[index];
                         const gain = cumulativeGains[index];
-                        window.activeParentTrackId = trackId;
+
+                        // CRITICAL FIX: Ensure exact variable match to index.html's let declaration
+                        activeParentTrackId = trackId;
+
                         showGeometryContextPopup([activeCoord[0], activeCoord[1]], { type: 'Point', coordinates: [activeCoord[0], activeCoord[1]] }, `KM ${dist}`, `📏 ${dist}km | 🔺 +${gain}m`, null, '📍');
                     }
                 }
