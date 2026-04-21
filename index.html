@@ -1078,7 +1078,7 @@
                             renderer.image = function(tokenOrHref, title, text) {
                                 const href = typeof tokenOrHref === 'object' ? tokenOrHref.href : tokenOrHref;
                                 const altText = typeof tokenOrHref === 'object' ? tokenOrHref.text : text;
-                                return `<img src="${href}" alt="${altText}" class="lightbox-trigger" onclick="openLightbox('${href}')" style="max-width:100%; max-height:300px; border-radius:8px; display:block; margin:10px 0; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:zoom-in;">`;
+                                return `<img src="${href}" alt="${altText}" onclick="openLightbox('${href}')" style="max-width:100%; max-height:300px; border-radius:8px; display:block; margin:10px 0; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:zoom-in; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">`;
                             };
                             parsedComments = marked.parse(geom.comments || '', { renderer: renderer, breaks: true });
                         }
@@ -1431,7 +1431,7 @@
                             renderer.image = function(tokenOrHref, title, text) {
                                 const href = typeof tokenOrHref === 'object' ? tokenOrHref.href : tokenOrHref;
                                 const altText = typeof tokenOrHref === 'object' ? tokenOrHref.text : text;
-                                return `<img src="${href}" alt="${altText}" class="lightbox-trigger" onclick="openLightbox('${href}')" style="max-width:100%; max-height:300px; border-radius:8px; display:block; margin:10px 0; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:zoom-in;">`;
+                                return `<img src="${href}" alt="${altText}" onclick="openLightbox('${href}')" style="max-width:100%; max-height:300px; border-radius:8px; display:block; margin:10px 0; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:zoom-in; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">`;
                             };
                         parsedComments = marked.parse(geom.comments || '', { renderer: renderer, breaks: true });
                     }
@@ -2875,7 +2875,7 @@
                 renderer.image = function(tokenOrHref, title, text) {
                     const href = typeof tokenOrHref === 'object' ? tokenOrHref.href : tokenOrHref;
                     const altText = typeof tokenOrHref === 'object' ? tokenOrHref.text : text;
-                    return `<img src="${href}" alt="${altText}" class="lightbox-trigger" onclick="openLightbox('${href}')" style="max-width:100%; max-height:300px; border-radius:8px; display:block; margin:10px 0; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:zoom-in;">`;
+                    return `<img src="${href}" alt="${altText}" onclick="openLightbox('${href}')" style="max-width:100%; max-height:300px; border-radius:8px; display:block; margin:10px 0; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:zoom-in; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">`;
                 };
                 parsedCharacteristics = marked.parse(task.characteristics || '', { renderer: renderer, breaks: true });
             }
