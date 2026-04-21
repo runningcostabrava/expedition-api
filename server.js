@@ -740,6 +740,10 @@ app.get('/api/config', (req, res) => {
   });
 });
 
+app.get('/icons/:name', (req, res) => {
+  res.sendFile(path.join(__dirname, req.params.name));
+});
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
