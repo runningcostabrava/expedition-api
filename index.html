@@ -3,11 +3,12 @@
 
 <head>
     <meta charset="utf-8">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Expedition v2">
-    <link rel="apple-touch-icon" href="/icon-192.png">
-    <link rel="icon" type="image/png" href="/icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" type="image/png" href="icon-192.png">
     <title>Expedition Ecosystem v2.0 - Logistics Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <link rel="manifest" href="/manifest.json">
@@ -38,6 +39,10 @@
         <img id="lightbox-image" src="" style="max-width:95%; max-height:95%; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.7); cursor:default;" onclick="event.stopPropagation()">
         <div style="position:absolute; top:20px; right:30px; color:white; font-size:40px; font-weight:bold; cursor:pointer; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">&times;</div>
     </div>
+
+    <button id="zen-toggle-btn" onclick="toggleZenMode()" title="Toggle Zen Mode">
+        🗺️
+    </button>
     <script>
         window.getResponsivePadding = function() {
             const isMobile = window.innerWidth <= 768;
@@ -3331,6 +3336,28 @@
         window.openLightbox = function(url) {
             document.getElementById('lightbox-image').src = url;
             document.getElementById('lightbox-modal').style.display = 'flex';
+        };
+
+        window.toggleZenMode = function() {
+            const body = document.body;
+            const btn = document.getElementById('zen-toggle-btn');
+            
+            // Toggle the class
+            const isZen = body.classList.toggle('zen-mode');
+            
+            // Visual feedback on the button
+            btn.innerHTML = isZen ? '🔍' : '🗺️';
+            
+            // Notify the user
+            if (typeof showToast !== 'undefined') {
+                showToast(isZen ? "Map Focus Enabled" : "UI Restored", "info");
+            }
+            
+            // Wait for the CSS sliding transition to finish (300ms), 
+            // then force Mapbox to recalculate its canvas size so it fills the screen perfectly.
+            setTimeout(() => {
+                if (typeof map !== 'undefined' && map) map.resize();
+            }, 350);
         };
 
         window.renderAttachmentManager = function(textareaId, containerId) {

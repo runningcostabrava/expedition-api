@@ -834,6 +834,65 @@ button {
     transition: transform 0.1s ease-out, opacity 0.2s ease-in-out;
 }
 
+/* --- ZEN MODE (FULLSCREEN MAP FOCUS) --- */
+
+/* Ensure the top bar and elevation panel transition smoothly */
+#command-bar, #elevation-panel, #mobile-fab-container {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
+}
+
+/* Slide elements out of view when Zen Mode is active */
+body.zen-mode #command-bar { transform: translateY(-150%) !important; opacity: 0; pointer-events: none; }
+body.zen-mode #left-panel { transform: translateX(-120%) !important; opacity: 0; pointer-events: none; }
+body.zen-mode #right-panel, 
+body.zen-mode #task-detail-panel { transform: translateX(120%) !important; opacity: 0; pointer-events: none; }
+body.zen-mode #elevation-panel { transform: translateY(150%) !important; opacity: 0; pointer-events: none; }
+
+/* Mobile-specific Zen Mode overrides */
+@media (max-width: 768px) {
+    body.zen-mode #left-panel, 
+    body.zen-mode #right-panel, 
+    body.zen-mode #task-detail-panel { 
+        transform: translateY(100%) !important; /* Slide down off-screen into the bottom sheet area */
+    }
+    body.zen-mode #mobile-fab-container { 
+        transform: translateX(150%) !important; opacity: 0; pointer-events: none; 
+    }
+}
+
+/* The Zen Mode Toggle Button */
+#zen-toggle-btn {
+    position: fixed;
+    bottom: max(env(safe-area-inset-bottom, 20px), 25px);
+    left: 20px;
+    z-index: 100001; /* Must stay above everything, even active modals */
+    background: var(--glass-dark);
+    backdrop-filter: var(--glass-blur);
+    color: white;
+    border: var(--border-light);
+    border-radius: 50%;
+    width: 54px;
+    height: 54px;
+    font-size: 1.4em;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: var(--card-shadow);
+    transition: all 0.3s ease;
+}
+
+#zen-toggle-btn:hover { 
+    background: #1e293b; 
+    transform: scale(1.05); 
+}
+
+/* Highlight the button when Zen Mode is active */
+body.zen-mode #zen-toggle-btn { 
+    background: var(--accent); 
+    border-color: transparent;
+}
+
 /* Hide markers entirely when zoomed out */
 #map.hide-markers .custom-map-pin {
     visibility: hidden;
