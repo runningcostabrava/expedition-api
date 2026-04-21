@@ -46,9 +46,23 @@
     <script>
         window.getResponsivePadding = function() {
             const isMobile = window.innerWidth <= 768;
-            return isMobile 
-                ? { top: 180, bottom: window.innerHeight * 0.75 + 20, left: 20, right: 20 }
-                : { top: 80, bottom: 80, left: 420, right: 80 };
+            const isZen = document.body.classList.contains('zen-mode');
+            const leftHidden = document.getElementById('left-panel').classList.contains('hidden');
+            const leftWide = document.getElementById('left-panel').classList.contains('wide');
+
+            if (isMobile) {
+                // If Zen mode is on, no bottom sheet is there. Use the whole screen.
+                return isZen 
+                    ? { top: 20, bottom: 20, left: 20, right: 20 } 
+                    : { top: 180, bottom: window.innerHeight * 0.75 + 20, left: 20, right: 20 };
+            } else {
+                // Desktop: calculate padding strictly based on actual sidebar state
+                let leftPad = 20; // Default small gap if hidden
+                if (!isZen && !leftHidden) {
+                    leftPad = leftWide ? 620 : 420;
+                }
+                return { top: 80, bottom: 80, left: leftPad, right: 80 };
+            }
         };
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
