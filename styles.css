@@ -1090,12 +1090,16 @@ button {
         top: env(safe-area-inset-top, 10px) !important;
         left: 10px !important;
         right: 10px !important;
-        height: 55px !important;
+        height: auto !important;
         padding: 0 10px !important;
         flex-wrap: nowrap !important;
         overflow: hidden !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 8px !important;
     }
     #command-bar > div:first-child { display: none !important; } /* Hide 'EXPEDITION v2' text */
+    #command-bar > div[style*="max-width: 300px"], #google-search-container { max-width: 100% !important; width: 100% !important; margin: 0 !important; }
     #style-switcher { display: none !important; } /* Hide map styles on mobile to save space */
     
     /* Convert action buttons into Google Maps style Floating Action Buttons (FABs) */
@@ -1181,6 +1185,8 @@ button {
     #right-panel:not(.hidden) {
         transform: translateY(0) !important;
     }
+
+    #left-panel > #panel-header > div:nth-of-type(2), #left-panel > #panel-header > div:nth-of-type(3) { display: none !important; }
 
     .mobile-only-btn { display: block !important; }
 
