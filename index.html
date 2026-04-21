@@ -1060,14 +1060,19 @@
                     try {
                         if (geom.comments && typeof geom.comments === 'string' && geom.comments.trim() !== '') {
                             const renderer = new marked.Renderer();
-                            renderer.link = function(href, title, text) {
-                                if (text && typeof text === 'string' && text.includes('📎')) {
-                                    return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="display:inline-block; background:#8b5cf6; color:white; padding:4px 10px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:0.9em; margin:2px 0;">${text}</a>`;
+                            renderer.link = function(tokenOrHref, title, text) {
+                                const href = typeof tokenOrHref === 'object' ? tokenOrHref.href : tokenOrHref;
+                                const linkText = typeof tokenOrHref === 'object' ? tokenOrHref.text : text;
+                                if (linkText && typeof linkText === 'string' && linkText.includes('📎')) {
+                                    return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="display:inline-block; background:#8b5cf6; color:white; padding:4px 10px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:0.9em; margin:2px 0;">${linkText}</a>`;
                                 }
-                                return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="color:#3498db; text-decoration:underline;">${text}</a>`;
+                                return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="color:#3498db; text-decoration:underline;">${linkText}</a>`;
                             };
-                            renderer.image = function(href, title, text) {
-                                return `<img src="${href}" alt="${text}" style="max-width:100%; max-height:300px; border-radius:8px; display:block; margin:10px 0; box-shadow:0 2px 4px rgba(0,0,0,0.1);">`;
+
+                            renderer.image = function(tokenOrHref, title, text) {
+                                const href = typeof tokenOrHref === 'object' ? tokenOrHref.href : tokenOrHref;
+                                const altText = typeof tokenOrHref === 'object' ? tokenOrHref.text : text;
+                                return `<img src="${href}" alt="${altText}" style="max-width:100%; max-height:300px; border-radius:8px; display:block; margin:10px 0; box-shadow:0 2px 4px rgba(0,0,0,0.1);">`;
                             };
                             parsedComments = marked.parse(geom.comments || '', { renderer: renderer, breaks: true });
                         }
@@ -1408,14 +1413,19 @@
                 try {
                     if (geom.comments && typeof geom.comments === 'string' && geom.comments.trim() !== '') {
                         const renderer = new marked.Renderer();
-                        renderer.link = function(href, title, text) {
-                            if (text && typeof text === 'string' && text.includes('📎')) {
-                                return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="display:inline-block; background:#8b5cf6; color:white; padding:4px 10px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:0.9em; margin:2px 0;">${text}</a>`;
+                        renderer.link = function(tokenOrHref, title, text) {
+                            const href = typeof tokenOrHref === 'object' ? tokenOrHref.href : tokenOrHref;
+                            const linkText = typeof tokenOrHref === 'object' ? tokenOrHref.text : text;
+                            if (linkText && typeof linkText === 'string' && linkText.includes('📎')) {
+                                return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="display:inline-block; background:#8b5cf6; color:white; padding:4px 10px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:0.9em; margin:2px 0;">${linkText}</a>`;
                             }
-                            return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="color:#3498db; text-decoration:underline;">${text}</a>`;
+                            return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="color:#3498db; text-decoration:underline;">${linkText}</a>`;
                         };
-                        renderer.image = function(href, title, text) {
-                            return `<img src="${href}" alt="${text}" style="max-width:100%; max-height:300px; border-radius:8px; display:block; margin:10px 0; box-shadow:0 2px 4px rgba(0,0,0,0.1);">`;
+
+                        renderer.image = function(tokenOrHref, title, text) {
+                            const href = typeof tokenOrHref === 'object' ? tokenOrHref.href : tokenOrHref;
+                            const altText = typeof tokenOrHref === 'object' ? tokenOrHref.text : text;
+                            return `<img src="${href}" alt="${altText}" style="max-width:100%; max-height:300px; border-radius:8px; display:block; margin:10px 0; box-shadow:0 2px 4px rgba(0,0,0,0.1);">`;
                         };
                         parsedComments = marked.parse(geom.comments || '', { renderer: renderer, breaks: true });
                     }
@@ -2845,15 +2855,19 @@
             // FIX: Ensure characteristics is a valid string before parsing
             if (task.characteristics && typeof task.characteristics === 'string' && task.characteristics.trim() !== '') {
                 const renderer = new marked.Renderer();
-                renderer.link = function(href, title, text) {
-                    // Style links as nice buttons if they contain the attachment emoji
-                    if (text && typeof text === 'string' && text.includes('📎')) {
-                        return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="display:inline-block; background:#8b5cf6; color:white; padding:4px 10px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:0.9em; margin:2px 0;">${text}</a>`;
+                renderer.link = function(tokenOrHref, title, text) {
+                    const href = typeof tokenOrHref === 'object' ? tokenOrHref.href : tokenOrHref;
+                    const linkText = typeof tokenOrHref === 'object' ? tokenOrHref.text : text;
+                    if (linkText && typeof linkText === 'string' && linkText.includes('📎')) {
+                        return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="display:inline-block; background:#8b5cf6; color:white; padding:4px 10px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:0.9em; margin:2px 0;">${linkText}</a>`;
                     }
-                    return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="color:#3498db; text-decoration:underline;">${text}</a>`;
+                    return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="color:#3498db; text-decoration:underline;">${linkText}</a>`;
                 };
-                renderer.image = function(href, title, text) {
-                    return `<img src="${href}" alt="${text}" style="max-width:100%; max-height:300px; border-radius:8px; display:block; margin:10px 0; box-shadow:0 2px 4px rgba(0,0,0,0.1);">`;
+
+                renderer.image = function(tokenOrHref, title, text) {
+                    const href = typeof tokenOrHref === 'object' ? tokenOrHref.href : tokenOrHref;
+                    const altText = typeof tokenOrHref === 'object' ? tokenOrHref.text : text;
+                    return `<img src="${href}" alt="${altText}" style="max-width:100%; max-height:300px; border-radius:8px; display:block; margin:10px 0; box-shadow:0 2px 4px rgba(0,0,0,0.1);">`;
                 };
                 parsedCharacteristics = marked.parse(task.characteristics || '', { renderer: renderer, breaks: true });
             }

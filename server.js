@@ -158,9 +158,12 @@ app.post('/api/upload', adminAuth, upload.single('file'), (req, res) => {
     const resType = isImage ? 'auto' : 'raw';
 
     // Create a direct upload stream to Cloudinary
-    const stream = cloudinary.uploader.upload_stream(
-      { folder: "expedition_media", resource_type: resType },
-      (error, result) => {
+    const uploadOptions = { folder: "expedition_media", resource_type: resType };
+    if (resType === 'raw') {
+        uploadOptions.format = req.file.originalname.split('.').pop();
+        uploadOptions.use_filename = true;
+    }
+    const stream = cloudinary.uploader.upload_stream(uploadOptions, (error, result) => {
         if (error) {
           console.error("Cloudinary Stream Error:", error);
           return res.status(500).json({ error: 'Upload failed', details: error.message });
