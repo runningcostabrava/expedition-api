@@ -65,16 +65,6 @@ body {
     #command-bar .action-btn-modern:hover {
         background: rgba(255, 255, 255, 0.2);
     }
-    #command-bar > div[style*="flex-shrink: 0"] {
-        width: 100% !important;
-        flex-wrap: wrap !important;
-        justify-content: space-between !important;
-    }
-    #google-search-container input {
-        width: 100% !important;
-        max-width: 100% !important;
-        box-sizing: border-box !important;
-    }
     .modal {
         z-index: 100000 !important;
     }
