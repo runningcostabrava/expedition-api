@@ -19,6 +19,7 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  if (!event.request.url.startsWith('http')) return;
   const url = new URL(event.request.url);
 
   // Network-First for API endpoints
@@ -53,7 +54,9 @@ self.addEventListener('fetch', (event) => {
       caches.match(event.request).then((response) => {
         return response || fetch(event.request).then((fetchResponse) => {
           return caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, fetchResponse.clone());
+            if (fetchResponse && fetchResponse.status === 200) {
+              cache.put(event.request, fetchResponse.clone());
+            }
             return fetchResponse;
           });
         });
