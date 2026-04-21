@@ -1070,34 +1070,46 @@ button {
 }
 
 @media (max-width: 768px) {
+    /* Wrap and stack the command bar */
+    #command-bar {
+        top: env(safe-area-inset-top, 10px) !important;
+        left: 10px !important;
+        right: 10px !important;
+        height: auto !important;
+        flex-wrap: wrap !important;
+        padding: 10px !important;
+        gap: 10px !important;
+    }
+    /* Force search and style dropdown to full width on mobile */
+    #command-bar > div:nth-child(2),
+    #style-switcher {
+        min-width: 100% !important;
+        margin: 0 !important;
+    }
+    /* Push Mapbox controls safely below the expanded header */
+    .mapboxgl-ctrl-top-left { top: 150px !important; left: 10px !important; }
+    .mapboxgl-ctrl-top-right { top: 150px !important; }
+
+    /* Turn sidebars into bottom-sheets with Safe Area padding */
     #left-panel, #task-detail-panel, #right-panel {
         width: 100% !important;
         left: 0 !important;
-        height: 60vh !important;
+        height: 75vh !important;
         position: fixed !important;
         top: auto !important;
         bottom: 0 !important;
-        border-radius: 20px 20px 0 0 !important;
+        border-radius: 24px 24px 0 0 !important;
         transform: translateY(100%) !important;
-        transition: transform 0.3s ease-out !important;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        z-index: 9999 !important;
+        padding-bottom: env(safe-area-inset-bottom, 20px) !important;
+        border: 1px solid rgba(255,255,255,0.3) !important;
     }
 
-    #left-panel.open, #task-detail-panel.open, #right-panel:not(.hidden) {
+    /* Fix the visibility logic so they actually slide up */
+    #left-panel:not(.hidden), 
+    #task-detail-panel.open, 
+    #right-panel:not(.hidden) {
         transform: translateY(0) !important;
-    }
-
-    /* Override hidden class for mobile bottom sheets */
-    #left-panel.hidden {
-        transform: translateY(100%) !important;
-        opacity: 1 !important;
-    }
-
-    /* Mapbox UI Fix for Mobile Bottom Sheets */
-    .mapboxgl-ctrl-top-left {
-        top: 70px !important;
-        left: 10px !important;
-    }
-    .mapboxgl-ctrl-top-right {
-        top: 70px !important;
     }
 }
