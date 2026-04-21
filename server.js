@@ -188,6 +188,27 @@ app.post('/api/upload', adminAuth, upload.single('file'), (req, res) => {
   }
 });
 
+app.delete('/api/upload', adminAuth, async (req, res) => {
+  const { fileUrl } = req.body;
+  if (!fileUrl) return res.status(400).json({ error: 'No URL provided' });
+  try {
+    const urlParts = fileUrl.split('/');
+    const uploadIndex = urlParts.indexOf('upload');
+    if (uploadIndex === -1) return res.status(400).json({ error: 'Invalid URL' });
+    
+    let public_id = urlParts.slice(uploadIndex + 2).join('/');
+    const resourceType = urlParts[uploadIndex - 1]; // usually 'image' or 'raw'
+    
+    if (resourceType !== 'raw') {
+      public_id = public_id.substring(0, public_id.lastIndexOf('.'));
+    }
+    await cloudinary.uploader.destroy(public_id, { resource_type: resourceType });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // 2. TRACKS: GPX Upload & Management
 app.post('/tasks', adminAuth, async (req, res) => {
   const { task_name, responsible, target_group, task_type_id, starts_at, ends_at, is_completed, comments, parent_id, is_milestone, section_id, category_id, characteristics } = req.body;
