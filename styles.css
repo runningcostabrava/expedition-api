@@ -1131,7 +1131,7 @@ button {
     }
 
     /* Add Native iOS Drawer Handle to Bottom Sheets */
-    #left-panel::before, #task-detail-panel::before, #right-panel::before {
+    #task-detail-panel::before, #right-panel::before {
         content: '';
         display: block;
         width: 40px;
@@ -1184,7 +1184,7 @@ button {
 
     .mobile-only-btn { display: block !important; }
 
-    .mobile-close-bar { display: block !important; }
+    .mobile-close-bar { display: block !important; border-radius: 24px 24px 0 0; }
 
     #asana-container, #task-detail-content { padding-bottom: 100px !important; }
 }

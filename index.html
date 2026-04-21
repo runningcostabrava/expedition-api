@@ -1566,6 +1566,10 @@
 
         function cycleSidebar() {
             const panel = document.getElementById('left-panel');
+            if (window.innerWidth <= 768) {
+                panel.classList.toggle('hidden');
+                return;
+            }
             if (panel.classList.contains('hidden')) {
                 panel.classList.remove('hidden');
             } else if (!panel.classList.contains('wide')) {
