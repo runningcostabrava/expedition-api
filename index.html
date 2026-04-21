@@ -647,10 +647,6 @@
                     map.setLight({ anchor: 'map' });
                     map.addLayer({ 'id': 'sky', 'type': 'sky', 'paint': { 'sky-type': 'atmosphere', 'sky-atmosphere-sun-intensity': 15 } });
                     refreshData();
-                    if (window.innerWidth <= 768) {
-                        document.getElementById('left-panel').classList.add('hidden');
-                        document.getElementById('right-panel').classList.add('hidden');
-                    }
 
                     // Start Live Tracking Poll
                     setInterval(async () => {
@@ -3435,6 +3431,13 @@
                 if (lb) lb.style.display = 'none';
             }
         });
+
+        if (window.innerWidth <= 768) {
+            document.getElementById('left-panel').classList.add('hidden');
+            document.getElementById('right-panel').classList.add('hidden');
+        }
+
+        initializeApp();
     </script>
 </body>
 
