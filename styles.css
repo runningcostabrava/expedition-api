@@ -3,6 +3,8 @@
     display: none !important;
 }
 
+.mobile-only-btn { display: none !important; }
+
 :root {
     --bg-main: #0f172a;
     /* Slate 900 */
@@ -1099,11 +1101,11 @@ button {
     /* Convert action buttons into Google Maps style Floating Action Buttons (FABs) */
     #mobile-fab-container {
         position: fixed !important;
-        bottom: env(safe-area-inset-bottom, 30px) !important;
+        bottom: env(safe-area-inset-bottom, 90px) !important;
         right: 15px !important;
         flex-direction: column !important;
         gap: 15px !important;
-        z-index: 110 !important;
+        z-index: 100000 !important;
         align-items: flex-end !important;
     }
     #mobile-fab-container button {
@@ -1179,4 +1181,8 @@ button {
     #right-panel:not(.hidden) {
         transform: translateY(0) !important;
     }
+
+    .mobile-only-btn { display: block !important; }
+
+    #asana-container, #task-detail-content { padding-bottom: 100px !important; }
 }

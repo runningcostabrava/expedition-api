@@ -95,6 +95,7 @@
 
     <div id="left-panel">
         <div id="panel-header" style="padding: 15px; border-bottom: 1px solid rgba(0,0,0,0.1);">
+            <button class="mobile-only-btn" onclick="document.getElementById('left-panel').classList.add('hidden')" style="width:100%; margin-bottom:12px; background:#e2e8f0; color:#0f172a; border:none; padding:12px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">🗺️ Hide List & View Map</button>
             <button onclick="showAllSectionsOnMap()" style="width:100%; margin-bottom:12px; background:#34495e; color:white; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">🌍 Show All (Long-press map to add points)</button>
             <div class="search-container" style="display: flex; gap: 10px; margin-bottom: 10px;">
                 <input type="text" id="search-filter" placeholder="🔍 Search tasks..." oninput="renderProjectView()"
@@ -141,7 +142,7 @@
     <div id="task-detail-panel">
         <div
             style="padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
-            <button onclick="closeTaskDetailPanel()"
+            <button onclick="closeTaskDetailPanel(); if(window.innerWidth <= 768) document.getElementById('left-panel').classList.remove('hidden');"
                 style="width:auto; padding: 6px 12px; background: transparent; color: #64748b; border: 1px solid #cbd5e0; font-weight: bold;">←
                 Back to Plan</button>
             <button id="detail-edit-btn" class="action-btn-modern"
@@ -622,6 +623,10 @@
                     map.setLight({ anchor: 'map' });
                     map.addLayer({ 'id': 'sky', 'type': 'sky', 'paint': { 'sky-type': 'atmosphere', 'sky-atmosphere-sun-intensity': 15 } });
                     refreshData();
+                    if (window.innerWidth <= 768) {
+                        document.getElementById('left-panel').classList.add('hidden');
+                        document.getElementById('right-panel').classList.add('hidden');
+                    }
 
                     // Start Live Tracking Poll
                     setInterval(async () => {
