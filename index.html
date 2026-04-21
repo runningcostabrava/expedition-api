@@ -30,6 +30,10 @@
 </head>
 
 <body>
+    <div id="lightbox-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:999999; align-items:center; justify-content:center; cursor:zoom-out;" onclick="this.style.display='none'">
+        <img id="lightbox-image" src="" style="max-width:95%; max-height:95%; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.7); cursor:default;" onclick="event.stopPropagation()">
+        <div style="position:absolute; top:20px; right:30px; color:white; font-size:40px; font-weight:bold; cursor:pointer; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">&times;</div>
+    </div>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -145,11 +149,6 @@
         </div>
         <div id="right-panel-content">
         </div>
-    </div>
-
-    <div id="lightbox-overlay" onclick="this.classList.remove('active')">
-        <div class="lightbox-close">&times;</div>
-        <img id="lightbox-image" src="" alt="Full Screen Preview">
     </div>
 
     <div id="map-wrapper">
@@ -380,17 +379,19 @@
                     <div><label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Name</label><input type="text" id="new-geom-title" value="${(title || '').replace(/"/g, '"')}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;"></div>
                     <div><label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">External Link (URL)</label><input type="text" id="new-geom-link" value="${defaultLink || ''}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;"></div>
                     <div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
-                        <label style="font-size:0.85em; font-weight:bold; color:#34495e;">Notes & Attachments</label>
-                        <input type="file" id="upload-new-geom-file" style="display:none;" onchange="uploadMediaFile(this.files[0], 'new-geom-notes', document.getElementById('btn-upload-new-geom'))">
-                        <button id="btn-upload-new-geom" onclick="document.getElementById('upload-new-geom-file').click()" style="background:#8b5cf6; color:white; border:none; border-radius:4px; padding:2px 8px; font-size:0.8em; cursor:pointer; font-weight:bold;">📁 Attach File</button>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                            <label style="font-size:0.85em; font-weight:bold; color:#34495e;">Notes & Attachments</label>
+                            <input type="file" id="upload-new-geom-file" style="display:none;" onchange="uploadMediaFile(this.files[0], 'new-geom-notes', document.getElementById('btn-upload-new-geom'))">
+                            <button id="btn-upload-new-geom" onclick="document.getElementById('upload-new-geom-file').click()" style="background:#8b5cf6; color:white; border:none; border-radius:4px; padding:2px 8px; font-size:0.8em; cursor:pointer; font-weight:bold;">📁 Attach File</button>
+                        </div>
+                        <textarea id="new-geom-notes" rows="3" placeholder="Type notes or paste an image here..." style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; resize:vertical;" oninput="renderAttachmentManager('new-geom-notes', 'new-geom-attachments')"></textarea>
+                        <div id="new-geom-attachments" style="display:flex; flex-wrap:wrap; margin-top:5px;"></div>
                     </div>
-                    <textarea id="new-geom-notes" rows="3" placeholder="Type notes or paste an image here..." style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; resize:vertical;"></textarea>
-                </div>
                     <button id="btn-save-new-geom" style="width:100%; padding:14px; background:#27ae60; color:white; border:none; border-radius:8px; font-weight:bold; font-size:1.05em; margin-top:5px; cursor:pointer; box-shadow:0 4px 10px rgba(39, 174, 96, 0.3);">💾 SAVE TO DATABASE</button>
                 </div>
             `;
             openRightPanel(`✨ Save ${kind === 'point' ? 'Location' : 'Route'}`, html);
+            renderAttachmentManager('new-geom-notes', 'new-geom-attachments');
             document.getElementById('btn-save-new-geom').onclick = async () => {
                 const btn = document.getElementById('btn-save-new-geom'); btn.innerText = 'Saving...'; btn.disabled = true;
                 const payload = { title: document.getElementById('new-geom-title').value || 'Unnamed', comments: document.getElementById('new-geom-notes').value || '', link: document.getElementById('new-geom-link').value || '', color: defaultColor, existing_task_id: activeTask || null };
@@ -2243,7 +2244,8 @@
                             <input type="file" id="upload-task-file" style="display:none;" onchange="uploadMediaFile(this.files[0], 'edit-task-desc', document.getElementById('btn-upload-task'))">
                             <button id="btn-upload-task" onclick="document.getElementById('upload-task-file').click()" style="background:#8b5cf6; color:white; border:none; border-radius:4px; padding:2px 8px; font-size:0.8em; cursor:pointer; font-weight:bold;">📁 Attach File</button>
                         </div>
-                        <textarea id="edit-task-desc" rows="3" placeholder="Type notes or paste an image here..." style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; resize:vertical;">${desc}</textarea>
+                        <textarea id="edit-task-desc" rows="3" placeholder="Type notes or paste an image here..." style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; resize:vertical;" oninput="renderAttachmentManager('edit-task-desc', 'edit-task-attachments')">${desc}</textarea>
+                        <div id="edit-task-attachments" style="display:flex; flex-wrap:wrap; margin-top:5px;"></div>
                     </div>
 
                 ${task ? `
@@ -2273,6 +2275,7 @@
                 </div>
             `;
             openRightPanel(taskId ? `⚙️ Edit Task` : `✨ New Task`, html);
+            renderAttachmentManager('edit-task-desc', 'edit-task-attachments');
         }
 
         async function saveTaskFromRightPanel(taskId) {
@@ -3077,12 +3080,14 @@
                     </div>
                     <div>
                         <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Comments / Notes</label>
-                        <textarea id="edit-geom-comments" rows="4" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; font-family:inherit; resize:vertical;">${safeComments}</textarea>
+                        <textarea id="edit-geom-comments" rows="4" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; font-family:inherit; resize:vertical;" oninput="renderAttachmentManager('edit-geom-comments', 'edit-geom-attachments')">${safeComments}</textarea>
+                        <div id="edit-geom-attachments" style="display:flex; flex-wrap:wrap; margin-top:5px;"></div>
                     </div>
                     <button onclick="saveGeomFromRightPanel('${kind}', ${id})" style="width:100%; padding:14px; background:#27ae60; color:white; border:none; border-radius:8px; font-weight:bold; font-size:1.05em; margin-top:5px; cursor:pointer; box-shadow:0 4px 10px rgba(39, 174, 96, 0.3);">💾 UPDATE DETAILS</button>
                 </div>
             `;
             openRightPanel(`ℹ️ Location Details`, html);
+            renderAttachmentManager('edit-geom-comments', 'edit-geom-attachments');
         }
 
         async function saveGeomFromRightPanel(kind, id) {
@@ -3177,6 +3182,9 @@
                             const isImage = file.type.startsWith('image/');
                             const mdLink = isImage ? `\n![${file.name || 'Image'}](${data.secure_url})\n` : `\n[📎 ${file.name || 'Document'}](${data.secure_url})\n`;
                             targetInput.value += mdLink;
+                            // Trigger manager refresh
+                            const containerMap = { 'new-geom-notes': 'new-geom-attachments', 'edit-task-desc': 'edit-task-attachments', 'edit-geom-comments': 'edit-geom-attachments' };
+                            if (containerMap[targetInputId]) renderAttachmentManager(targetInputId, containerMap[targetInputId]);
                         } else {
                             // Replace value for single-line text inputs
                             targetInput.value = data.secure_url;
@@ -3273,17 +3281,58 @@
 
         // --- LIGHTBOX ENGINE ---
         window.openLightbox = function(url) {
-            const overlay = document.getElementById('lightbox-overlay');
-            const img = document.getElementById('lightbox-image');
-            img.src = url;
-            overlay.classList.add('active');
+            document.getElementById('lightbox-image').src = url;
+            document.getElementById('lightbox-modal').style.display = 'flex';
+        };
+
+        window.renderAttachmentManager = function(textareaId, containerId) {
+            const textarea = document.getElementById(textareaId);
+            const container = document.getElementById(containerId);
+            if (!textarea || !container) return;
+            
+            const regex = /!?\[([^\]]+)\]\((https:\/\/res\.cloudinary\.com\/[^)]+)\)/g;
+            let match;
+            let html = '';
+            while ((match = regex.exec(textarea.value)) !== null) {
+                const name = match[1].replace('📎 ', '');
+                const url = match[2];
+                html += `<div style="display:inline-flex; align-items:center; background:#f1f5f9; border:1px solid #cbd5e0; padding:4px 8px; border-radius:6px; font-size:0.8em; margin:4px 4px 0 0;">
+                    <span style="max-width:150px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-right:8px; font-weight:bold;">${name}</span>
+                    <button onclick="removeAttachment('${url}', '${textareaId}', '${containerId}', this)" style="background:#ef4444; color:white; border:none; border-radius:4px; padding:2px 6px; cursor:pointer; width:auto;">🗑️</button>
+                </div>`;
+            }
+            container.innerHTML = html;
+        };
+
+        window.removeAttachment = async function(url, textareaId, containerId, btnElement) {
+            if (!confirm("Permanently delete this file from the cloud?")) return;
+            btnElement.innerText = '⏳';
+            try {
+                const res = await authFetch(`${API_URL}/api/upload`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fileUrl: url })
+                });
+                if (!res.ok) throw new Error("Cloud deletion failed");
+                
+                const textarea = document.getElementById(textareaId);
+                const escapedUrl = url.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                const regex = new RegExp(`!?\\[.*?\\]\\(${escapedUrl}\\)\\n?`, 'g');
+                textarea.value = textarea.value.replace(regex, '').trim();
+                
+                renderAttachmentManager(textareaId, containerId);
+                if (typeof showToast !== 'undefined') showToast("File permanently deleted", "success");
+            } catch(e) {
+                alert("Error: " + e.message);
+                btnElement.innerText = '🗑️';
+            }
         };
 
         // Handle ESC key for Lightbox
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                const lb = document.getElementById('lightbox-overlay');
-                if (lb) lb.classList.remove('active');
+                const lb = document.getElementById('lightbox-modal');
+                if (lb) lb.style.display = 'none';
             }
         });
     </script>
