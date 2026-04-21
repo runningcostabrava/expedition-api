@@ -87,13 +87,14 @@
             <button onclick="document.getElementById('gpx-file').click()" class="action-btn-modern"
                 title="Upload GPX">📤</button>
 
-            <button onclick="cycleSidebar()" class="action-btn-modern">📅</button>
+            <button onclick="cycleSidebar()" class="action-btn-modern">📋</button>
             <button onclick="openTaskEditor(null)" class="add-task-btn" style="width: auto; padding: 8px 15px; margin: 0;">+
                 Task</button>
         </div>
     </div>
 
     <div id="left-panel">
+        <div class="mobile-close-bar" onclick="document.getElementById('left-panel').classList.add('hidden')" style="display:none; text-align:center; padding:12px; background:#f1f5f9; font-weight:bold; color:#475569; border-bottom: 1px solid #cbd5e0; cursor:pointer; z-index: 10;">⬇️ Tap to Hide List ⬇️</div>
         <div id="panel-header" style="padding: 15px; border-bottom: 1px solid rgba(0,0,0,0.1);">
             <button class="mobile-only-btn" onclick="document.getElementById('left-panel').classList.add('hidden')" style="width:100%; margin-bottom:12px; background:#e2e8f0; color:#0f172a; border:none; padding:12px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">🗺️ Hide List & View Map</button>
             <button onclick="showAllSectionsOnMap()" style="width:100%; margin-bottom:12px; background:#34495e; color:white; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">🌍 Show All (Long-press map to add points)</button>
