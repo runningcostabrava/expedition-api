@@ -675,14 +675,25 @@ app.delete('/tasks/:task_id/anchors/:anchor_id', adminAuth, async (req, res) => 
 
 // --- LIVE TRACKING API (APP COMPATIBLE) ---
 app.all('/api/location', async (req, res) => {
-    const guide_id = req.body.guide_id || req.query.guide_id || req.query.id || req.query.name;
-    const lat = req.body.lat || req.query.lat;
-    const lng = req.body.lng || req.query.lng || req.query.lon;
+    // CRITICAL FIX: Default to an empty object if no body is sent to prevent crashes
+    const body = req.body || {}; 
+    
+    const guide_id = body.guide_id || req.query.guide_id || req.query.id || req.query.name;
+    const lat = body.lat || req.query.lat;
+    const lng = body.lng || req.query.lng || req.query.lon;
+    
     if (!guide_id || !lat || !lng) return res.status(400).json({ error: "Missing data" });
+    
     try {
+        // FOOLPROOF FIX: Auto-create the table if it doesn't exist yet!
+        await pool.query(`CREATE TABLE IF NOT EXISTS location_logs (id SERIAL PRIMARY KEY, guide_id TEXT, lat DOUBLE PRECISION, lng DOUBLE PRECISION, timestamp TIMESTAMPTZ DEFAULT NOW())`);
+        
         await pool.query('INSERT INTO location_logs (guide_id, lat, lng) VALUES ($1, $2, $3)', [guide_id, lat, lng]);
         res.status(200).send("OK");
-    } catch (err) { res.status(500).json({ error: err.message }); }
+    } catch (err) { 
+        console.error("Tracking Error:", err);
+        res.status(500).json({ error: err.message }); 
+    }
 });
 
 app.get('/api/locations/latest', async (req, res) => {
