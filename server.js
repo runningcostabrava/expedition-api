@@ -57,6 +57,7 @@ app.get('/setup-db', adminAuth, async (req, res) => {
     const queries = [
       // Core Tables
       "CREATE TABLE IF NOT EXISTS location_logs (id SERIAL PRIMARY KEY, guide_id TEXT, lat DOUBLE PRECISION, lng DOUBLE PRECISION, timestamp TIMESTAMPTZ DEFAULT NOW())",
+      "CREATE TABLE IF NOT EXISTS live_devices (id SERIAL PRIMARY KEY, device_identifier TEXT UNIQUE, display_name TEXT, assigned_user TEXT, color TEXT DEFAULT '#ef4444', is_visible BOOLEAN DEFAULT true)",
       "CREATE TABLE IF NOT EXISTS sections (id SERIAL PRIMARY KEY, section_date DATE, title TEXT, description TEXT)",
       "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS section_id INTEGER REFERENCES sections(id) ON DELETE SET NULL",
       "CREATE TABLE IF NOT EXISTS categories (id SERIAL PRIMARY KEY, name TEXT UNIQUE, color TEXT, icon TEXT)",
@@ -673,11 +674,11 @@ app.delete('/tasks/:task_id/anchors/:anchor_id', adminAuth, async (req, res) => 
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- LIVE TRACKING API (APP COMPATIBLE) ---
+// --- 📡 FLEET TRACKING & TELEMETRY ---
+
+// 1. The Webhook (Receives data from phones)
 app.all('/api/location', async (req, res) => {
-    // CRITICAL FIX: Default to an empty object if no body is sent to prevent crashes
     const body = req.body || {}; 
-    
     const guide_id = body.guide_id || req.query.guide_id || req.query.id || req.query.name;
     const lat = body.lat || req.query.lat;
     const lng = body.lng || req.query.lng || req.query.lon;
@@ -685,9 +686,13 @@ app.all('/api/location', async (req, res) => {
     if (!guide_id || !lat || !lng) return res.status(400).json({ error: "Missing data" });
     
     try {
-        // FOOLPROOF FIX: Auto-create the table if it doesn't exist yet!
-        await pool.query(`CREATE TABLE IF NOT EXISTS location_logs (id SERIAL PRIMARY KEY, guide_id TEXT, lat DOUBLE PRECISION, lng DOUBLE PRECISION, timestamp TIMESTAMPTZ DEFAULT NOW())`);
+        // Auto-register new devices into the directory if they don't exist
+        await pool.query(
+            `INSERT INTO live_devices (device_identifier, display_name) VALUES ($1, $2) ON CONFLICT (device_identifier) DO NOTHING`,
+            [guide_id, guide_id]
+        );
         
+        // Log the actual coordinate
         await pool.query('INSERT INTO location_logs (guide_id, lat, lng) VALUES ($1, $2, $3)', [guide_id, lat, lng]);
         res.status(200).send("OK");
     } catch (err) { 
@@ -696,9 +701,40 @@ app.all('/api/location', async (req, res) => {
     }
 });
 
-app.get('/api/locations/latest', async (req, res) => {
+// 2. Fetch Fleet Directory (For the UI Panel)
+app.get('/api/fleet/devices', async (req, res) => {
     try {
-        const result = await pool.query("SELECT DISTINCT ON (guide_id) guide_id, lat, lng, timestamp FROM location_logs WHERE timestamp > NOW() - INTERVAL '12 hours' ORDER BY guide_id, timestamp DESC");
+        const result = await pool.query('SELECT * FROM live_devices ORDER BY display_name ASC');
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 3. Update Device Settings (Rename, Color, Toggle Visibility)
+app.put('/api/fleet/devices/:id', adminAuth, async (req, res) => {
+    const { display_name, assigned_user, color, is_visible } = req.body;
+    try {
+        await pool.query(
+            'UPDATE live_devices SET display_name = COALESCE($1, display_name), assigned_user = COALESCE($2, assigned_user), color = COALESCE($3, color), is_visible = COALESCE($4, is_visible) WHERE id = $5',
+            [display_name, assigned_user, color, is_visible, req.params.id]
+        );
+        res.json({ message: "Device updated" });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 4. Fetch the Telemetry History (For drawing the map lines)
+app.get('/api/fleet/telemetry', async (req, res) => {
+    const minutes = parseInt(req.query.minutes) || 60; // Default to 1 hour tail
+    try {
+        // Only fetch history for devices that are marked as visible
+        const query = `
+            SELECT l.guide_id, l.lat, l.lng, l.timestamp, d.display_name, d.color 
+            FROM location_logs l
+            JOIN live_devices d ON l.guide_id = d.device_identifier
+            WHERE l.timestamp >= NOW() - INTERVAL '1 minute' * $1
+            AND d.is_visible = true
+            ORDER BY l.timestamp ASC
+        `;
+        const result = await pool.query(query, [minutes]);
         res.json(result.rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });

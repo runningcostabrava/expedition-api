@@ -106,6 +106,8 @@
             <button onclick="document.getElementById('gpx-file').click()" class="action-btn-modern"
                 title="Upload GPX">📤</button>
 
+            <button onclick="toggleFleetPanel()" class="action-btn-modern" title="Fleet Tracking">📡</button>
+
             <button onclick="cycleSidebar()" class="action-btn-modern">📋</button>
             <button onclick="openTaskEditor(null)" class="add-task-btn" style="width: auto; padding: 8px 15px; margin: 0;">+
                 Task</button>
@@ -179,6 +181,40 @@
                 style="width: auto; background: none; border: none; font-size: 1.2em; cursor: pointer; color: #94a3b8; padding: 0;">✖</button>
         </div>
         <div id="right-panel-content">
+        </div>
+    </div>
+
+    <div id="fleet-panel" class="hidden">
+        <div id="right-panel-header" style="background: #1e293b; color: white;">
+            <span id="right-panel-title">📡 Fleet Command Center</span>
+            <button onclick="toggleFleetPanel()"
+                style="width: auto; background: none; border: none; font-size: 1.2em; cursor: pointer; color: #94a3b8; padding: 0;">✖</button>
+        </div>
+        <div id="right-panel-content" style="background: #f8fafc;">
+
+            <div
+                style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:8px; color:#34495e;">Show
+                    Map History (Tail)</label>
+                <select id="fleet-time-filter" onchange="window.forceFleetUpdate()"
+                    style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-weight: bold; color: #1e293b;">
+                    <option value="15">Last 15 Minutes</option>
+                    <option value="60" selected>Last 1 Hour</option>
+                    <option value="240">Last 4 Hours</option>
+                    <option value="720">Last 12 Hours</option>
+                    <option value="1440">Last 24 Hours</option>
+                </select>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <h3 style="margin:0; font-size: 1.1em; color: #0f172a;">Active Devices</h3>
+                <button onclick="window.fetchFleetDirectory()"
+                    style="background: transparent; border: 1px solid #cbd5e0; border-radius: 4px; padding: 4px 8px; font-size: 0.8em; cursor: pointer; color: #475569;">🔄
+                    Refresh</button>
+            </div>
+
+            <div id="fleet-device-list" style="display: flex; flex-direction: column; gap: 10px;">
+            </div>
         </div>
     </div>
 
