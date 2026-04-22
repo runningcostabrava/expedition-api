@@ -58,6 +58,8 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       // Core Tables
       "CREATE TABLE IF NOT EXISTS location_logs (id SERIAL PRIMARY KEY, guide_id TEXT, lat DOUBLE PRECISION, lng DOUBLE PRECISION, timestamp TIMESTAMPTZ DEFAULT NOW())",
       "CREATE TABLE IF NOT EXISTS live_devices (id SERIAL PRIMARY KEY, device_identifier TEXT UNIQUE, display_name TEXT, assigned_user TEXT, color TEXT DEFAULT '#ef4444', is_visible BOOLEAN DEFAULT true)",
+      "ALTER TABLE live_devices ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT '🏃‍♂️'",
+      "ALTER TABLE live_devices ADD COLUMN IF NOT EXISTS icon_size INTEGER DEFAULT 28",
       "CREATE TABLE IF NOT EXISTS sections (id SERIAL PRIMARY KEY, section_date DATE, title TEXT, description TEXT)",
       "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS section_id INTEGER REFERENCES sections(id) ON DELETE SET NULL",
       "CREATE TABLE IF NOT EXISTS categories (id SERIAL PRIMARY KEY, name TEXT UNIQUE, color TEXT, icon TEXT)",
@@ -709,13 +711,13 @@ app.get('/api/fleet/devices', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 3. Update Device Settings (Rename, Color, Toggle Visibility)
+// 3. Update Device Settings (Rename, Color, Icon, Size, Toggle Visibility)
 app.put('/api/fleet/devices/:id', adminAuth, async (req, res) => {
-    const { display_name, assigned_user, color, is_visible } = req.body;
+    const { display_name, assigned_user, color, is_visible, icon, icon_size } = req.body;
     try {
         await pool.query(
-            'UPDATE live_devices SET display_name = COALESCE($1, display_name), assigned_user = COALESCE($2, assigned_user), color = COALESCE($3, color), is_visible = COALESCE($4, is_visible) WHERE id = $5',
-            [display_name, assigned_user, color, is_visible, req.params.id]
+            'UPDATE live_devices SET display_name = COALESCE($1, display_name), assigned_user = COALESCE($2, assigned_user), color = COALESCE($3, color), is_visible = COALESCE($4, is_visible), icon = COALESCE($5, icon), icon_size = COALESCE($6, icon_size) WHERE id = $7',
+            [display_name, assigned_user, color, is_visible, icon, icon_size, req.params.id]
         );
         res.json({ message: "Device updated" });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -727,7 +729,7 @@ app.get('/api/fleet/telemetry', async (req, res) => {
     try {
         // Only fetch history for devices that are marked as visible
         const query = `
-            SELECT l.guide_id, l.lat, l.lng, l.timestamp, d.display_name, d.color 
+            SELECT l.guide_id, l.lat, l.lng, l.timestamp, d.display_name, d.color, d.icon, d.icon_size 
             FROM location_logs l
             JOIN live_devices d ON l.guide_id = d.device_identifier
             WHERE l.timestamp >= NOW() - INTERVAL '1 minute' * $1
