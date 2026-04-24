@@ -182,6 +182,7 @@
     </div>
 
     <div id="task-detail-panel">
+        <div class="mobile-close-bar" onclick="closeTaskDetailPanel()" style="display:none; text-align:center; padding:12px; background:#f1f5f9; font-weight:bold; color:#475569; border-bottom: 1px solid #cbd5e0; cursor:pointer; z-index: 10;">⬇️ Tap to Hide Details ⬇️</div>
         <div
             style="padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
             <button
@@ -196,6 +197,7 @@
     </div>
 
     <div id="right-panel" class="hidden">
+        <div class="mobile-close-bar" onclick="closeRightPanel()" style="display:none; text-align:center; padding:12px; background:#f1f5f9; font-weight:bold; color:#475569; border-bottom: 1px solid #cbd5e0; cursor:pointer; z-index: 10;">⬇️ Tap to Hide Panel ⬇️</div>
         <div id="right-panel-header">
             <span id="right-panel-title">Details</span>
             <button onclick="closeRightPanel()"
@@ -206,6 +208,7 @@
     </div>
 
     <div id="fleet-panel" class="hidden">
+        <div class="mobile-close-bar" onclick="toggleFleetPanel()" style="display:none; text-align:center; padding:12px; background:#1e293b; font-weight:bold; color:#94a3b8; border-bottom: 1px solid rgba(0,0,0,0.2); cursor:pointer; z-index: 10;">⬇️ Tap to Hide Fleet ⬇️</div>
         <div id="right-panel-header" style="background: #1e293b; color: white;">
             <span id="right-panel-title">📡 Fleet Command Center</span>
             <button onclick="toggleFleetPanel()"
