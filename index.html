@@ -103,23 +103,17 @@
                 <option value="mapbox://styles/mapbox/streets-v12">🛣️ Standard</option>
             </select>
         </div>
+    </div>
 
-        <div id="mobile-fab-container" style="display: flex; gap: 8px; align-items: center; flex-shrink: 0;">
-
-            <button onclick="startSmartRoute()" class="action-btn-modern" style="font-size: 1.1em;"
-                title="Smart Route">🚗</button>
-
-            <input type="file" id="gpx-file" accept=".gpx" style="display: none;">
-            <button onclick="document.getElementById('gpx-file').click()" class="action-btn-modern"
-                title="Upload GPX">📤</button>
-
-            <button onclick="toggleFleetPanel()" class="action-btn-modern" title="Fleet Tracking">📡</button>
-
-            <button onclick="cycleSidebar()" class="action-btn-modern">📋</button>
-            <button onclick="openTaskEditor(null)" class="add-task-btn"
-                style="width: auto; padding: 8px 15px; margin: 0;">+
-                Task</button>
-        </div>
+    <div id="mobile-fab-container">
+        <button onclick="startSmartRoute()" class="action-btn-modern" style="font-size: 1.1em;"
+            title="Smart Route">🚗</button>
+        <input type="file" id="gpx-file" accept=".gpx" style="display: none;">
+        <button onclick="document.getElementById('gpx-file').click()" class="action-btn-modern" title="Upload GPX">📤</button>
+        <button onclick="toggleFleetPanel()" class="action-btn-modern" title="Fleet Tracking">📡</button>
+        <button onclick="cycleSidebar()" class="action-btn-modern">📋</button>
+        <button onclick="openTaskEditor(null)" class="add-task-btn" style="width: auto; padding: 8px 15px; margin: 0;">+
+            Task</button>
     </div>
 
     <div id="left-panel">

@@ -3,7 +3,9 @@
     display: none !important;
 }
 
-.mobile-only-btn { display: none !important; }
+.mobile-only-btn {
+    display: none !important;
+}
 
 :root {
     --bg-main: #0f172a;
@@ -46,10 +48,24 @@ body {
     z-index: 150 !important;
     display: flex;
     align-items: center;
-    padding: 0 15px;
+    /* Leave a 320px gap on the right so it doesn't overlap our newly extracted buttons */
+    padding: 0 320px 0 15px;
     box-shadow: var(--card-shadow);
     gap: 15px;
     color: white;
+}
+
+/* Base Desktop Styling for the newly extracted FAB container */
+#mobile-fab-container {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    height: 55px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding-right: 15px;
+    z-index: 160;
 }
 
 /* Overrides for dark bar legibility */
@@ -62,12 +78,13 @@ body {
     color: white;
 }
 
-    #command-bar .action-btn-modern:hover {
-        background: rgba(255, 255, 255, 0.2);
-    }
-    .modal {
-        z-index: 100000 !important;
-    }
+#command-bar .action-btn-modern:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.modal {
+    z-index: 100000 !important;
+}
 
 #internal-map-search {
     background: rgba(255, 255, 255, 0.1) !important;
@@ -837,26 +854,52 @@ button {
 /* --- ZEN MODE (FULLSCREEN MAP FOCUS) --- */
 
 /* Ensure the top bar and elevation panel transition smoothly */
-#command-bar, #elevation-panel, #mobile-fab-container {
+#command-bar,
+#elevation-panel,
+#mobile-fab-container {
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
 }
 
 /* Slide elements out of view when Zen Mode is active */
-body.zen-mode #command-bar { transform: translateY(-150%) !important; opacity: 0; pointer-events: none; }
-body.zen-mode #left-panel { transform: translateX(-120%) !important; opacity: 0; pointer-events: none; }
-body.zen-mode #right-panel, 
-body.zen-mode #task-detail-panel { transform: translateX(120%) !important; opacity: 0; pointer-events: none; }
-body.zen-mode #elevation-panel { transform: translateY(150%) !important; opacity: 0; pointer-events: none; }
+body.zen-mode #command-bar {
+    transform: translateY(-150%) !important;
+    opacity: 0;
+    pointer-events: none;
+}
+
+body.zen-mode #left-panel {
+    transform: translateX(-120%) !important;
+    opacity: 0;
+    pointer-events: none;
+}
+
+body.zen-mode #right-panel,
+body.zen-mode #task-detail-panel {
+    transform: translateX(120%) !important;
+    opacity: 0;
+    pointer-events: none;
+}
+
+body.zen-mode #elevation-panel {
+    transform: translateY(150%) !important;
+    opacity: 0;
+    pointer-events: none;
+}
 
 /* Mobile-specific Zen Mode overrides */
 @media (max-width: 768px) {
-    body.zen-mode #left-panel, 
-    body.zen-mode #right-panel, 
-    body.zen-mode #task-detail-panel { 
-        transform: translateY(100%) !important; /* Slide down off-screen into the bottom sheet area */
+
+    body.zen-mode #left-panel,
+    body.zen-mode #right-panel,
+    body.zen-mode #task-detail-panel {
+        transform: translateY(100%) !important;
+        /* Slide down off-screen into the bottom sheet area */
     }
-    body.zen-mode #mobile-fab-container { 
-        transform: translateX(150%) !important; opacity: 0; pointer-events: none; 
+
+    body.zen-mode #mobile-fab-container {
+        transform: translateX(150%) !important;
+        opacity: 0;
+        pointer-events: none;
     }
 }
 
@@ -865,7 +908,8 @@ body.zen-mode #elevation-panel { transform: translateY(150%) !important; opacity
     position: fixed;
     bottom: max(env(safe-area-inset-bottom, 20px), 25px);
     left: 20px;
-    z-index: 100001; /* Must stay above everything, even active modals */
+    z-index: 100001;
+    /* Must stay above everything, even active modals */
     background: var(--glass-dark);
     backdrop-filter: var(--glass-blur);
     color: white;
@@ -882,14 +926,14 @@ body.zen-mode #elevation-panel { transform: translateY(150%) !important; opacity
     transition: all 0.3s ease;
 }
 
-#zen-toggle-btn:hover { 
-    background: #1e293b; 
-    transform: scale(1.05); 
+#zen-toggle-btn:hover {
+    background: #1e293b;
+    transform: scale(1.05);
 }
 
 /* Highlight the button when Zen Mode is active */
-body.zen-mode #zen-toggle-btn { 
-    background: var(--accent); 
+body.zen-mode #zen-toggle-btn {
+    background: var(--accent);
     border-color: transparent;
 }
 
@@ -973,7 +1017,8 @@ body.zen-mode #zen-toggle-btn {
     position: absolute;
     top: 85px;
     right: 15px;
-    bottom: 15px; /* Takes full height */
+    bottom: 15px;
+    /* Takes full height */
     width: 380px;
     background: var(--glass-white);
     backdrop-filter: var(--glass-blur);
@@ -994,8 +1039,10 @@ body.zen-mode #zen-toggle-btn {
 }
 
 /* Ensure Zen Mode hides it */
-body.zen-mode #fleet-panel { 
-    transform: translateX(120%) !important; opacity: 0; pointer-events: none; 
+body.zen-mode #fleet-panel {
+    transform: translateX(120%) !important;
+    opacity: 0;
+    pointer-events: none;
 }
 
 /* Mobile responsive sliding */
@@ -1012,6 +1059,7 @@ body.zen-mode #fleet-panel {
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
         z-index: 9999 !important;
     }
+
     #fleet-panel:not(.hidden) {
         transform: translateY(0) !important;
     }
@@ -1162,7 +1210,7 @@ body.zen-mode #fleet-panel {
     max-height: 95vh;
     object-fit: contain;
     border-radius: 4px;
-    box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
     transition: transform 0.3s ease;
 }
 
@@ -1173,7 +1221,7 @@ body.zen-mode #fleet-panel {
     color: white;
     font-size: 30px;
     cursor: pointer;
-    background: rgba(255,255,255,0.1);
+    background: rgba(255, 255, 255, 0.1);
     width: 44px;
     height: 44px;
     display: flex;
@@ -1183,57 +1231,87 @@ body.zen-mode #fleet-panel {
 }
 
 @media (max-width: 768px) {
+
     /* Simplify Top Bar to just Search */
     #command-bar {
         top: env(safe-area-inset-top, 10px) !important;
         left: 10px !important;
         right: 10px !important;
         height: auto !important;
-        padding: 0 10px !important;
+        padding: 12px !important; /* Added padding so inputs don't touch the glass edges */
         flex-wrap: nowrap !important;
         overflow: hidden !important;
         flex-direction: column !important;
         align-items: stretch !important;
-        gap: 8px !important;
+        gap: 10px !important;
     }
-    #command-bar > div:first-child { display: none !important; } /* Hide 'EXPEDITION v2' text */
-    #command-bar > div[style*="max-width: 300px"], #google-search-container { max-width: 100% !important; width: 100% !important; margin: 0 !important; }
-    #style-switcher { display: none !important; } /* Hide map styles on mobile to save space */
-    
-    /* Convert action buttons into Google Maps style Floating Action Buttons (FABs) */
+
+    /* Force Google Maps Search to match your custom search bar width */
+    #google-discovery-input {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    #command-bar>div:first-child {
+        display: none !important;
+    }
+
+    /* Hide 'EXPEDITION v2' text */
+    #command-bar>div[style*="max-width: 300px"],
+    #google-search-container {
+        max-width: 100% !important;
+        width: 100% !important;
+        margin: 0 !important;
+    }
+
+    #style-switcher {
+        display: none !important;
+    }
+
+    /* Hide map styles on mobile to save space */
+
+    /* --- NEW POLISHED MOBILE FABS --- */
     #mobile-fab-container {
         position: fixed !important;
-        bottom: env(safe-area-inset-bottom, 90px) !important;
+        bottom: 30px !important; /* Moves them slightly closer to the bottom */
         right: 15px !important;
         flex-direction: column !important;
-        gap: 15px !important;
-        z-index: 100000 !important;
+        gap: 12px !important;
+        z-index: 100 !important; /* CRITICAL: Lowers them so bottom-sheets slide OVER them cleanly! */
         align-items: flex-end !important;
     }
+
     #mobile-fab-container button {
-        width: 50px !important;
-        height: 50px !important;
+        width: 48px !important;
+        height: 48px !important;
         border-radius: 50% !important;
         border: none !important;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25) !important;
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
         font-size: 1.3em !important;
-        background: var(--bg-main) !important;
+        background: #1e293b !important; /* Uniform dark slate color */
         color: white !important;
         padding: 0 !important;
     }
+
+    /* Transform the "+ Task" button into a perfect circle with just a plus icon on mobile */
     #mobile-fab-container .add-task-btn {
-        width: auto !important;
-        border-radius: 30px !important;
-        padding: 0 20px !important;
-        font-size: 1.1em !important;
-        background: var(--success) !important;
+        width: 48px !important;
+        background: #10b981 !important; /* Keep it bright green */
+        font-size: 0 !important; /* Hides the word "Task" */
+    }
+
+    #mobile-fab-container .add-task-btn::after {
+        content: "➕"; /* Replaces text with an icon */
+        font-size: 18px;
+        display: block;
     }
 
     /* Add Native iOS Drawer Handle to Bottom Sheets */
-    #task-detail-panel::before, #right-panel::before {
+    #task-detail-panel::before,
+    #right-panel::before {
         content: '';
         display: block;
         width: 40px;
@@ -1243,26 +1321,33 @@ body.zen-mode #fleet-panel {
         margin: 12px auto 5px auto;
         flex-shrink: 0;
     }
-    
+
     /* Fat-Finger Touch Targets for Task Actions */
     .task-actions-modern {
-        opacity: 1 !important; /* Always visible */
+        opacity: 1 !important;
+        /* Always visible */
         gap: 10px !important;
     }
+
     .action-btn-modern {
         min-width: 44px !important;
         min-height: 44px !important;
-        background: #f1f5f9 !important; /* Make buttons look clickable */
+        background: #f1f5f9 !important;
+        /* Make buttons look clickable */
         border: 1px solid #e2e8f0 !important;
     }
-    
+
     /* Smooth momentum scrolling for iOS */
-    #asana-container, #task-detail-content, #right-panel-content {
+    #asana-container,
+    #task-detail-content,
+    #right-panel-content {
         -webkit-overflow-scrolling: touch !important;
     }
 
     /* Turn sidebars into bottom-sheets with Safe Area padding */
-    #left-panel, #task-detail-panel, #right-panel {
+    #left-panel,
+    #task-detail-panel,
+    #right-panel {
         width: 100% !important;
         left: 0 !important;
         height: 75vh !important;
@@ -1274,21 +1359,51 @@ body.zen-mode #fleet-panel {
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
         z-index: 9999 !important;
         padding-bottom: env(safe-area-inset-bottom, 20px) !important;
-        border: 1px solid rgba(255,255,255,0.3) !important;
+        border: 1px solid rgba(255, 255, 255, 0.3) !important;
     }
 
     /* Fix the visibility logic so they actually slide up */
-    #left-panel:not(.hidden), 
-    #task-detail-panel.open, 
+    #left-panel:not(.hidden),
+    #task-detail-panel.open,
     #right-panel:not(.hidden) {
         transform: translateY(0) !important;
     }
 
-    #left-panel > #panel-header > div:nth-of-type(2), #left-panel > #panel-header > div:nth-of-type(3) { display: none !important; }
+    #left-panel>#panel-header>div:nth-of-type(2),
+    #left-panel>#panel-header>div:nth-of-type(3) {
+        display: none !important;
+    }
 
-    .mobile-only-btn { display: block !important; }
+    .mobile-only-btn {
+        display: block !important;
+    }
 
-    .mobile-close-bar { display: block !important; border-radius: 24px 24px 0 0; }
+    .mobile-close-bar {
+        display: block !important;
+        border-radius: 24px 24px 0 0;
+    }
 
-    #asana-container, #task-detail-content { padding-bottom: 100px !important; }
+    #asana-container,
+    #task-detail-content {
+        padding-bottom: 100px !important;
+    }
+
+    /* Push Mapbox zoom/compass controls down so they don't overlap the search bars */
+    .mapboxgl-ctrl-top-right {
+        top: 110px !important;
+        right: 10px !important;
+    }
+
+    /* Make sure the native iOS drawer handles look consistent */
+    #fleet-panel::before {
+        content: '';
+        display: block;
+        width: 40px;
+        height: 5px;
+        background: #64748b;
+        /* Darker handle for the dark fleet panel */
+        border-radius: 3px;
+        margin: 12px auto 5px auto;
+        flex-shrink: 0;
+    }
 }
