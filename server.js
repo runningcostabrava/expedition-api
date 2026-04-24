@@ -681,11 +681,21 @@ app.delete('/tasks/:task_id/anchors/:anchor_id', adminAuth, async (req, res) => 
 // 1. The Webhook (Receives data from phones)
 app.all('/api/location', async (req, res) => {
     const body = req.body || {}; 
-    const guide_id = body.guide_id || req.query.guide_id || req.query.id || req.query.name;
-    const lat = body.lat || req.query.lat;
-    const lng = body.lng || req.query.lng || req.query.lon;
     
-    if (!guide_id || !lat || !lng) return res.status(400).json({ error: "Missing data" });
+    // DEBUG: This will print exactly what the phone sends to your Render logs!
+    console.log("Incoming tracking payload:", JSON.stringify(body).substring(0, 200));
+
+    // Smart Extract: Understands Standard, Query Params, and TransistorSoft formats
+    const guide_id = body.guide_id || req.query.id || req.query.device_id || body.device_id || "Mobile-Guide";
+    
+    // Dig deep into the payload to find the coordinates, wherever they are hiding
+    const lat = body.lat || req.query.lat || body.latitude || (body.location && body.location.coords ? body.location.coords.latitude : null);
+    const lng = body.lng || req.query.lng || req.query.lon || body.longitude || (body.location && body.location.coords ? body.location.coords.longitude : null);
+    
+    if (!lat || !lng) {
+        console.error("Rejected - Could not find coordinates in payload.");
+        return res.status(400).json({ error: "Missing data" });
+    }
     
     try {
         // Auto-register new devices into the directory if they don't exist
