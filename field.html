@@ -160,6 +160,7 @@
 
     <button class="fab-pin" onclick="enableDropPinMode()">📍</button>
     <button class="fab-fleet" onclick="openFieldFleet()">📡</button>
+    <button id="fab-record" class="fab-fleet" style="top: 210px; background: #e74c3c;" onclick="toggleRecording()">⏺️</button>
 
     <div id="elevation-panel" class="bottom-panel" style="height: 250px;">
         <span class="close-panel" onclick="document.getElementById('elevation-panel').style.display='none'">×</span>
@@ -294,6 +295,11 @@
 
         // Start the Field Map app
         initFieldMap();
+
+        // Register Offline Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').then(() => console.log("Offline mode ready."));
+        }
 
         async function loadDayTracks(sectionId) {
             if (map.getLayer('daily-route')) map.removeLayer('daily-route');
