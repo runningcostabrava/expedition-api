@@ -296,6 +296,90 @@
         // Start the Field Map app
         initFieldMap();
 
+        // --- ⏺️ LIVE TRACK RECORDER ---
+        let isRecording = false;
+        let recordWatchId = null;
+        let recordedCoords = [];
+        let recordingLineSource = null;
+
+        function toggleRecording() {
+            const btn = document.getElementById('fab-record');
+
+            if (!isRecording) {
+                // START RECORDING
+                if (!confirm("Start recording a new GPS track?")) return;
+                isRecording = true;
+                recordedCoords = [];
+                btn.innerHTML = '⏹️';
+                btn.style.animation = 'pulse-ring 2s infinite'; // Optional: add a CSS pulse animation
+
+                // Setup visual line on map
+                if (map.getLayer('live-recording-layer')) map.removeLayer('live-recording-layer');
+                if (map.getSource('live-recording')) map.removeSource('live-recording');
+
+                map.addSource('live-recording', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } } });
+                map.addLayer({ id: 'live-recording-layer', type: 'line', source: 'live-recording', paint: { 'line-color': '#e74c3c', 'line-width': 5, 'line-dasharray': [2, 2] } });
+
+                recordWatchId = navigator.geolocation.watchPosition((position) => {
+                    const { longitude, latitude, altitude } = position.coords;
+                    recordedCoords.push([longitude, latitude, altitude || 0]);
+
+                    // Update map line live
+                    if (recordedCoords.length > 1) {
+                        map.getSource('live-recording').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: recordedCoords } });
+                    }
+                }, (err) => console.error(err), { enableHighAccuracy: true, maximumAge: 0 });
+
+            } else {
+                // STOP RECORDING
+                isRecording = false;
+                navigator.geolocation.clearWatch(recordWatchId);
+                btn.innerHTML = '⏺️';
+                btn.style.animation = 'none';
+
+                if (recordedCoords.length < 2) {
+                    alert("Not enough movement recorded to save a track.");
+                    return;
+                }
+
+                // Calculate basic stats for the prompt
+                const lineGeom = { type: 'LineString', coordinates: recordedCoords };
+                const dist = turf.length(lineGeom, { units: 'kilometers' }).toFixed(2);
+
+                if (confirm(`Finished! Recorded ${dist}km. Save this track to the database?`)) {
+                    saveRecordedTrack(lineGeom, dist);
+                } else {
+                    map.getSource('live-recording').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: [] } });
+                }
+            }
+        }
+
+        async function saveRecordedTrack(geometry, distance) {
+            const title = prompt("Name this track:") || "Recorded Track";
+            // Use the currently selected task dropdown from the Pin Modal logic if you want, or just save it loosely
+
+            const payload = {
+                title: title,
+                color: '#e74c3c',
+                distance: distance,
+                geojson_data: {
+                    type: "FeatureCollection",
+                    features: [{ type: "Feature", geometry: geometry, properties: { route_type: 'recorded' } }]
+                }
+            };
+
+            try {
+                await authFetch(`${API_URL}/tracks`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                alert("Track saved successfully!");
+                loadDayTracks(document.getElementById('day-selector').value || 'all');
+            } catch (e) {
+                alert("Failed to save track.");
+            }
+        }
+
         // Register Offline Service Worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js').then(() => console.log("Offline mode ready."));
