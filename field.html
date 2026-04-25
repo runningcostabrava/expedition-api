@@ -430,32 +430,81 @@
             }
         }
 
-        // --- NEW: Mobile Fleet Manager ---
+        // --- UPGRADED: Mobile Fleet Manager (Trails & Zoom) ---
         let teamMarkers = {};
+        let latestTeamCoords = {}; // Stores coordinates so we can zoom to them
+
         async function fetchTeamLocations() {
             try {
                 const res = await fetch(`${API_URL}/api/fleet/telemetry?minutes=60`);
                 const data = await res.json();
-                const latestPositions = {};
-                data.forEach(p => { latestPositions[p.guide_id] = p; });
 
-                const activeIds = Object.keys(latestPositions);
+                // Group data to build trails
+                const paths = {};
+                data.forEach(point => {
+                    if (!paths[point.guide_id]) {
+                        paths[point.guide_id] = { coords: [], color: point.color, icon: point.icon || '🏃‍♂️' };
+                    }
+                    paths[point.guide_id].coords.push([point.lng, point.lat]);
+                });
+
+                const lineFeatures = [];
+                const activeIds = Object.keys(paths);
+                latestTeamCoords = {}; // Reset for zooming
 
                 activeIds.forEach(id => {
-                    const point = latestPositions[id];
+                    const track = paths[id];
+                    const latestCoord = track.coords[track.coords.length - 1];
+                    latestTeamCoords[id] = latestCoord; // Save for the Zoom button
+
+                    // 1. Draw the Trail
+                    if (track.coords.length > 1) {
+                        lineFeatures.push({
+                            type: 'Feature',
+                            properties: { color: track.color },
+                            geometry: { type: 'LineString', coordinates: track.coords }
+                        });
+                    }
+
+                    // 2. Draw the Live Avatar
                     if (!teamMarkers[id]) {
                         const el = document.createElement('div');
-                        el.innerHTML = `<div style="font-size: 24px; background: white; border-radius: 50%; padding: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 2px solid ${point.color};">${point.icon || '🏃‍♂️'}</div>`;
-                        teamMarkers[id] = new mapboxgl.Marker({ element: el }).setLngLat([point.lng, point.lat]).addTo(map);
-                    } else teamMarkers[id].setLngLat([point.lng, point.lat]);
+                        el.innerHTML = `<div style="font-size: 24px; background: white; border-radius: 50%; padding: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 2px solid ${track.color};">${track.icon}</div>`;
+                        teamMarkers[id] = new mapboxgl.Marker({ element: el }).setLngLat(latestCoord).addTo(map);
+                    } else {
+                        teamMarkers[id].setLngLat(latestCoord);
+                    }
                 });
 
                 // Remove hidden markers
                 Object.keys(teamMarkers).forEach(id => {
                     if (!activeIds.includes(id)) { teamMarkers[id].remove(); delete teamMarkers[id]; }
                 });
+
+                // Update Mapbox Line Source
+                const geojson = { type: 'FeatureCollection', features: lineFeatures };
+                if (map.getSource('fleet-tails')) {
+                    map.getSource('fleet-tails').setData(geojson);
+                } else {
+                    map.addSource('fleet-tails', { type: 'geojson', data: geojson });
+                    map.addLayer({
+                        id: 'fleet-tails-layer', type: 'line', source: 'fleet-tails',
+                        layout: { 'line-join': 'round', 'line-cap': 'round' },
+                        paint: { 'line-color': ['get', 'color'], 'line-width': 4, 'line-opacity': 0.7 }
+                    });
+                }
             } catch (e) { }
         }
+
+        window.zoomToGuide = function (guideId) {
+            const coords = latestTeamCoords[guideId];
+            if (coords) {
+                map.flyTo({ center: coords, zoom: 16, duration: 1500 });
+                document.getElementById('fleet-panel-mobile').style.display = 'none'; // Close panel
+            } else {
+                alert("Location not found yet. Wait for next GPS ping.");
+            }
+        };
 
         async function openFieldFleet() {
             document.getElementById('fleet-panel-mobile').style.display = 'block';
@@ -466,9 +515,12 @@
             devices.forEach(d => {
                 html += `
                 <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
-                    <div style="font-size: 1.1em;">${d.icon || '🏃‍♂️'} <strong>${d.display_name}</strong></div>
+                    <div style="flex: 1; cursor: pointer;" onclick="zoomToGuide(${d.id})">
+                        <div style="font-size: 1.1em;">${d.icon || '🏃‍♂️'} <strong>${d.display_name}</strong></div>
+                        <div style="font-size: 0.8em; color: #3498db; font-weight: bold; margin-top: 4px;">📍 Tap to Zoom</div>
+                    </div>
                     <button onclick="toggleFieldDevice(${d.id}, ${!d.is_visible})" style="padding:8px 16px; border-radius:8px; border:none; background:${d.is_visible ? '#10b981' : '#94a3b8'}; color:white; font-weight:bold; cursor:pointer;">
-                        ${d.is_visible ? '👁️ Visible' : '🙈 Hidden'}
+                        ${d.is_visible ? '👁️' : '🙈'}
                     </button>
                 </div>`;
             });
