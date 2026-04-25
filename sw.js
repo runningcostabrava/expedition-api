@@ -7,8 +7,7 @@ const APP_SHELL = [
     '/pm.html',
     '/field.html',
     '/index.html',
-    '/styles.css', // If you use a separate CSS file
-    '/icon-192.png' // If you have a PWA icon
+    '/styles.css'
 ];
 
 self.addEventListener('install', event => {
@@ -27,11 +26,15 @@ self.addEventListener('activate', event => {
 
 // 2. The Interceptor Engine
 self.addEventListener('fetch', event => {
+    // --- CRITICAL FIX: NEVER attempt to cache POST, PUT, or DELETE requests ---
+    if (event.request.method !== 'GET') {
+        return; // Let the browser handle it normally and exit the Service Worker
+    }
+
     const url = new URL(event.request.url);
 
     // --- STRATEGY A: Your Database API (Network First, Fallback to Cache) ---
-    // This means it always tries to get live data. If no signal, it uses the last saved list.
-    if (url.origin === API_URL && event.request.method === 'GET') {
+    if (url.origin === API_URL) {
         event.respondWith(
             fetch(event.request)
                 .then(response => {
@@ -52,9 +55,10 @@ self.addEventListener('fetch', event => {
         event.respondWith(
             caches.match(event.request).then(cachedResponse => {
                 const networkFetch = fetch(event.request).then(response => {
-                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
+                    const clone = response.clone();
+                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
                     return response;
-                }).catch(() => null); // Ignore network errors for these
+                }).catch(() => null);
 
                 return cachedResponse || networkFetch;
             })
