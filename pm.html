@@ -296,9 +296,33 @@
 
         function renderItinerary() {
             const groups = {};
-            fullItinerary.forEach(t => {
+            
+            // 1. Separate main tasks from subtasks
+            const mainTasks = fullItinerary.filter(t => !t.parent_id);
+            const subTasks = fullItinerary.filter(t => t.parent_id);
+
+            // 2. Sort main tasks chronologically (by time)
+            mainTasks.sort((a, b) => {
+                if (!a.starts_at && !b.starts_at) return 0;
+                if (!a.starts_at) return 1; // Push unscheduled to the bottom
+                if (!b.starts_at) return -1;
+                return a.starts_at.localeCompare(b.starts_at);
+            });
+
+            // 3. Group main tasks by section and attach their subtasks
+            mainTasks.forEach(t => {
                 const sId = t.section_id || 'unscheduled';
-                if (!groups[sId]) groups[sId] = [];
+                if(!groups[sId]) groups[sId] = [];
+                
+                // Find subtasks belonging to this task and sort them chronologically too
+                t.subtasks = subTasks.filter(sub => sub.parent_id === t.task_id);
+                t.subtasks.sort((a, b) => {
+                    if (!a.starts_at && !b.starts_at) return 0;
+                    if (!a.starts_at) return 1;
+                    if (!b.starts_at) return -1;
+                    return a.starts_at.localeCompare(b.starts_at);
+                });
+                
                 groups[sId].push(t);
             });
 
@@ -306,44 +330,67 @@
             container.innerHTML = '';
 
             allSections.forEach(sec => {
-                if (groups[sec.id]) container.appendChild(createSectionCard(sec.title, groups[sec.id]));
+                if(groups[sec.id]) container.appendChild(createSectionCard(sec.title, groups[sec.id]));
             });
-            if (groups['unscheduled']) container.appendChild(createSectionCard('Unscheduled', groups['unscheduled']));
+            if(groups['unscheduled']) container.appendChild(createSectionCard('Unscheduled', groups['unscheduled']));
         }
 
         function createSectionCard(title, tasks) {
             const card = document.createElement('div');
             card.className = 'section-card';
-            card.innerHTML = `<div class="section-header"><span>📅 ${title}</span><span style="color:#94a3b8;">${tasks.length} items</span></div>`;
+            card.innerHTML = `<div class="section-header"><span>📅 ${title}</span><span style="color:#94a3b8;">${tasks.length} main tasks</span></div>`;
 
             tasks.forEach(task => {
-                const time = task.starts_at ? task.starts_at.substring(11, 16) : '';
-                const hasMapData = task.geometries && task.geometries.length > 0;
-                const row = document.createElement('div');
-                row.className = `task-row ${task.is_completed ? 'completed' : ''}`;
-
-                row.innerHTML = `
-                    <div class="task-title-bar">
-                        <div class="task-title">${task.task_name}</div>
-                    </div>
-                    ${task.characteristics ? `<div class="task-desc">${task.characteristics}</div>` : ''}
-                    <div class="task-meta-bar">
-                        <div class="task-meta">
-                            ${time ? `<span class="meta-badge">🕒 ${time}</span>` : ''}
-                            ${task.responsible ? `<span class="meta-badge">👤 ${task.responsible}</span>` : ''}
-                        </div>
-                        <div class="action-icons">
-                            <button class="icon-btn edit" onclick="openTaskModal(${task.task_id})">✏️</button>
-                            ${hasMapData ? `<a href="field.html?task_id=${task.task_id}" class="icon-btn map" title="View on Map">🗺️</a>` : ''}
-                            <button class="icon-btn ${task.is_completed ? '' : 'complete'}" onclick="toggleComplete(${task.task_id}, ${!task.is_completed})">
-                                ${task.is_completed ? '↩️' : '✅'}
-                            </button>
-                        </div>
-                    </div>
-                `;
-                card.appendChild(row);
+                // Render the Parent Task
+                card.appendChild(buildTaskRow(task, false));
+                
+                // If it has Subtasks, render them indented below it
+                if (task.subtasks && task.subtasks.length > 0) {
+                    const subContainer = document.createElement('div');
+                    subContainer.style.cssText = "margin-left: 25px; border-left: 3px solid #cbd5e0; background: #f8fafc;";
+                    
+                    task.subtasks.forEach(sub => {
+                        subContainer.appendChild(buildTaskRow(sub, true));
+                    });
+                    card.appendChild(subContainer);
+                }
             });
             return card;
+        }
+
+        function buildTaskRow(task, isSubtask) {
+            const time = task.starts_at ? task.starts_at.substring(11, 16) : '';
+            const hasMapData = task.geometries && task.geometries.length > 0;
+            const row = document.createElement('div');
+            
+            row.className = `task-row ${task.is_completed ? 'completed' : ''}`;
+            if (isSubtask) row.style.borderBottom = "1px dashed #e2e8f0";
+            
+            row.innerHTML = `
+                <div class="task-title-bar">
+                    <div class="task-title">${isSubtask ? '↳ ' : ''}${task.task_name}</div>
+                </div>
+                ${task.characteristics ? `<div class="task-desc">${task.characteristics}</div>` : ''}
+                <div class="task-meta-bar">
+                    <div class="task-meta">
+                        ${time ? `<span class="meta-badge">🕒 ${time}</span>` : ''}
+                        ${task.responsible ? `<span class="meta-badge">👤 ${task.responsible}</span>` : ''}
+                    </div>
+                    <div class="action-icons">
+                        <button class="icon-btn edit" onclick="openTaskModal(${task.task_id})">✏️</button>
+                        ${hasMapData ? `<a href="field.html?task_id=${task.task_id}" class="icon-btn map" title="View on Map">🗺️</a>` : ''}
+                        <button class="icon-btn ${task.is_completed ? '' : 'complete'}" onclick="toggleComplete(${task.task_id}, ${!task.is_completed})">
+                            ${task.is_completed ? '↩️' : '✅'}
+                        </button>
+                    </div>
+                </div>
+            `;
+            // Ensure the URL parameter catcher can find this row
+            if (hasMapData) {
+                const mapBtn = row.querySelector('.map');
+                if (mapBtn) mapBtn.setAttribute('href', `field.html?task_id=${task.task_id}`);
+            }
+            return row;
         }
 
         async function toggleComplete(taskId, status) {
