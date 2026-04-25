@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <title>Mobile PM - Expedition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { background: #f1f5f9; font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 0; padding-bottom: 50px; }
+        header { background: #0f172a; color: white; padding: env(safe-area-inset-top, 20px) 20px 20px 20px; font-weight: bold; font-size: 1.2em; text-align: center; position: sticky; top: 0; z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        
+        .section-card { background: white; margin: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid #e2e8f0; }
+        .section-header { background: #f8fafc; padding: 15px; font-weight: bold; color: #1e293b; border-bottom: 2px solid #e2e8f0; font-size: 1.1em; display: flex; justify-content: space-between; }
+        
+        .task-row { padding: 15px; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 10px; }
+        .task-row:last-child { border-bottom: none; }
+        .task-row.completed { opacity: 0.6; background: #f8fafc; }
+        
+        .task-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+        .task-title { font-weight: 700; color: #0f172a; font-size: 1.05em; line-height: 1.3; }
+        
+        .task-meta { font-size: 0.85em; color: #64748b; display: flex; flex-wrap: wrap; gap: 8px; font-weight: 600; }
+        .meta-badge { background: #f1f5f9; padding: 4px 8px; border-radius: 4px; }
+        
+        .action-row { display: flex; gap: 10px; margin-top: 5px; }
+        .btn-map { flex: 1; background: #38bdf8; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 0.9em; cursor: pointer; text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .btn-complete { flex: 1; background: #10b981; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 0.9em; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .btn-complete.undo { background: #94a3b8; }
+
+        .loader { text-align: center; padding: 40px; color: #64748b; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <header>📋 Expedition Itinerary</header>
+    <div id="pm-container"><div class="loader">⏳ Syncing with database...</div></div>
+
+    <div id="app-switcher" style="position: fixed; bottom: 25px; left: 20px; z-index: 100000;">
+        <button onclick="document.getElementById('switcher-menu').classList.toggle('show')" style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;">
+            📱
+        </button>
+        <div id="switcher-menu" style="display: none; position: absolute; bottom: 65px; left: 0; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 220px; flex-direction: column; gap: 8px; border: 1px solid #e2e8f0;">
+            <div style="font-size: 0.75em; font-weight: bold; color: #64748b; text-transform: uppercase; padding-left: 5px; margin-bottom: 2px;">Switch App</div>
+            <a href="index.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">
+                🗺️ Command Center
+            </a>
+            <a href="field.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">
+                🧭 Field Map
+            </a>
+            <a href="pm.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">
+                📋 Mobile PM
+            </a>
+        </div>
+    </div>
+
+    <style>
+        #switcher-menu.show { display: flex !important; }
+        #switcher-menu a:hover { background: #e2e8f0 !important; }
+        /* Hide the switcher when Zen Mode is active in the main app */
+        body.zen-mode #app-switcher { transform: translateX(-150%); opacity: 0; pointer-events: none; }
+    </style>
+
+    <script>
+        const API_URL = 'https://mapbox-api-uz9a.onrender.com';
+        let AUTH_TOKEN = sessionStorage.getItem('expedition_token');
+
+        // Self-contained Auth Fetch
+        async function authFetch(url, options = {}) {
+            if (!AUTH_TOKEN) {
+                const pass = prompt("Enter Admin Password:");
+                if (!pass) return null;
+                const res = await fetch(`${API_URL}/api/login`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pass })
+                });
+                const data = await res.json();
+                if (data.token) {
+                    AUTH_TOKEN = data.token;
+                    sessionStorage.setItem('expedition_token', AUTH_TOKEN);
+                } else { alert("Unauthorized"); return null; }
+            }
+            options.headers = { ...options.headers, 'Authorization': `Bearer ${AUTH_TOKEN}` };
+            return fetch(url, options);
+        }
+
+        async function loadItinerary() {
+            try {
+                const [secRes, itRes] = await Promise.all([
+                    authFetch(`${API_URL}/sections`),
+                    authFetch(`${API_URL}/itinerary`)
+                ]);
+                
+                if(!secRes || !itRes) return; // Auth failed
+
+                const sections = await secRes.json();
+                const tasks = await itRes.json();
+                
+                // Group tasks by section
+                const groups = {};
+                tasks.forEach(t => {
+                    const sId = t.section_id || 'unscheduled';
+                    if(!groups[sId]) groups[sId] = [];
+                    groups[sId].push(t);
+                });
+
+                const container = document.getElementById('pm-container');
+                container.innerHTML = '';
+
+                sections.forEach(sec => {
+                    if(!groups[sec.id]) return;
+                    container.appendChild(createSectionCard(sec.title, groups[sec.id]));
+                });
+
+                if(groups['unscheduled']) {
+                    container.appendChild(createSectionCard('Unscheduled', groups['unscheduled']));
+                }
+
+            } catch (e) {
+                document.getElementById('pm-container').innerHTML = `<div class="loader">🚨 Connection Error</div>`;
+            }
+        }
+
+        function createSectionCard(title, tasks) {
+            const card = document.createElement('div');
+            card.className = 'section-card';
+            
+            const header = document.createElement('div');
+            header.className = 'section-header';
+            header.innerHTML = `<span>📅 ${title}</span> <span style="color:#94a3b8;">${tasks.length} items</span>`;
+            card.appendChild(header);
+
+            tasks.forEach(task => {
+                const time = task.starts_at ? task.starts_at.substring(11, 16) : '';
+                const row = document.createElement('div');
+                row.className = `task-row ${task.is_completed ? 'completed' : ''}`;
+                
+                // Determine if this task actually has coordinates to show on the map
+                const hasMapData = task.geometries && task.geometries.length > 0;
+
+                row.innerHTML = `
+                    <div class="task-header">
+                        <div class="task-title">${task.is_completed ? '✅' : '⏳'} ${task.task_name}</div>
+                    </div>
+                    <div class="task-meta">
+                        ${time ? `<span class="meta-badge">🕒 ${time}</span>` : ''}
+                        ${task.responsible ? `<span class="meta-badge">👤 ${task.responsible}</span>` : ''}
+                        ${task.category_icon ? `<span class="meta-badge">${task.category_icon}</span>` : ''}
+                    </div>
+                    <div class="action-row">
+                        <button class="btn-complete ${task.is_completed ? 'undo' : ''}" onclick="toggleComplete(${task.task_id}, ${!task.is_completed})">
+                            ${task.is_completed ? '↩️ Undo' : '✔️ Complete'}
+                        </button>
+                        ${hasMapData ? `<a href="index.html?task_id=${task.task_id}" class="btn-map">🗺️ View on Map</a>` : `<div style="flex:1;"></div>`}
+                    </div>
+                `;
+                card.appendChild(row);
+            });
+            return card;
+        }
+
+        async function toggleComplete(taskId, status) {
+            try {
+                await authFetch(`${API_URL}/tasks/${taskId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ is_completed: status })
+                });
+                loadItinerary(); // Refresh the list
+            } catch (e) { alert('Error updating task'); }
+        }
+
+        loadItinerary();
+    </script>
+</body>
+</html>

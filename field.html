@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <title>Expedition Field Map</title>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; background: #0f172a; font-family: sans-serif; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        
+        /* Floating Top Bar for Day Selection */
+        #top-bar {
+            position: absolute; top: env(safe-area-inset-top, 15px); left: 15px; right: 15px;
+            background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);
+            padding: 10px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            display: flex; gap: 10px; z-index: 100;
+        }
+        select { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ddd; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <div id="top-bar">
+        <select id="day-selector" onchange="loadDayTracks(this.value)">
+            <option value="">Loading days...</option>
+        </select>
+    </div>
+
+    <script src="js/api.js"></script> 
+    
+    <script>
+        // 1. INITIALIZE MAP
+        mapboxgl.accessToken = 'YOUR_MAPBOX_TOKEN_HERE'; // The server will fetch this dynamically in reality
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/outdoors-v12',
+            center: [12.5928, 38.0662], // Trapani, Sicily
+            zoom: 11
+        });
+
+        // 2. FEATURE: YOUR OWN REAL-TIME LOCATION (The Blue Dot)
+        const geolocate = new mapboxgl.GeolocateControl({
+            positionOptions: { enableHighAccuracy: true },
+            trackUserLocation: true, // Moves the map as you move
+            showUserHeading: true    // Shows the direction you are facing
+        });
+        map.addControl(geolocate, 'bottom-right');
+
+        map.on('load', async () => {
+            // Fetch config for Mapbox Token
+            try {
+                const configRes = await fetch(`${API_URL}/api/config`);
+                const config = await configRes.json();
+                mapboxgl.accessToken = config.MAPBOX_TOKEN;
+                
+                // Re-initialize map if needed or just update token
+                // Since map is already created, we might need to set the token before map creation
+                // but let's see if we can just trigger load actions.
+            } catch (e) { console.error("Config fetch error", e); }
+
+            // Trigger GPS immediately on load
+            geolocate.trigger();
+
+            // Load the Days into the dropdown
+            const secRes = await fetch(`${API_URL}/sections`);
+            const sections = await secRes.json();
+            const selector = document.getElementById('day-selector');
+            selector.innerHTML = '<option value="all">🌍 Show All Days</option>';
+            sections.forEach(s => {
+                selector.innerHTML += `<option value="${s.id}">${s.title}</option>`;
+            });
+
+            // Start polling for the rest of the team
+            setInterval(fetchTeamLocations, 10000);
+            fetchTeamLocations(); // Initial fetch
+        });
+
+        // 3. FEATURE: FETCH THE ROUTE FOR THE DAY
+        async function loadDayTracks(sectionId) {
+            // Remove old layers...
+            if(map.getLayer('daily-route')) map.removeLayer('daily-route');
+            if(map.getSource('daily-route')) map.removeSource('daily-route');
+
+            // Fetch tasks for that day
+            const url = sectionId === 'all' ? `${API_URL}/itinerary` : `${API_URL}/itinerary?section_id=${sectionId}`;
+            const res = await fetch(url);
+            const tasks = await res.json();
+
+            let features = [];
+            tasks.forEach(task => {
+                if(task.geometries) {
+                    task.geometries.forEach(g => {
+                        if(g.kind === 'line' && g.geojson) {
+                            features.push(...g.geojson.features);
+                        }
+                    });
+                }
+            });
+
+            if(features.length > 0) {
+                map.addSource('daily-route', { type: 'geojson', data: { type: 'FeatureCollection', features: features } });
+                map.addLayer({
+                    id: 'daily-route', type: 'line', source: 'daily-route',
+                    paint: { 'line-color': ['get', 'color'], 'line-width': 5, 'line-opacity': 0.8 }
+                });
+                
+                // Fit bounds to the route
+                const bbox = turf.bbox({ type: 'FeatureCollection', features: features });
+                map.fitBounds(bbox, { padding: 50 });
+            }
+        }
+
+        // 4. FEATURE: SHOW TEAM LOCATIONS (Fleet Tracking)
+        let teamMarkers = {};
+        async function fetchTeamLocations() {
+            try {
+                const res = await fetch(`${API_URL}/api/fleet/telemetry?minutes=60`);
+                const data = await res.json();
+                
+                // Keep only the newest coordinate for each guide
+                const latestPositions = {};
+                data.forEach(p => { latestPositions[p.guide_id] = p; });
+
+                Object.keys(latestPositions).forEach(id => {
+                    const point = latestPositions[id];
+                    if(!teamMarkers[id]) {
+                        // Create a floating emoji for the team member
+                        const el = document.createElement('div');
+                        el.innerHTML = `<div style="font-size: 24px; background: white; border-radius: 50%; padding: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 2px solid ${point.color};">${point.icon || '🏃‍♂️'}</div>`;
+                        teamMarkers[id] = new mapboxgl.Marker({element: el}).setLngLat([point.lng, point.lat]).addTo(map);
+                    } else {
+                        teamMarkers[id].setLngLat([point.lng, point.lat]);
+                    }
+                });
+            } catch(e) { console.error("Team fetch error", e); }
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <div id="app-switcher" style="position: fixed; bottom: 25px; left: 20px; z-index: 100000;">
+        <button onclick="document.getElementById('switcher-menu').classList.toggle('show')" style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;">
+            📱
+        </button>
+        <div id="switcher-menu" style="display: none; position: absolute; bottom: 65px; left: 0; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 220px; flex-direction: column; gap: 8px; border: 1px solid #e2e8f0;">
+            <div style="font-size: 0.75em; font-weight: bold; color: #64748b; text-transform: uppercase; padding-left: 5px; margin-bottom: 2px;">Switch App</div>
+            <a href="index.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">
+                🗺️ Command Center
+            </a>
+            <a href="field.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">
+                🧭 Field Map
+            </a>
+            <a href="pm.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">
+                📋 Mobile PM
+            </a>
+        </div>
+    </div>
+
+    <style>
+        #switcher-menu.show { display: flex !important; }
+        #switcher-menu a:hover { background: #e2e8f0 !important; }
+        /* Hide the switcher when Zen Mode is active in the main app */
+        body.zen-mode #app-switcher { transform: translateX(-150%); opacity: 0; pointer-events: none; }
+    </style>
+</body>
+</html>

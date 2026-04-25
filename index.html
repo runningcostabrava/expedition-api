@@ -3492,6 +3492,30 @@
 
             initializeApp();
     </script>
+    <div id="app-switcher" style="position: fixed; bottom: 25px; left: 20px; z-index: 100000;">
+        <button onclick="document.getElementById('switcher-menu').classList.toggle('show')" style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;">
+            📱
+        </button>
+        <div id="switcher-menu" style="display: none; position: absolute; bottom: 65px; left: 0; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 220px; flex-direction: column; gap: 8px; border: 1px solid #e2e8f0;">
+            <div style="font-size: 0.75em; font-weight: bold; color: #64748b; text-transform: uppercase; padding-left: 5px; margin-bottom: 2px;">Switch App</div>
+            <a href="index.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">
+                🗺️ Command Center
+            </a>
+            <a href="field.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">
+                🧭 Field Map
+            </a>
+            <a href="pm.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">
+                📋 Mobile PM
+            </a>
+        </div>
+    </div>
+
+    <style>
+        #switcher-menu.show { display: flex !important; }
+        #switcher-menu a:hover { background: #e2e8f0 !important; }
+        /* Hide the switcher when Zen Mode is active in the main app */
+        body.zen-mode #app-switcher { transform: translateX(-150%); opacity: 0; pointer-events: none; }
+    </style>
 </body>
 
 </html>
