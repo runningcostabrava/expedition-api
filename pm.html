@@ -295,13 +295,32 @@
             if (!AUTH_TOKEN) {
                 const pass = prompt("Enter Admin Password:");
                 if (!pass) return null;
-                const res = await fetch(`${API_URL}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pass }) });
-                const data = await res.json();
-                if (data.token) { AUTH_TOKEN = data.token; sessionStorage.setItem('expedition_token', AUTH_TOKEN); }
-                else return null;
+                try {
+                    const res = await fetch(`${API_URL}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pass }) });
+                    const data = await res.json();
+                    if (data.token) { AUTH_TOKEN = data.token; sessionStorage.setItem('expedition_token', AUTH_TOKEN); }
+                    else return null;
+                } catch (e) {
+                    alert("⚠️ Cannot log in while offline.");
+                    throw e;
+                }
             }
+
             options.headers = { ...options.headers, 'Authorization': `Bearer ${AUTH_TOKEN}` };
-            return fetch(url, options);
+
+            try {
+                // Try to make the network request
+                const response = await fetch(url, options);
+                return response;
+            } catch (error) {
+                // If the fetch completely fails (like when offline) AND they are trying to save data
+                if (options.method && options.method !== 'GET') {
+                    alert("📡 You are currently offline. This action cannot be saved to the database right now.");
+                    throw new Error("User is offline, mutative request aborted.");
+                }
+                // For GET requests, the Service Worker should theoretically catch it, but if it falls through:
+                throw error;
+            }
         }
 
         async function loadData() {
