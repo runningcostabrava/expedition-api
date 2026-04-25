@@ -682,40 +682,20 @@ app.delete('/tasks/:task_id/anchors/:anchor_id', adminAuth, async (req, res) => 
 // 1. TRACCAR LOCATION WEBHOOK (From the native mobile app)
 app.all('/api/location', async (req, res) => {
     try {
-        // Print exactly what Traccar sent us to the Render Logs
-        console.log("[Traccar Incoming] Query:", req.query, "Body:", req.body);
-
         const id = req.query.id || req.body.id;
         const lat = req.query.lat || req.body.lat;
         const lon = req.query.lon || req.body.lon;
 
-        if (!id || !lat || !lon) {
-            console.log("[Fleet Radar] ❌ Rejected: Missing GPS parameters");
-            return res.status(400).send("Missing GPS parameters");
-        }
+        if (!id || !lat || !lon) return res.status(400).send("Missing GPS parameters");
 
-        // Find the device's true Database ID (Matches display_name, device_identifier, or ID)
-        const deviceQuery = await pool.query(
-            'SELECT id FROM live_devices WHERE LOWER(display_name) = LOWER($1) OR LOWER(device_identifier) = LOWER($1) OR id::text = $1 LIMIT 1',
-            [id.toString().trim()]
-        );
-
-        if (deviceQuery.rows.length === 0) {
-            console.log(`[Fleet Radar] ⚠️ Rejected: Unknown device name '${id}'`);
-            return res.status(404).send("Device not found");
-        }
-
-        const trueDbId = deviceQuery.rows[0].id.toString();
-
-        // Save using the true numeric ID (as text)
+        // Save EXACTLY what Traccar sends (e.g. "pablo")
         await pool.query(
             'INSERT INTO location_logs (guide_id, lat, lng) VALUES ($1, $2, $3)',
-            [trueDbId, lat, lon]
+            [id.toString().trim(), lat, lon]
         );
 
-        console.log(`[Fleet Radar] 🟢 📍 Successfully saved location for: ${id} (DB ID: ${trueDbId})`);
+        console.log(`[Fleet Radar] 📍 Saved Traccar location for: ${id}`);
         res.status(200).send("OK");
-
     } catch (err) {
         console.error("Traccar Webhook Error:", err);
         res.status(500).send("Server Error");
@@ -723,14 +703,14 @@ app.all('/api/location', async (req, res) => {
 });
 
 // 2. WEB BROADCASTER (From field.html)
-app.post('/api/fleet/telemetry', async (req, res) => {
+app.post('/api/fleet/telemetry', adminAuth, async (req, res) => {
     const { device_id, lat, lng } = req.body;
     if (!device_id || !lat || !lng) return res.status(400).json({error: "Missing data"});
     
     try {
         await pool.query(
             'INSERT INTO location_logs (guide_id, lat, lng) VALUES ($1, $2, $3)',
-            [device_id.toString(), lat, lng]
+            [device_id.toString().trim(), lat, lng]
         );
         res.json({success: true});
     } catch (e) { 
@@ -758,15 +738,16 @@ app.put('/api/fleet/devices/:id', adminAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// 5. Fetch the Telemetry History (For drawing the map lines)
+// 5. Fetch the Telemetry History (The Magic Translation)
 app.get('/api/fleet/telemetry', async (req, res) => {
     const minutes = parseInt(req.query.minutes) || 60; 
     try {
-        // CRITICAL FIX: Join strictly using the numeric Database ID
+        // THE FIX: Notice the first selected item is "d.id AS guide_id"
+        // This forces the database to output the numeric ID for the UI, regardless of whether Traccar saved "pablo" or "cris".
         const query = `
-            SELECT l.guide_id, l.lat, l.lng, l.timestamp, d.display_name, d.color, d.icon, d.icon_size 
+            SELECT d.id AS guide_id, l.lat, l.lng, l.timestamp, d.display_name, d.color, d.icon, d.icon_size 
             FROM location_logs l
-            JOIN live_devices d ON l.guide_id = d.id::text
+            JOIN live_devices d ON LOWER(l.guide_id) = LOWER(d.device_identifier) OR l.guide_id = d.id::text
             WHERE l.timestamp >= NOW() - INTERVAL '1 minute' * $1
             AND d.is_visible = true
             ORDER BY l.timestamp ASC
