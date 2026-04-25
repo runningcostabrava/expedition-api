@@ -49,7 +49,7 @@
             font-weight: bold;
         }
 
-        /* Floating Pin Drop Button */
+        /* Floating Buttons */
         .fab-pin {
             position: fixed;
             top: 100px;
@@ -69,29 +69,50 @@
             z-index: 100;
         }
 
-        /* Elevation Panel */
-        #elevation-panel {
+        .fab-fleet {
+            position: fixed;
+            top: 155px;
+            right: 15px;
+            width: 44px;
+            height: 44px;
+            background: #34495e;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            border: none;
+            cursor: pointer;
+            z-index: 100;
+        }
+
+        /* Bottom Panels */
+        .bottom-panel {
             display: none;
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
-            height: 220px;
+            max-height: 60vh;
             background: white;
             z-index: 1000;
             border-top: 2px solid #ccc;
             padding: 15px;
             box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.1);
             border-radius: 20px 20px 0 0;
+            overflow-y: auto;
         }
 
-        #close-elevation {
+        .close-panel {
             position: absolute;
             top: 10px;
             right: 15px;
-            font-size: 20px;
+            font-size: 24px;
             cursor: pointer;
             font-weight: bold;
+            color: #64748b;
         }
 
         /* Modal for saving location */
@@ -136,12 +157,23 @@
     <div id="top-bar"><select id="day-selector" onchange="loadDayTracks(this.value)">
             <option value="">Loading days...</option>
         </select></div>
-    <button class="fab-pin" onclick="enableDropPinMode()">📍</button>
 
-    <div id="elevation-panel">
-        <span id="close-elevation" onclick="document.getElementById('elevation-panel').style.display='none'">×</span>
-        <div id="elevation-stats-header" style="margin-bottom: 10px; font-size: 0.9em; display: flex; gap: 10px;"></div>
+    <button class="fab-pin" onclick="enableDropPinMode()">📍</button>
+    <button class="fab-fleet" onclick="openFieldFleet()">📡</button>
+
+    <div id="elevation-panel" class="bottom-panel" style="height: 250px;">
+        <span class="close-panel" onclick="document.getElementById('elevation-panel').style.display='none'">×</span>
+        <div id="elevation-stats-header"
+            style="margin-bottom: 10px; font-size: 0.9em; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+        </div>
         <div style="height: 160px; width: 100%;"><canvas id="elevation-chart"></canvas></div>
+    </div>
+
+    <div id="fleet-panel-mobile" class="bottom-panel">
+        <span class="close-panel" onclick="document.getElementById('fleet-panel-mobile').style.display='none'">×</span>
+        <h3 style="margin-top: 0; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">📡 Team Radar
+        </h3>
+        <div id="field-fleet-list" style="display: flex; flex-direction: column; gap: 10px;">Loading...</div>
     </div>
 
     <div id="pin-modal" class="modal">
@@ -149,12 +181,10 @@
             <h3 style="margin-top:0;">Save Location</h3>
             <input type="hidden" id="pin-lat"><input type="hidden" id="pin-lng">
             <input type="text" id="pin-title" placeholder="Location Name">
-
             <label style="display:block; margin-bottom:5px; font-size:0.9em; font-weight:bold; color:#475569;">📷 Take a
                 Photo (Optional)</label>
             <input type="file" id="pin-photo" accept="image/*" capture="environment"
                 style="padding: 0; border: none; margin-bottom: 20px;">
-
             <button id="save-pin-btn" onclick="saveDroppedPin()"
                 style="width: 100%; background: #27ae60; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer;">💾
                 Save</button>
@@ -200,54 +230,61 @@
             return fetch(url, options);
         }
 
-        mapboxgl.accessToken = 'YOUR_MAPBOX_TOKEN_HERE';
-
-        map = new mapboxgl.Map({
-            container: 'map', style: 'mapbox://styles/mapbox/outdoors-v12', center: [12.5928, 38.0662], zoom: 11
-        });
-
-        const geolocate = new mapboxgl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true, showUserHeading: true });
-        map.addControl(geolocate, 'bottom-right');
-
-        map.on('load', async () => {
+        async function initFieldMap() {
+            // 1. Fetch the real Mapbox Token from the server FIRST
             try {
                 const configRes = await fetch(`${API_URL}/api/config`);
                 const config = await configRes.json();
                 mapboxgl.accessToken = config.MAPBOX_TOKEN;
-            } catch (e) { }
-
-            geolocate.trigger();
-
-            const secRes = await fetch(`${API_URL}/sections`);
-            const sections = await secRes.json();
-            const selector = document.getElementById('day-selector');
-            selector.innerHTML = '<option value="all">🌍 Show All Days</option>';
-            sections.forEach(s => selector.innerHTML += `<option value="${s.id}">${s.title}</option>`);
-
-            setInterval(fetchTeamLocations, 10000); fetchTeamLocations();
-
-            // Catch PM.html URL redirect
-            const urlParams = new URLSearchParams(window.location.search);
-            const focusTaskId = urlParams.get('task_id');
-            if (focusTaskId) {
-                const itRes = await fetch(`${API_URL}/itinerary`);
-                const tasks = await itRes.json();
-                const task = tasks.find(t => t.task_id == focusTaskId);
-                if (task && task.geometries && task.geometries.length > 0) {
-                    const g = task.geometries[0];
-                    if (g.kind === 'point') map.flyTo({ center: [g.lng, g.lat], zoom: 16 });
-                    else if (g.geojson) {
-                        const bbox = turf.bbox(g.geojson);
-                        map.fitBounds(bbox, { padding: 50 });
-                        showElevationProfile(g.geojson, g.title, { distance: g.distance, gain: g.gain, loss: g.loss });
-                    }
-                    if (task.section_id) {
-                        document.getElementById('day-selector').value = task.section_id;
-                        loadDayTracks(task.section_id);
-                    } else { loadDayTracks('all'); }
-                }
+            } catch (e) {
+                console.error("Failed to load map token:", e);
             }
-        });
+
+            // 2. NOW initialize the map (after we have the real token)
+            map = new mapboxgl.Map({
+                container: 'map', style: 'mapbox://styles/mapbox/outdoors-v12', center: [12.5928, 38.0662], zoom: 11
+            });
+
+            const geolocate = new mapboxgl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true, showUserHeading: true });
+            map.addControl(geolocate, 'bottom-right');
+
+            map.on('load', async () => {
+                geolocate.trigger();
+
+                const secRes = await fetch(`${API_URL}/sections`);
+                const sections = await secRes.json();
+                const selector = document.getElementById('day-selector');
+                selector.innerHTML = '<option value="all">🌍 Show All Days</option>';
+                sections.forEach(s => selector.innerHTML += `<option value="${s.id}">${s.title}</option>`);
+
+                setInterval(fetchTeamLocations, 10000); fetchTeamLocations();
+
+                // Catch PM.html URL redirect
+                const urlParams = new URLSearchParams(window.location.search);
+                const focusTaskId = urlParams.get('task_id');
+                if (focusTaskId) {
+                    const itRes = await fetch(`${API_URL}/itinerary`);
+                    const tasks = await itRes.json();
+                    const task = tasks.find(t => t.task_id == focusTaskId);
+                    if (task && task.geometries && task.geometries.length > 0) {
+                        const g = task.geometries[0];
+                        if (g.kind === 'point') map.flyTo({ center: [g.lng, g.lat], zoom: 16 });
+                        else if (g.geojson) {
+                            const bbox = turf.bbox(g.geojson);
+                            map.fitBounds(bbox, { padding: 50 });
+                            showElevationProfile(g.geojson, g.title, { distance: g.distance, gain: g.gain, loss: g.loss, taskId: task.task_id });
+                        }
+                        if (task.section_id) {
+                            document.getElementById('day-selector').value = task.section_id;
+                            loadDayTracks(task.section_id);
+                        } else { loadDayTracks('all'); }
+                    }
+                }
+            });
+        }
+
+        // Start the Field Map app
+        initFieldMap();
 
         async function loadDayTracks(sectionId) {
             if (map.getLayer('daily-route')) map.removeLayer('daily-route');
@@ -260,11 +297,25 @@
             let features = [];
             tasks.forEach(task => {
                 if (task.geometries) task.geometries.forEach(g => {
-                    if (g.kind === 'line' && g.geojson) features.push(...g.geojson.features);
+                    if (g.kind === 'line' && g.geojson) {
+                        // Inject Task ID so we can link back when clicked
+                        g.geojson.features.forEach(f => {
+                            f.properties = { ...f.properties, taskId: task.task_id, title: g.title, color: g.color };
+                            features.push(f);
+                        });
+                    }
                     if (g.kind === 'point') {
                         const el = document.createElement('div');
                         el.innerHTML = `<div style="background:${g.color || '#3498db'}; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3); font-size:12px;">${g.icon || '📍'}</div>`;
-                        new mapboxgl.Marker({ element: el }).setLngLat([g.lng, g.lat]).setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML(`<b>${g.title}</b>`)).addTo(map);
+
+                        // Add link back to PM.html inside the map popup
+                        const popupHtml = `
+                            <div style="text-align: center;">
+                                <strong style="display:block; margin-bottom: 8px;">${g.title}</strong>
+                                <button onclick="window.location.href='pm.html?task_id=${task.task_id}'" style="background:#0f172a; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.9em;">⬅️ Back to Task</button>
+                            </div>
+                        `;
+                        new mapboxgl.Marker({ element: el }).setLngLat([g.lng, g.lat]).setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML(popupHtml)).addTo(map);
                     }
                 });
             });
@@ -273,15 +324,14 @@
                 map.addSource('daily-route', { type: 'geojson', data: { type: 'FeatureCollection', features: features } });
                 map.addLayer({ id: 'daily-route', type: 'line', source: 'daily-route', paint: { 'line-color': ['get', 'color'], 'line-width': 5, 'line-opacity': 0.8 } });
 
-                // Allow tapping a line to see elevation
                 map.on('click', 'daily-route', (e) => {
                     const feature = e.features[0];
-                    showElevationProfile({ type: 'FeatureCollection', features: [feature] }, feature.properties.title || "Route", { distance: turf.length(feature).toFixed(2) });
+                    showElevationProfile({ type: 'FeatureCollection', features: [feature] }, feature.properties.title || "Route", { distance: turf.length(feature).toFixed(2), taskId: feature.properties.taskId });
                 });
             }
         }
 
-        // Fleet Location logic
+        // --- NEW: Mobile Fleet Manager ---
         let teamMarkers = {};
         async function fetchTeamLocations() {
             try {
@@ -290,7 +340,9 @@
                 const latestPositions = {};
                 data.forEach(p => { latestPositions[p.guide_id] = p; });
 
-                Object.keys(latestPositions).forEach(id => {
+                const activeIds = Object.keys(latestPositions);
+
+                activeIds.forEach(id => {
                     const point = latestPositions[id];
                     if (!teamMarkers[id]) {
                         const el = document.createElement('div');
@@ -298,13 +350,46 @@
                         teamMarkers[id] = new mapboxgl.Marker({ element: el }).setLngLat([point.lng, point.lat]).addTo(map);
                     } else teamMarkers[id].setLngLat([point.lng, point.lat]);
                 });
+
+                // Remove hidden markers
+                Object.keys(teamMarkers).forEach(id => {
+                    if (!activeIds.includes(id)) { teamMarkers[id].remove(); delete teamMarkers[id]; }
+                });
             } catch (e) { }
         }
 
-        // Elevation Profile Engine for Field
+        async function openFieldFleet() {
+            document.getElementById('fleet-panel-mobile').style.display = 'block';
+            const res = await fetch(`${API_URL}/api/fleet/devices`);
+            const devices = await res.json();
+
+            let html = '';
+            devices.forEach(d => {
+                html += `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
+                    <div style="font-size: 1.1em;">${d.icon || '🏃‍♂️'} <strong>${d.display_name}</strong></div>
+                    <button onclick="toggleFieldDevice(${d.id}, ${!d.is_visible})" style="padding:8px 16px; border-radius:8px; border:none; background:${d.is_visible ? '#10b981' : '#94a3b8'}; color:white; font-weight:bold; cursor:pointer;">
+                        ${d.is_visible ? '👁️ Visible' : '🙈 Hidden'}
+                    </button>
+                </div>`;
+            });
+            document.getElementById('field-fleet-list').innerHTML = html;
+        }
+
+        async function toggleFieldDevice(id, isVisible) {
+            await authFetch(`${API_URL}/api/fleet/devices/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_visible: isVisible }) });
+            fetchTeamLocations(); // Instantly apply to map
+            openFieldFleet();     // Refresh the list UI
+        }
+
+        // Elevation Profile Engine (Now includes "Back to Task" button)
         function showElevationProfile(geojson, title, metadata) {
             document.getElementById('elevation-panel').style.display = 'block';
-            document.getElementById('elevation-stats-header').innerHTML = `<span style="color:#000;">🏁 <strong>${title}</strong></span> <span style="color:#000;">📏 <strong>${metadata.distance || 0} km</strong></span>`;
+
+            // Generate the Back to Task button if a taskId was provided
+            const backBtnHtml = metadata.taskId ? `<button onclick="window.location.href='pm.html?task_id=${metadata.taskId}'" style="background:#0f172a; color:white; border:none; padding:4px 10px; border-radius:4px; cursor:pointer; font-weight:bold; font-size: 0.9em; margin-left: auto;">⬅️ Back to Task</button>` : '';
+
+            document.getElementById('elevation-stats-header').innerHTML = `<span style="color:#000;">🏁 <strong>${title}</strong></span> <span style="color:#000;">📏 <strong>${metadata.distance || 0} km</strong></span> ${backBtnHtml}`;
 
             let distances = [], elevations = [], cumulative = 0;
             const coords = geojson.features[0].geometry.type === 'Polygon' ? geojson.features[0].geometry.coordinates[0] : geojson.features[0].geometry.coordinates;
@@ -323,7 +408,6 @@
             });
         }
 
-        // --- NEW: Camera / Waypoint Upload Logic ---
         function enableDropPinMode() {
             isDroppingPin = true;
             map.getCanvas().style.cursor = 'crosshair';
@@ -348,8 +432,6 @@
             const fileInput = document.getElementById('pin-photo');
 
             let photoUrl = '';
-
-            // 1. Upload the photo to Cloudinary first if they took one
             if (fileInput.files.length > 0) {
                 const formData = new FormData();
                 formData.append('file', fileInput.files[0]);
@@ -362,7 +444,6 @@
                 } catch (e) { console.error("Photo upload failed", e); }
             }
 
-            // 2. Save Waypoint to DB
             try {
                 await authFetch(`${API_URL}/waypoints`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
