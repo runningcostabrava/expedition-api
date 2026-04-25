@@ -430,32 +430,50 @@
             }
         }
 
-        // --- UPGRADED: Mobile Fleet Manager (Trails & Zoom) ---
+        // --- UPGRADED: Mobile Fleet Manager (Trails, Zoom & Last Update Time) ---
         let teamMarkers = {};
         let latestTeamCoords = {}; // Stores coordinates so we can zoom to them
+        let latestTeamUpdates = {}; // Stores the exact timestamp of the last ping
+
+        // Helper function to calculate "Time Ago"
+        function timeAgo(dateString) {
+            if (!dateString) return "No data";
+            const diffMs = new Date() - new Date(dateString);
+            const diffMins = Math.floor(diffMs / 1000 / 60);
+
+            if (diffMins < 1) return "Just now";
+            if (diffMins < 60) return `${diffMins}m ago`;
+
+            const hours = Math.floor(diffMins / 60);
+            const mins = diffMins % 60;
+            return `${hours}h ${mins}m ago`;
+        }
 
         async function fetchTeamLocations() {
             try {
                 const res = await fetch(`${API_URL}/api/fleet/telemetry?minutes=60`);
                 const data = await res.json();
 
-                // Group data to build trails
                 const paths = {};
                 data.forEach(point => {
                     if (!paths[point.guide_id]) {
                         paths[point.guide_id] = { coords: [], color: point.color, icon: point.icon || '🏃‍♂️' };
                     }
                     paths[point.guide_id].coords.push([point.lng, point.lat]);
+
+                    // Capture the absolute latest timestamp for this guide
+                    // (Uses created_at or timestamp depending on your DB column name)
+                    latestTeamUpdates[point.guide_id] = point.created_at || point.timestamp;
                 });
 
                 const lineFeatures = [];
                 const activeIds = Object.keys(paths);
-                latestTeamCoords = {}; // Reset for zooming
+                latestTeamCoords = {};
 
                 activeIds.forEach(id => {
                     const track = paths[id];
                     const latestCoord = track.coords[track.coords.length - 1];
-                    latestTeamCoords[id] = latestCoord; // Save for the Zoom button
+                    latestTeamCoords[id] = latestCoord;
 
                     // 1. Draw the Trail
                     if (track.coords.length > 1) {
@@ -493,14 +511,14 @@
                         paint: { 'line-color': ['get', 'color'], 'line-width': 4, 'line-opacity': 0.7 }
                     });
                 }
-            } catch (e) { }
+            } catch (e) { console.error("Telemetry error", e); }
         }
 
         window.zoomToGuide = function (guideId) {
             const coords = latestTeamCoords[guideId];
             if (coords) {
                 map.flyTo({ center: coords, zoom: 16, duration: 1500 });
-                document.getElementById('fleet-panel-mobile').style.display = 'none'; // Close panel
+                document.getElementById('fleet-panel-mobile').style.display = 'none';
             } else {
                 alert("Location not found yet. Wait for next GPS ping.");
             }
@@ -508,23 +526,43 @@
 
         async function openFieldFleet() {
             document.getElementById('fleet-panel-mobile').style.display = 'block';
-            const res = await fetch(`${API_URL}/api/fleet/devices`);
-            const devices = await res.json();
+            document.getElementById('field-fleet-list').innerHTML = '<div style="padding: 20px; text-align: center; color: #64748b;">Loading radar...</div>';
 
-            let html = '';
-            devices.forEach(d => {
-                html += `
-                <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
-                    <div style="flex: 1; cursor: pointer;" onclick="zoomToGuide(${d.id})">
-                        <div style="font-size: 1.1em;">${d.icon || '🏃‍♂️'} <strong>${d.display_name}</strong></div>
-                        <div style="font-size: 0.8em; color: #3498db; font-weight: bold; margin-top: 4px;">📍 Tap to Zoom</div>
-                    </div>
-                    <button onclick="toggleFieldDevice(${d.id}, ${!d.is_visible})" style="padding:8px 16px; border-radius:8px; border:none; background:${d.is_visible ? '#10b981' : '#94a3b8'}; color:white; font-weight:bold; cursor:pointer;">
-                        ${d.is_visible ? '👁️' : '🙈'}
-                    </button>
-                </div>`;
-            });
-            document.getElementById('field-fleet-list').innerHTML = html;
+            try {
+                const res = await fetch(`${API_URL}/api/fleet/devices`);
+                const devices = await res.json();
+
+                let html = '';
+                devices.forEach(d => {
+                    const lastPingTime = latestTeamUpdates[d.id];
+                    const timeString = timeAgo(lastPingTime);
+
+                    // Determine if the tracker is currently online (pinged in the last 15 minutes)
+                    const isOnline = lastPingTime && (new Date() - new Date(lastPingTime)) < (15 * 60 * 1000);
+                    const statusIcon = isOnline ? '🟢' : '🔴';
+
+                    html += `
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
+                        <div style="flex: 1; cursor: pointer;" onclick="zoomToGuide(${d.id})">
+                            <div style="font-size: 1.1em; color: #0f172a;">${d.icon || '🏃‍♂️'} <strong>${d.display_name}</strong></div>
+                            
+                            <div style="font-size: 0.85em; color: #64748b; margin-top: 4px; font-weight: 600;">
+                                ${statusIcon} Last seen: ${timeString}
+                            </div>
+                            
+                            <div style="font-size: 0.8em; color: #3498db; font-weight: bold; margin-top: 4px;">📍 Tap to Zoom to Location</div>
+                        </div>
+                        <button onclick="event.stopPropagation(); toggleFieldDevice(${d.id}, ${!d.is_visible})" style="padding:8px 16px; border-radius:8px; border:none; background:${d.is_visible ? '#10b981' : '#94a3b8'}; color:white; font-weight:bold; cursor:pointer;">
+                            ${d.is_visible ? '👁️' : '🙈'}
+                        </button>
+                    </div>`;
+                });
+
+                if (html === '') html = '<div style="color: #64748b;">No devices configured.</div>';
+                document.getElementById('field-fleet-list').innerHTML = html;
+            } catch (e) {
+                document.getElementById('field-fleet-list').innerHTML = '<div style="color: #ef4444;">Failed to load devices.</div>';
+            }
         }
 
         async function toggleFieldDevice(id, isVisible) {
