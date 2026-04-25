@@ -289,6 +289,9 @@
 
                 setInterval(fetchTeamLocations, 10000); fetchTeamLocations();
 
+                // ---> NEW: Start transmitting MY location <---
+                startLocationBroadcast();
+
                 // Catch PM.html URL redirect
                 const urlParams = new URLSearchParams(window.location.search);
                 const focusTaskId = urlParams.get('task_id');
@@ -315,6 +318,67 @@
 
         // Start the Field Map app
         initFieldMap();
+
+        // --- 📡 LIVE GPS BROADCASTER ---
+        let myDeviceId = localStorage.getItem('expedition_device_id');
+        let broadcastWatchId = null;
+
+        async function startLocationBroadcast() {
+            // 1. If we don't know who this is, ask them to pick their profile
+            if (!myDeviceId) {
+                try {
+                    const res = await fetch(`${API_URL}/api/fleet/devices`);
+                    const devices = await res.json();
+
+                    let promptText = "Who are you? Enter your ID number:\n";
+                    devices.forEach(d => { promptText += `${d.id}: ${d.display_name}\n`; });
+
+                    const chosenId = prompt(promptText);
+                    if (chosenId) {
+                        myDeviceId = chosenId;
+                        localStorage.setItem('expedition_device_id', myDeviceId);
+                    } else {
+                        console.warn("No device ID selected. Broadcasting disabled.");
+                        return; // Exit if they hit cancel
+                    }
+                } catch (e) {
+                    console.error("Could not load devices for broadcasting setup.");
+                    return;
+                }
+            }
+
+            // 2. Start watching the GPS and sending it to the server
+            if (navigator.geolocation) {
+                broadcastWatchId = navigator.geolocation.watchPosition(
+                    async (position) => {
+                        const { latitude, longitude, altitude, speed } = position.coords;
+
+                        try {
+                            // Silently POST location to your database
+                            await fetch(`${API_URL}/api/fleet/telemetry`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${AUTH_TOKEN}`
+                                },
+                                body: JSON.stringify({
+                                    device_id: myDeviceId, // or guide_id, depending on your DB column name
+                                    lat: latitude,
+                                    lng: longitude,
+                                    altitude: altitude || 0,
+                                    speed: speed || 0
+                                })
+                            });
+                        } catch (e) {
+                            // Fail silently if offline, the Service Worker will catch the GETs, 
+                            // but we just ignore failed POSTs until signal returns.
+                        }
+                    },
+                    (error) => console.error("GPS Error:", error),
+                    { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+                );
+            }
+        }
 
         // --- ⏺️ LIVE TRACK RECORDER ---
         let isRecording = false;
