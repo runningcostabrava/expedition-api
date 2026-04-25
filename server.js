@@ -747,7 +747,7 @@ app.get('/api/fleet/telemetry', async (req, res) => {
         const query = `
             SELECT d.id AS guide_id, l.lat, l.lng, l.timestamp, d.display_name, d.color, d.icon, d.icon_size 
             FROM location_logs l
-            JOIN live_devices d ON LOWER(l.guide_id) = LOWER(d.device_identifier) OR l.guide_id = d.id::text
+            JOIN live_devices d ON LOWER(l.guide_id) = LOWER(d.device_identifier) OR LOWER(l.guide_id) = LOWER(d.display_name) OR l.guide_id = d.id::text
             WHERE l.timestamp >= NOW() - INTERVAL '1 minute' * $1
             AND d.is_visible = true
             ORDER BY l.timestamp ASC
