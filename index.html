@@ -3228,6 +3228,24 @@
 
             initializeApp();
 
+            // --- NEW: Catch URL parameters from the PM App ---
+            window.addEventListener('load', () => {
+                setTimeout(() => { // Give the map 1 second to fetch data first
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const focusTaskId = urlParams.get('task_id');
+                    if (focusTaskId) {
+                        const taskIdNum = parseInt(focusTaskId);
+                        const task = AppStore.get('itinerary').find(t => t.task_id === taskIdNum);
+                        if (task) {
+                            focusTaskInSidebar(taskIdNum);
+                            openTaskDetailPanel(task);
+                            // Clear the URL so it doesn't re-trigger if they refresh
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                        }
+                    }
+                }, 1500); 
+            });
+
             async function saveTaskFromRightPanel(taskId = null) {
                 const task = taskId ? (AppStore.get('itinerary').find(t => t.task_id === taskId) || {}) : {};
 
