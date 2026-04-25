@@ -181,10 +181,19 @@
             <h3 style="margin-top:0;">Save Location</h3>
             <input type="hidden" id="pin-lat"><input type="hidden" id="pin-lng">
             <input type="text" id="pin-title" placeholder="Location Name">
+
+            <label style="display:block; margin-bottom:5px; font-size:0.9em; font-weight:bold; color:#475569;">🔗 Link to
+                Task (Optional)</label>
+            <select id="pin-task-id"
+                style="width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 8px;">
+                <option value="">-- No Task (Loose Waypoint) --</option>
+            </select>
+
             <label style="display:block; margin-bottom:5px; font-size:0.9em; font-weight:bold; color:#475569;">📷 Take a
                 Photo (Optional)</label>
             <input type="file" id="pin-photo" accept="image/*" capture="environment"
                 style="padding: 0; border: none; margin-bottom: 20px;">
+
             <button id="save-pin-btn" onclick="saveDroppedPin()"
                 style="width: 100%; background: #27ae60; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer;">💾
                 Save</button>
@@ -408,7 +417,19 @@
             });
         }
 
-        function enableDropPinMode() {
+        async function enableDropPinMode() {
+            // 1. Fetch the tasks to populate the dropdown
+            try {
+                const res = await fetch(`${API_URL}/itinerary`);
+                const tasks = await res.json();
+                const select = document.getElementById('pin-task-id');
+                select.innerHTML = '<option value="">-- No Task (Loose Waypoint) --</option>';
+                tasks.forEach(t => {
+                    select.innerHTML += `<option value="${t.task_id}">${t.task_name}</option>`;
+                });
+            } catch (e) { console.error("Failed to load tasks", e); }
+
+            // 2. Activate the pin drop logic
             isDroppingPin = true;
             map.getCanvas().style.cursor = 'crosshair';
             alert("Tap anywhere on the map to save a location.");
@@ -429,6 +450,7 @@
             const lat = document.getElementById('pin-lat').value;
             const lng = document.getElementById('pin-lng').value;
             const title = document.getElementById('pin-title').value || "Field Location";
+            const taskId = document.getElementById('pin-task-id').value; // Get the selected task
             const fileInput = document.getElementById('pin-photo');
 
             let photoUrl = '';
@@ -447,13 +469,21 @@
             try {
                 await authFetch(`${API_URL}/waypoints`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: title, lat: lat, lng: lng, photo_url: photoUrl, color: '#f39c12', icon: '📸' })
+                    body: JSON.stringify({
+                        title: title,
+                        lat: lat,
+                        lng: lng,
+                        photo_url: photoUrl,
+                        color: '#f39c12',
+                        icon: '📸',
+                        existing_task_id: taskId ? parseInt(taskId) : null // Attach to task!
+                    })
                 });
                 document.getElementById('pin-modal').classList.remove('open');
                 document.getElementById('pin-photo').value = '';
                 document.getElementById('pin-title').value = '';
                 loadDayTracks(document.getElementById('day-selector').value || 'all');
-                alert("Location saved!");
+                alert("Location saved successfully!");
             } catch (e) { alert("Failed to save location"); }
 
             btn.innerText = "💾 Save"; btn.disabled = false;
