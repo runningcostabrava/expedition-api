@@ -407,7 +407,35 @@
             loadData();
         }
 
-        loadData();
+        async function initPM() {
+            // 1. Load the checklist first
+            await loadData();
+            
+            // 2. Catch the URL parameter from field.html and scroll to it
+            setTimeout(() => {
+                const urlParams = new URLSearchParams(window.location.search);
+                const focusTaskId = urlParams.get('task_id');
+                
+                if (focusTaskId) {
+                    // Find the map button that matches this task, then find its parent row
+                    const mapBtn = document.querySelector(`.task-row a[href="field.html?task_id=${focusTaskId}"]`);
+                    if (mapBtn) {
+                        const taskRow = mapBtn.closest('.task-row');
+                        
+                        // Visually highlight the row with a blue glow and scroll it to the center
+                        taskRow.style.border = '2px solid #38bdf8';
+                        taskRow.style.boxShadow = '0 0 15px rgba(56, 189, 248, 0.3)';
+                        taskRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        
+                        // Clean the URL so it doesn't jump again if they refresh the page normally
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+                }
+            }, 800); // 800ms delay gives the phone time to finish drawing the HTML checklist
+        }
+
+        // Start the app
+        initPM();
     </script>
 </body>
 
