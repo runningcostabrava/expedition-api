@@ -18,6 +18,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 const app = express();
 app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true })); // <--- 🚨 ADD THIS CRITICAL LINE 🚨
 app.use(express.static(path.join(__dirname)));
 
 const JWT_SECRET = process.env.JWT_SECRET || 'emergency_fallback_secret'; // 2. Set secret
@@ -681,22 +682,26 @@ app.delete('/tasks/:task_id/anchors/:anchor_id', adminAuth, async (req, res) => 
 // 1. TRACCAR LOCATION WEBHOOK (From the native mobile app)
 app.all('/api/location', async (req, res) => {
     try {
+        // Print exactly what Traccar sent us to the Render Logs
+        console.log("[Traccar Incoming] Query:", req.query, "Body:", req.body);
+
         const id = req.query.id || req.body.id;
         const lat = req.query.lat || req.body.lat;
         const lon = req.query.lon || req.body.lon;
 
         if (!id || !lat || !lon) {
+            console.log("[Fleet Radar] ❌ Rejected: Missing GPS parameters");
             return res.status(400).send("Missing GPS parameters");
         }
 
-        // Find the device's true Database ID (Matches name or number)
+        // Find the device's true Database ID (Matches display_name, device_identifier, or ID)
         const deviceQuery = await pool.query(
-            'SELECT id FROM live_devices WHERE LOWER(display_name) = LOWER($1) OR id::text = $1 LIMIT 1',
+            'SELECT id FROM live_devices WHERE LOWER(display_name) = LOWER($1) OR LOWER(device_identifier) = LOWER($1) OR id::text = $1 LIMIT 1',
             [id.toString().trim()]
         );
 
         if (deviceQuery.rows.length === 0) {
-            console.log(`[Fleet Radar] ⚠️ Rejected location: Unknown device '${id}'`);
+            console.log(`[Fleet Radar] ⚠️ Rejected: Unknown device name '${id}'`);
             return res.status(404).send("Device not found");
         }
 
@@ -708,7 +713,7 @@ app.all('/api/location', async (req, res) => {
             [trueDbId, lat, lon]
         );
 
-        console.log(`[Fleet Radar] 📍 Saved location for: ${id} (DB ID: ${trueDbId})`);
+        console.log(`[Fleet Radar] 🟢 📍 Successfully saved location for: ${id} (DB ID: ${trueDbId})`);
         res.status(200).send("OK");
 
     } catch (err) {
