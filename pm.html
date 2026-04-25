@@ -1,155 +1,344 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <title>Mobile PM - Expedition</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap"
+        rel="stylesheet">
     <style>
-        body { background: #f1f5f9; font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 0; padding-bottom: 50px; }
-        header { background: #0f172a; color: white; padding: env(safe-area-inset-top, 20px) 20px 20px 20px; font-weight: bold; font-size: 1.2em; text-align: center; position: sticky; top: 0; z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        
-        .section-card { background: white; margin: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid #e2e8f0; }
-        .section-header { background: #f8fafc; padding: 15px; font-weight: bold; color: #1e293b; border-bottom: 2px solid #e2e8f0; font-size: 1.1em; display: flex; justify-content: space-between; }
-        
-        .task-row { padding: 15px; border-bottom: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 10px; }
-        .task-row:last-child { border-bottom: none; }
-        .task-row.completed { opacity: 0.6; background: #f8fafc; }
-        
-        .task-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
-        .task-title { font-weight: 700; color: #0f172a; font-size: 1.05em; line-height: 1.3; }
-        
-        .task-meta { font-size: 0.85em; color: #64748b; display: flex; flex-wrap: wrap; gap: 8px; font-weight: 600; }
-        .meta-badge { background: #f1f5f9; padding: 4px 8px; border-radius: 4px; }
-        
-        .action-row { display: flex; gap: 10px; margin-top: 5px; }
-        .btn-map { flex: 1; background: #38bdf8; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 0.9em; cursor: pointer; text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 5px; }
-        .btn-complete { flex: 1; background: #10b981; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 0.9em; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; }
-        .btn-complete.undo { background: #94a3b8; }
+        body {
+            background: #f1f5f9;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            margin: 0;
+            padding: 0;
+            padding-bottom: 80px;
+        }
 
-        .loader { text-align: center; padding: 40px; color: #64748b; font-weight: bold; }
+        header {
+            background: #0f172a;
+            color: white;
+            padding: env(safe-area-inset-top, 20px) 20px 20px 20px;
+            font-weight: bold;
+            font-size: 1.2em;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-card {
+            background: white;
+            margin: 15px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+
+        .section-header {
+            background: #f8fafc;
+            padding: 15px;
+            font-weight: bold;
+            color: #1e293b;
+            border-bottom: 2px solid #e2e8f0;
+            font-size: 1.1em;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .task-row {
+            padding: 15px;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .task-row:last-child {
+            border-bottom: none;
+        }
+
+        .task-row.completed {
+            opacity: 0.6;
+            background: #f8fafc;
+        }
+
+        .task-title-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .task-title {
+            font-weight: 700;
+            color: #0f172a;
+            font-size: 1.05em;
+            line-height: 1.3;
+        }
+
+        .task-meta-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 5px;
+        }
+
+        .task-meta {
+            font-size: 0.85em;
+            color: #64748b;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            font-weight: 600;
+            align-items: center;
+        }
+
+        .meta-badge {
+            background: #f1f5f9;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .action-icons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .icon-btn {
+            background: #e2e8f0;
+            border: none;
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-decoration: none;
+            transition: 0.2s;
+        }
+
+        .icon-btn.complete {
+            background: #10b981;
+            color: white;
+        }
+
+        .icon-btn.map {
+            background: #38bdf8;
+            color: white;
+        }
+
+        .icon-btn.edit {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .task-desc {
+            font-size: 0.85em;
+            color: #475569;
+            background: #f8fafc;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            white-space: pre-wrap;
+        }
+
+        /* Floating Add Button */
+        .fab {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            background: #27ae60;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            border: none;
+            cursor: pointer;
+            z-index: 1000;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            align-items: flex-end;
+        }
+
+        .modal.open {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            width: 100%;
+            border-radius: 20px 20px 0 0;
+            padding: 20px;
+            box-sizing: border-box;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+
+        .modal input,
+        .modal select,
+        .modal textarea {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
     </style>
 </head>
+
 <body>
 
     <header>📋 Expedition Itinerary</header>
-    <div id="pm-container"><div class="loader">⏳ Syncing with database...</div></div>
+    <div id="pm-container">
+        <div style="text-align: center; padding: 40px; color: #64748b;">⏳ Syncing...</div>
+    </div>
 
-    <div id="app-switcher" style="position: fixed; bottom: 25px; left: 20px; z-index: 100000;">
-        <button onclick="document.getElementById('switcher-menu').classList.toggle('show')" style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;">
-            📱
-        </button>
-        <div id="switcher-menu" style="display: none; position: absolute; bottom: 65px; left: 0; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 220px; flex-direction: column; gap: 8px; border: 1px solid #e2e8f0;">
-            <div style="font-size: 0.75em; font-weight: bold; color: #64748b; text-transform: uppercase; padding-left: 5px; margin-bottom: 2px;">Switch App</div>
-            <a href="index.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">
-                🗺️ Command Center
-            </a>
-            <a href="field.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">
-                🧭 Field Map
-            </a>
-            <a href="pm.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">
-                📋 Mobile PM
-            </a>
+    <button class="fab" onclick="openTaskModal()">+</button>
+
+    <div id="task-modal" class="modal">
+        <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 id="modal-title" style="margin: 0;">Task</h3>
+                <span onclick="closeTaskModal()" style="font-size: 24px; cursor: pointer;">×</span>
+            </div>
+            <input type="hidden" id="edit-task-id">
+            <input type="text" id="edit-task-name" placeholder="Task Name">
+            <div style="display: flex; gap: 10px;">
+                <input type="time" id="edit-task-time">
+                <select id="edit-task-sec">
+                    <option value="">Unscheduled</option>
+                </select>
+            </div>
+            <input type="text" id="edit-task-resp" placeholder="Responsible (e.g. Guide Name)">
+            <textarea id="edit-task-desc" rows="4" placeholder="Description / Notes..."></textarea>
+
+            <button onclick="saveTask()"
+                style="width: 100%; background: #27ae60; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer;">💾
+                Save Task</button>
+            <button id="delete-btn" onclick="deleteTask()"
+                style="width: 100%; background: #ef4444; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer; margin-top: 10px; display: none;">🗑️
+                Delete Task</button>
         </div>
     </div>
 
+    <div id="app-switcher" style="position: fixed; bottom: 25px; left: 20px; z-index: 100000;">
+        <button onclick="document.getElementById('switcher-menu').classList.toggle('show')"
+            style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center;">📱</button>
+        <div id="switcher-menu"
+            style="display: none; position: absolute; bottom: 65px; left: 0; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 220px; flex-direction: column; gap: 8px;">
+            <a href="index.html"
+                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block;">🗺️
+                Command Center</a>
+            <a href="field.html"
+                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block;">🧭
+                Field Map</a>
+        </div>
+    </div>
     <style>
-        #switcher-menu.show { display: flex !important; }
-        #switcher-menu a:hover { background: #e2e8f0 !important; }
-        /* Hide the switcher when Zen Mode is active in the main app */
-        body.zen-mode #app-switcher { transform: translateX(-150%); opacity: 0; pointer-events: none; }
+        #switcher-menu.show {
+            display: flex !important;
+        }
     </style>
 
     <script>
         const API_URL = 'https://mapbox-api-uz9a.onrender.com';
         let AUTH_TOKEN = sessionStorage.getItem('expedition_token');
+        let fullItinerary = [];
+        let allSections = [];
 
-        // Self-contained Auth Fetch
         async function authFetch(url, options = {}) {
             if (!AUTH_TOKEN) {
                 const pass = prompt("Enter Admin Password:");
                 if (!pass) return null;
-                const res = await fetch(`${API_URL}/api/login`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pass })
-                });
+                const res = await fetch(`${API_URL}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pass }) });
                 const data = await res.json();
-                if (data.token) {
-                    AUTH_TOKEN = data.token;
-                    sessionStorage.setItem('expedition_token', AUTH_TOKEN);
-                } else { alert("Unauthorized"); return null; }
+                if (data.token) { AUTH_TOKEN = data.token; sessionStorage.setItem('expedition_token', AUTH_TOKEN); }
+                else return null;
             }
             options.headers = { ...options.headers, 'Authorization': `Bearer ${AUTH_TOKEN}` };
             return fetch(url, options);
         }
 
-        async function loadItinerary() {
+        async function loadData() {
             try {
-                const [secRes, itRes] = await Promise.all([
-                    authFetch(`${API_URL}/sections`),
-                    authFetch(`${API_URL}/itinerary`)
-                ]);
-                
-                if(!secRes || !itRes) return; // Auth failed
+                const [secRes, itRes] = await Promise.all([authFetch(`${API_URL}/sections`), authFetch(`${API_URL}/itinerary`)]);
+                allSections = await secRes.json();
+                fullItinerary = await itRes.json();
 
-                const sections = await secRes.json();
-                const tasks = await itRes.json();
-                
-                // Group tasks by section
-                const groups = {};
-                tasks.forEach(t => {
-                    const sId = t.section_id || 'unscheduled';
-                    if(!groups[sId]) groups[sId] = [];
-                    groups[sId].push(t);
-                });
+                // Populate Dropdown
+                const secSelect = document.getElementById('edit-task-sec');
+                secSelect.innerHTML = '<option value="">Unscheduled</option>';
+                allSections.forEach(s => secSelect.innerHTML += `<option value="${s.id}">${s.title}</option>`);
 
-                const container = document.getElementById('pm-container');
-                container.innerHTML = '';
+                renderItinerary();
+            } catch (e) { document.getElementById('pm-container').innerHTML = `<div style="text-align:center; padding:20px;">Error loading data</div>`; }
+        }
 
-                sections.forEach(sec => {
-                    if(!groups[sec.id]) return;
-                    container.appendChild(createSectionCard(sec.title, groups[sec.id]));
-                });
+        function renderItinerary() {
+            const groups = {};
+            fullItinerary.forEach(t => {
+                const sId = t.section_id || 'unscheduled';
+                if (!groups[sId]) groups[sId] = [];
+                groups[sId].push(t);
+            });
 
-                if(groups['unscheduled']) {
-                    container.appendChild(createSectionCard('Unscheduled', groups['unscheduled']));
-                }
+            const container = document.getElementById('pm-container');
+            container.innerHTML = '';
 
-            } catch (e) {
-                document.getElementById('pm-container').innerHTML = `<div class="loader">🚨 Connection Error</div>`;
-            }
+            allSections.forEach(sec => {
+                if (groups[sec.id]) container.appendChild(createSectionCard(sec.title, groups[sec.id]));
+            });
+            if (groups['unscheduled']) container.appendChild(createSectionCard('Unscheduled', groups['unscheduled']));
         }
 
         function createSectionCard(title, tasks) {
             const card = document.createElement('div');
             card.className = 'section-card';
-            
-            const header = document.createElement('div');
-            header.className = 'section-header';
-            header.innerHTML = `<span>📅 ${title}</span> <span style="color:#94a3b8;">${tasks.length} items</span>`;
-            card.appendChild(header);
+            card.innerHTML = `<div class="section-header"><span>📅 ${title}</span><span style="color:#94a3b8;">${tasks.length} items</span></div>`;
 
             tasks.forEach(task => {
                 const time = task.starts_at ? task.starts_at.substring(11, 16) : '';
+                const hasMapData = task.geometries && task.geometries.length > 0;
                 const row = document.createElement('div');
                 row.className = `task-row ${task.is_completed ? 'completed' : ''}`;
-                
-                // Determine if this task actually has coordinates to show on the map
-                const hasMapData = task.geometries && task.geometries.length > 0;
 
                 row.innerHTML = `
-                    <div class="task-header">
-                        <div class="task-title">${task.is_completed ? '✅' : '⏳'} ${task.task_name}</div>
+                    <div class="task-title-bar">
+                        <div class="task-title">${task.task_name}</div>
                     </div>
-                    <div class="task-meta">
-                        ${time ? `<span class="meta-badge">🕒 ${time}</span>` : ''}
-                        ${task.responsible ? `<span class="meta-badge">👤 ${task.responsible}</span>` : ''}
-                        ${task.category_icon ? `<span class="meta-badge">${task.category_icon}</span>` : ''}
-                    </div>
-                    <div class="action-row">
-                        <button class="btn-complete ${task.is_completed ? 'undo' : ''}" onclick="toggleComplete(${task.task_id}, ${!task.is_completed})">
-                            ${task.is_completed ? '↩️ Undo' : '✔️ Complete'}
-                        </button>
-                        ${hasMapData ? `<a href="index.html?task_id=${task.task_id}" class="btn-map">🗺️ View on Map</a>` : `<div style="flex:1;"></div>`}
+                    ${task.characteristics ? `<div class="task-desc">${task.characteristics}</div>` : ''}
+                    <div class="task-meta-bar">
+                        <div class="task-meta">
+                            ${time ? `<span class="meta-badge">🕒 ${time}</span>` : ''}
+                            ${task.responsible ? `<span class="meta-badge">👤 ${task.responsible}</span>` : ''}
+                        </div>
+                        <div class="action-icons">
+                            <button class="icon-btn edit" onclick="openTaskModal(${task.task_id})">✏️</button>
+                            ${hasMapData ? `<a href="field.html?task_id=${task.task_id}" class="icon-btn map" title="View on Map">🗺️</a>` : ''}
+                            <button class="icon-btn ${task.is_completed ? '' : 'complete'}" onclick="toggleComplete(${task.task_id}, ${!task.is_completed})">
+                                ${task.is_completed ? '↩️' : '✅'}
+                            </button>
+                        </div>
                     </div>
                 `;
                 card.appendChild(row);
@@ -158,17 +347,68 @@
         }
 
         async function toggleComplete(taskId, status) {
-            try {
-                await authFetch(`${API_URL}/tasks/${taskId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ is_completed: status })
-                });
-                loadItinerary(); // Refresh the list
-            } catch (e) { alert('Error updating task'); }
+            await authFetch(`${API_URL}/tasks/${taskId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_completed: status }) });
+            loadData();
         }
 
-        loadItinerary();
+        function openTaskModal(taskId = null) {
+            document.getElementById('task-modal').classList.add('open');
+            document.getElementById('delete-btn').style.display = taskId ? 'block' : 'none';
+            document.getElementById('modal-title').innerText = taskId ? 'Edit Task' : 'New Task';
+
+            if (taskId) {
+                const task = fullItinerary.find(t => t.task_id === taskId);
+                document.getElementById('edit-task-id').value = task.task_id;
+                document.getElementById('edit-task-name').value = task.task_name || '';
+                document.getElementById('edit-task-time').value = task.starts_at ? task.starts_at.substring(11, 16) : '';
+                document.getElementById('edit-task-sec').value = task.section_id || '';
+                document.getElementById('edit-task-resp').value = task.responsible || '';
+                document.getElementById('edit-task-desc').value = task.characteristics || '';
+            } else {
+                document.getElementById('edit-task-id').value = '';
+                document.getElementById('edit-task-name').value = '';
+                document.getElementById('edit-task-time').value = '';
+                document.getElementById('edit-task-sec').value = '';
+                document.getElementById('edit-task-resp').value = '';
+                document.getElementById('edit-task-desc').value = '';
+            }
+        }
+
+        function closeTaskModal() { document.getElementById('task-modal').classList.remove('open'); }
+
+        async function saveTask() {
+            const taskId = document.getElementById('edit-task-id').value;
+            const payload = {
+                task_name: document.getElementById('edit-task-name').value,
+                section_id: document.getElementById('edit-task-sec').value || null,
+                responsible: document.getElementById('edit-task-resp').value,
+                characteristics: document.getElementById('edit-task-desc').value
+            };
+
+            const time = document.getElementById('edit-task-time').value;
+            if (time) {
+                const datePart = payload.section_id ? allSections.find(s => s.id == payload.section_id).section_date.split('T')[0] : new Date().toISOString().split('T')[0];
+                payload.starts_at = `${datePart}T${time}:00.000Z`;
+            } else payload.starts_at = null;
+
+            const method = taskId ? 'PUT' : 'POST';
+            const url = taskId ? `${API_URL}/tasks/${taskId}` : `${API_URL}/tasks`;
+
+            await authFetch(url, { method: method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            closeTaskModal();
+            loadData();
+        }
+
+        async function deleteTask() {
+            if (!confirm("Delete this task?")) return;
+            const taskId = document.getElementById('edit-task-id').value;
+            await authFetch(`${API_URL}/tasks/${taskId}`, { method: 'DELETE' });
+            closeTaskModal();
+            loadData();
+        }
+
+        loadData();
     </script>
 </body>
+
 </html>
