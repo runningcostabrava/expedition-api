@@ -8,6 +8,7 @@
     <title>Mobile PM - Expedition</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap"
         rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         body {
             background: #f1f5f9;
@@ -208,6 +209,16 @@
 
 <body>
 
+    <div id="lightbox-modal"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:999999; align-items:center; justify-content:center; cursor:zoom-out;"
+        onclick="this.style.display='none'">
+        <img id="lightbox-image" src=""
+            style="max-width:95%; max-height:95%; border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,0.7);"
+            onclick="event.stopPropagation()">
+        <div style="position:absolute; top:20px; right:30px; color:white; font-size:40px; font-weight:bold; cursor:pointer;">
+            &times;</div>
+    </div>
+
     <header>📋 Expedition Itinerary</header>
     <div id="pm-container">
         <div style="text-align: center; padding: 40px; color: #64748b;">⏳ Syncing...</div>
@@ -262,6 +273,12 @@
 
     <script>
         const API_URL = 'https://mapbox-api-uz9a.onrender.com';
+
+        // The Lightbox Engine
+        window.openLightbox = function (url) {
+            document.getElementById('lightbox-image').src = url;
+            document.getElementById('lightbox-modal').style.display = 'flex';
+        };
         let AUTH_TOKEN = sessionStorage.getItem('expedition_token');
         let fullItinerary = [];
         let allSections = [];
@@ -362,15 +379,25 @@
             const time = task.starts_at ? task.starts_at.substring(11, 16) : '';
             const hasMapData = task.geometries && task.geometries.length > 0;
             const row = document.createElement('div');
-            
+
             row.className = `task-row ${task.is_completed ? 'completed' : ''}`;
             if (isSubtask) row.style.borderBottom = "1px dashed #e2e8f0";
-            
+
+            // Parse Characteristics for Images and Links
+            let parsedCharacteristics = '';
+            if (task.characteristics) {
+                const renderer = new marked.Renderer();
+                renderer.image = function (href, title, text) {
+                    return `<img src="${href}" alt="${text}" onclick="openLightbox('${href}')" style="max-width:100%; max-height:200px; border-radius:8px; display:block; margin:10px 0; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:zoom-in;">`;
+                };
+                parsedCharacteristics = marked.parse(task.characteristics, { renderer: renderer, breaks: true });
+            }
+
             row.innerHTML = `
                 <div class="task-title-bar">
                     <div class="task-title">${isSubtask ? '↳ ' : ''}${task.task_name}</div>
                 </div>
-                ${task.characteristics ? `<div class="task-desc">${task.characteristics}</div>` : ''}
+                ${parsedCharacteristics ? `<div class="task-desc" style="overflow-wrap: anywhere;">${parsedCharacteristics}</div>` : ''}
                 <div class="task-meta-bar">
                     <div class="task-meta">
                         ${time ? `<span class="meta-badge">🕒 ${time}</span>` : ''}
@@ -385,7 +412,7 @@
                     </div>
                 </div>
             `;
-            // Ensure the URL parameter catcher can find this row
+
             if (hasMapData) {
                 const mapBtn = row.querySelector('.map');
                 if (mapBtn) mapBtn.setAttribute('href', `field.html?task_id=${task.task_id}`);
