@@ -678,38 +678,49 @@ app.delete('/tasks/:task_id/anchors/:anchor_id', adminAuth, async (req, res) => 
 
 // --- 📡 FLEET TRACKING & TELEMETRY ---
 
-// 1. The Webhook (Receives data from phones)
+// --- 📡 TRACCAR LOCATION WEBHOOK ---
 app.all('/api/location', async (req, res) => {
-    const body = req.body || {}; 
-    
-    // DEBUG: This will print exactly what the phone sends to your Render logs!
-    console.log("Incoming tracking payload:", JSON.stringify(body).substring(0, 200));
-
-    // Smart Extract: Understands Standard, Query Params, and TransistorSoft formats
-    const guide_id = body.guide_id || req.query.id || req.query.device_id || body.device_id || "Mobile-Guide";
-    
-    // Dig deep into the payload to find the coordinates, wherever they are hiding
-    const lat = body.lat || req.query.lat || body.latitude || (body.location && body.location.coords ? body.location.coords.latitude : null);
-    const lng = body.lng || req.query.lng || req.query.lon || body.longitude || (body.location && body.location.coords ? body.location.coords.longitude : null);
-    
-    if (!lat || !lng) {
-        console.error("Rejected - Could not find coordinates in payload.");
-        return res.status(400).json({ error: "Missing data" });
-    }
-    
     try {
-        // Auto-register new devices into the directory if they don't exist
+        // Traccar sends data in the URL, whether it's a GET or POST request
+        const id = req.query.id || req.body.id;
+        const lat = req.query.lat || req.body.lat;
+        const lon = req.query.lon || req.body.lon;
+        const altitude = req.query.altitude || 0;
+        const speed = req.query.speed || 0;
+
+        if (!id || !lat || !lon) {
+            return res.status(400).send("Missing GPS parameters");
+        }
+
+        let deviceId = parseInt(id);
+
+        // THE MAGIC: If the guide typed a name (like "pablo") instead of a number, look it up!
+        if (isNaN(deviceId)) {
+            const deviceQuery = await pool.query(
+                'SELECT id FROM live_devices WHERE LOWER(display_name) = LOWER($1) LIMIT 1',
+                [id.trim()]
+            );
+
+            if (deviceQuery.rows.length === 0) {
+                console.log(`[Fleet Radar] ⚠️ Rejected location: Unknown guide name '${id}'`);
+                return res.status(404).send("Guide name not found in database");
+            }
+            // Swap the name for the real database ID
+            deviceId = deviceQuery.rows[0].id;
+        }
+
+        // Save the telemetry using the correct numeric ID
         await pool.query(
-            `INSERT INTO live_devices (device_identifier, display_name) VALUES ($1, $2) ON CONFLICT (device_identifier) DO NOTHING`,
-            [guide_id, guide_id]
+            'INSERT INTO location_logs (guide_id, lat, lng) VALUES ($1, $2, $3)',
+            [deviceId, lat, lon]
         );
-        
-        // Log the actual coordinate
-        await pool.query('INSERT INTO location_logs (guide_id, lat, lng) VALUES ($1, $2, $3)', [guide_id, lat, lng]);
+
+        console.log(`[Fleet Radar] 📍 Saved location for: ${id}`);
         res.status(200).send("OK");
-    } catch (err) { 
-        console.error("Tracking Error:", err);
-        res.status(500).json({ error: err.message }); 
+
+    } catch (err) {
+        console.error("Traccar Webhook Error:", err);
+        res.status(500).send("Server Error");
     }
 });
 
