@@ -3105,7 +3105,7 @@
             const panel = document.getElementById('task-detail-panel');
             if (panel) panel.classList.remove('open');
 
-            // FIX: On mobile, bring the main list back
+            // FIX: On mobile, bring the main list back when details are closed
             if (window.innerWidth <= 768) {
                 document.getElementById('left-panel').classList.remove('hidden');
             }
