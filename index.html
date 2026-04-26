@@ -2490,7 +2490,12 @@
 
         function renderProjectView() {
             const container = document.getElementById('asana-container');
-            const searchTerm = document.getElementById('search-filter').value.toLowerCase();
+            const searchInput = document.getElementById('search-filter');
+
+            // SAFETY: If we are in "Google Search Mode", the list is gone, so stop rendering
+            if (!container || !searchInput) return;
+
+            const searchTerm = searchInput.value.toLowerCase();
             const categoryFilter = document.getElementById('category-filter').value;
             const responsibleFilter = document.getElementById('responsible-filter').value;
             const groupFilter = document.getElementById('group-filter').value;
