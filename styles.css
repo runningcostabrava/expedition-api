@@ -1244,8 +1244,9 @@ body.zen-mode #fleet-panel {
         left: 10px !important;
         right: 10px !important;
         height: auto !important;
+        min-height: 55px;
         padding: 12px !important; /* Added padding so inputs don't touch the glass edges */
-        padding-right: 60px !important; /* Explicit gap for the right-side button stack */
+        padding-right: 70px !important; /* Explicit gap for the right-side button stack */
         flex-wrap: nowrap !important;
         overflow: visible !important;
         flex-direction: column !important;
@@ -1259,7 +1260,7 @@ body.zen-mode #fleet-panel {
         flex-direction: column !important;
         gap: 8px !important;
         width: 100% !important;
-        max-width: 85% !important; /* Leave room for FABs */
+        max-width: 80% !important; /* Leaves 20% room on the right */
         align-self: flex-start;
     }
 
@@ -1306,7 +1307,7 @@ body.zen-mode #fleet-panel {
     /* --- NEW POLISHED MOBILE FABS --- */
     #mobile-fab-container {
         position: fixed !important;
-        bottom: 30px !important; /* Moves them slightly closer to the bottom */
+        bottom: 25px !important; /* Slight lift for safe areas */
         right: 15px !important;
         flex-direction: column !important;
         gap: 12px !important;
