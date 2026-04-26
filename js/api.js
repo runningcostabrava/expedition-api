@@ -162,29 +162,106 @@ async function authFetch(url, options = {}) {
     }
 }
 
+window.closeAiChat = function() {
+    const modal = document.getElementById('ai-multimodal-assistant');
+    if (modal) {
+        modal.classList.add('ai-chat-hidden');
+        setTimeout(() => { modal.style.display = 'none'; }, 300); // Wait for slide animation
+    }
+};
+
 window.openAiChat = function() {
     const modalId = 'ai-multimodal-assistant';
     
-    // If the chat already exists, just show it (preserves history!)
-    if (document.getElementById(modalId)) {
-        document.getElementById(modalId).style.display = 'flex';
-        // Focus the input
-        document.getElementById('ai-prompt-text').focus();
+    // 1. STATE PRESERVATION: If chat exists, just slide it back into view
+    const existingModal = document.getElementById(modalId);
+    if (existingModal) {
+        existingModal.style.display = 'flex';
+        // Small delay to allow display:flex to apply before animating transform
+        setTimeout(() => {
+            existingModal.classList.remove('ai-chat-hidden');
+            document.getElementById('ai-prompt-text').focus();
+        }, 10);
         return;
     }
 
+    // 2. INJECT RESPONSIVE STYLES
+    if (!document.getElementById('ai-chat-styles')) {
+        const style = document.createElement('style');
+        style.id = 'ai-chat-styles';
+        style.innerHTML = `
+            #ai-multimodal-assistant {
+                position: fixed;
+                z-index: 1000000;
+                display: flex;
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
+            }
+            #ai-multimodal-assistant.ai-chat-hidden {
+                opacity: 0;
+            }
+            .ai-chat-box {
+                background: #f8fafc;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                pointer-events: auto; /* Chat is always clickable */
+            }
+            
+            /* DESKTOP: Snap to Right, Pass-through background */
+            @media (min-width: 769px) {
+                #ai-multimodal-assistant {
+                    top: 85px; /* Clear command bar */
+                    right: 15px;
+                    bottom: 25px;
+                    width: 400px;
+                    pointer-events: none; /* Let clicks pass through to map/sidebar */
+                }
+                #ai-multimodal-assistant.ai-chat-hidden {
+                    transform: translateX(450px); /* Slide off screen */
+                }
+                .ai-chat-box {
+                    width: 100%;
+                    height: 100%;
+                    border-radius: 16px;
+                    border: 1px solid rgba(0,0,0,0.1);
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+                }
+            }
+            
+            /* MOBILE: Centered Modal with Dark Backdrop */
+            @media (max-width: 768px) {
+                #ai-multimodal-assistant {
+                    inset: 0;
+                    background: rgba(0,0,0,0.5);
+                    backdrop-filter: blur(4px);
+                    align-items: center;
+                    justify-content: center;
+                    padding: 15px;
+                    pointer-events: auto; /* Block background clicks */
+                }
+                #ai-multimodal-assistant.ai-chat-hidden {
+                    transform: translateY(100%); /* Slide down */
+                }
+                .ai-chat-box {
+                    width: 100%;
+                    max-width: 450px;
+                    height: 85vh;
+                    max-height: 800px;
+                    border-radius: 20px;
+                    box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // 3. BUILD THE UI
     const modal = document.createElement('div');
     modal.id = modalId;
-    modal.style.cssText = `
-        position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000000;
-        display: flex; align-items: center; justify-content: center; padding: 15px;
-        backdrop-filter: blur(4px);
-    `;
-
-    // WhatsApp-style Chat UI
+    
     modal.innerHTML = `
-        <div style="background: #f8fafc; width: 100%; max-width: 450px; height: 85vh; max-height: 800px; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.4); display: flex; flex-direction: column;">
-            <div style="background: #0f172a; color: white; padding: 15px 20px; font-weight: bold; font-size: 1.1em; display: flex; justify-content: space-between; align-items: center;">
+        <div class="ai-chat-box">
+            <div style="background: #0f172a; color: white; padding: 15px 20px; font-weight: bold; font-size: 1.1em; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
                 <div style="display:flex; align-items:center; gap:10px;">
                     <div style="width:34px; height:34px; background:#8b5cf6; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.2em;">🤖</div>
                     <div style="display:flex; flex-direction:column;">
@@ -192,16 +269,16 @@ window.openAiChat = function() {
                         <span style="font-size:0.7em; color:#94a3b8; font-weight:normal;">Online</span>
                     </div>
                 </div>
-                <span onclick="document.getElementById('${modalId}').style.display='none'" style="cursor: pointer; font-size: 1.8em; line-height: 1; padding: 0 5px;">×</span>
+                <span onclick="window.closeAiChat()" style="cursor: pointer; font-size: 1.8em; line-height: 1; padding: 0 5px;">×</span>
             </div>
 
             <div id="ai-chat-history" style="flex: 1; overflow-y: auto; padding: 20px 15px; display: flex; flex-direction: column; gap: 15px; background: #e2e8f0; background-image: radial-gradient(#cbd5e0 1px, transparent 0); background-size: 20px 20px;">
-                <div style="text-align: center; color: #64748b; font-size: 0.85em; margin-bottom: 10px; background: rgba(255,255,255,0.6); padding: 4px 12px; border-radius: 12px; align-self: center;">
-                    Chat started. Ask me to update the itinerary, read receipts, or analyze map data!
+                <div style="text-align: center; color: #64748b; font-size: 0.85em; margin-bottom: 10px; background: rgba(255,255,255,0.8); padding: 6px 12px; border-radius: 12px; align-self: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                    Chat started. I can update your itinerary, read receipts via OCR, or analyze map data! Try asking me to move a task.
                 </div>
             </div>
 
-            <div style="background: white; padding: 12px 15px; border-top: 1px solid #cbd5e0; display: flex; flex-direction: column; gap: 10px;">
+            <div style="background: white; padding: 12px 15px; border-top: 1px solid #cbd5e0; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0;">
                 
                 <div id="ai-attachment-preview" style="display:none; align-items:center; justify-content:space-between; background:#f1f5f9; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0; font-size:0.85em;">
                     <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
@@ -272,12 +349,10 @@ window.openAiChat = function() {
 
         let contentHtml = '';
         
-        // Show local image preview for user messages
         if (imageUrl) {
-            contentHtml += `<img src="${imageUrl}" style="max-width:100%; border-radius:8px; border:1px solid rgba(0,0,0,0.1);">`;
+            contentHtml += `<img src="${imageUrl}" style="max-width:100%; border-radius:8px; border:1px solid rgba(0,0,0,0.1); cursor:pointer;" onclick="if(window.openLightbox) window.openLightbox('${imageUrl}')">`;
         }
         
-        // Use Marked.js to nicely format the AI's response (bolding, lists, etc)
         if (role === 'ai') {
             contentHtml += typeof marked !== 'undefined' ? marked.parse(text) : text.replace(/\n/g, '<br>');
         } else {
@@ -292,8 +367,6 @@ window.openAiChat = function() {
         if (paras.length > 0) paras[paras.length-1].style.margin = '0';
 
         history.appendChild(msgDiv);
-        
-        // Smooth scroll to bottom
         setTimeout(() => { history.scrollTo({ top: history.scrollHeight, behavior: 'smooth' }); }, 50);
         return msgDiv;
     }
@@ -307,23 +380,20 @@ window.openAiChat = function() {
         btn.disabled = true;
         btn.style.transform = 'scale(0.9)';
 
-        // 1. Render User Message instantly
+        // Render User Message instantly
         let previewUrl = null;
         if (attachedFile) previewUrl = URL.createObjectURL(attachedFile);
         appendMessage('user', promptText, previewUrl);
 
-        // 2. Reset Input Area
         textarea.value = '';
         textarea.style.height = 'auto';
         textarea.focus();
 
-        // 3. Render "AI is typing" indicator
         const typingIndicator = appendMessage('ai', '<span style="color:#94a3b8; font-style:italic;">thinking...</span>');
 
         try {
             let uploadedImageUrl = null;
 
-            // Upload image if attached
             if (attachedFile) {
                 const formData = new FormData();
                 formData.append('file', attachedFile);
@@ -333,7 +403,6 @@ window.openAiChat = function() {
                 uploadedImageUrl = uploadData.secure_url;
             }
 
-            // Send to Backend
             const res = await authFetch(`${API_URL}/api/ai/command`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -344,12 +413,11 @@ window.openAiChat = function() {
             const data = await res.json();
             if (data.error) throw new Error(data.error);
 
-            // 4. Remove typing indicator and render AI Response
             typingIndicator.remove();
             appendMessage('ai', data.message);
             window.clearAiAttachment();
 
-            // Refresh underlying map/data in the background quietly
+            // Quietly refresh the UI so the user can watch the map/sidebar update instantly behind the chat!
             if (typeof refreshData === 'function') refreshData();
             if (typeof loadData === 'function') loadData(); 
             
@@ -361,7 +429,10 @@ window.openAiChat = function() {
             btn.style.transform = 'scale(1)';
         }
     });
+
+    // Make sure input is focused when first opened
+    setTimeout(() => document.getElementById('ai-prompt-text').focus(), 100);
 };
 
-// Ensure all buttons trigger the new chat interface
+// Map the old global function to the new persistent chat UI
 window.processAiCommand = window.openAiChat;

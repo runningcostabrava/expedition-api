@@ -2378,7 +2378,7 @@
         }
 
         function openTaskEditor(taskId = null) {
-            const task = taskId ? AppStore.get('itinerary').find(t => t.task_id === taskId) : null;
+            const task = taskId ? AppStore.get('itinerary').find(t => t.task_id == taskId) : null;
 
             resetForm();
             if (taskId) AppStore.set('activeTaskId', taskId);
@@ -2742,7 +2742,7 @@
                       onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())" onclick="if(this.closest('.is-editing')) event.stopPropagation();">${task.task_name || 'Milestone'}</span>
                         <div class="task-actions-modern" onclick="event.stopPropagation()">
                             <button class="action-btn-modern" title="Edit Inline" onclick="toggleInlineEdit('task-row-${task.task_id}')">✏️</button>
-                            <button class="action-btn-modern" title="Details" onclick="openTaskDetailPanel(AppStore.get('itinerary').find(t => t.task_id === ${task.task_id}))">ℹ️</button>
+                            <button class="action-btn-modern" title="Details" onclick="openTaskDetailPanel(AppStore.get('itinerary').find(t => t.task_id == ${task.task_id}))">ℹ️</button>
                             <button class="action-btn-modern" title="Edit" onclick="openTaskEditor(${task.task_id})">⚙️</button>
                             <button class="action-btn-modern del" onclick="deleteTask(${task.task_id})">🗑️</button>
                         </div>
@@ -2770,7 +2770,7 @@
                 </div>
                 <div class="task-actions-modern" onclick="event.stopPropagation()">
                     <button class="action-btn-modern" title="Edit Inline" onclick="toggleInlineEdit('task-row-${task.task_id}')">✏️</button>
-                    <button class="action-btn-modern" title="Details" onclick="openTaskDetailPanel(AppStore.get('itinerary').find(t => t.task_id === ${task.task_id}))">ℹ️</button>
+                    <button class="action-btn-modern" title="Details" onclick="openTaskDetailPanel(AppStore.get('itinerary').find(t => t.task_id == ${task.task_id}))">ℹ️</button>
                     <button class="action-btn-modern" title="Edit" onclick="openTaskEditor(${task.task_id})">⚙️</button>
                     <button class="action-btn-modern del" title="Delete" onclick="deleteTask(${task.task_id})">🗑️</button>
                 </div>
