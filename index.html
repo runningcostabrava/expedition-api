@@ -2741,12 +2741,12 @@
                       style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
                       onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }"
                       onblur="updateTaskInline(${task.task_id}, 'task_name', this.innerText.trim())" onclick="if(this.closest('.is-editing')) event.stopPropagation();">${task.task_name || 'Milestone'}</span>
-                        <div class="task-actions-modern" onclick="event.stopPropagation()">
-                            <button class="action-btn-modern" title="Edit Inline" onclick="toggleInlineEdit('task-row-${task.task_id}')">✏️</button>
-                            <button class="action-btn-modern" title="Details" onclick="openTaskDetailPanel(AppStore.get('itinerary').find(t => t.task_id == ${task.task_id}))">ℹ️</button>
-                            <button class="action-btn-modern" title="Edit" onclick="openTaskEditor(${task.task_id})">⚙️</button>
-                            <button class="action-btn-modern del" onclick="deleteTask(${task.task_id})">🗑️</button>
-                        </div>
+                    <div class="task-actions-modern" onclick="event.stopPropagation()">
+                        <button class="action-btn-modern" title="Edit Inline" onclick="toggleInlineEdit('task-row-${task.task_id}')"><i class="ph ph-pencil-simple"></i></button>
+                        <button class="action-btn-modern" title="Details" onclick="openTaskDetailPanel(AppStore.get('itinerary').find(t => t.task_id == ${task.task_id}))"><i class="ph ph-info"></i></button>
+                        <button class="action-btn-modern" title="Edit" onclick="openTaskEditor(${task.task_id})"><i class="ph ph-gear"></i></button>
+                        <button class="action-btn-modern del" onclick="deleteTask(${task.task_id})"><i class="ph ph-trash"></i></button>
+                    </div>
                     </div>
                 `;
             } else {
@@ -2770,10 +2770,10 @@
                     </select>
                 </div>
                 <div class="task-actions-modern" onclick="event.stopPropagation()">
-                    <button class="action-btn-modern" title="Edit Inline" onclick="toggleInlineEdit('task-row-${task.task_id}')">✏️</button>
-                    <button class="action-btn-modern" title="Details" onclick="openTaskDetailPanel(AppStore.get('itinerary').find(t => t.task_id == ${task.task_id}))">ℹ️</button>
-                    <button class="action-btn-modern" title="Edit" onclick="openTaskEditor(${task.task_id})">⚙️</button>
-                    <button class="action-btn-modern del" title="Delete" onclick="deleteTask(${task.task_id})">🗑️</button>
+                    <button class="action-btn-modern" title="Edit Inline" onclick="toggleInlineEdit('task-row-${task.task_id}')"><i class="ph ph-pencil-simple"></i></button>
+                    <button class="action-btn-modern" title="Details" onclick="openTaskDetailPanel(AppStore.get('itinerary').find(t => t.task_id == ${task.task_id}))"><i class="ph ph-info"></i></button>
+                    <button class="action-btn-modern" title="Edit" onclick="openTaskEditor(${task.task_id})"><i class="ph ph-gear"></i></button>
+                    <button class="action-btn-modern del" title="Delete" onclick="deleteTask(${task.task_id})"><i class="ph ph-trash"></i></button>
                 </div>
             </div>
             <div class="task-row-2">
@@ -2892,9 +2892,9 @@
                     <span class="inline-edit section-title-text" style="font-weight: bold; flex-shrink: 0; font-size: 0.95em; color: #1e293b;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }" onblur="updateSectionMetadata(${section.id}, 'title', this.innerText)" onclick="if(this.closest('.is-editing')) event.stopPropagation();">${sectionTitle}</span>
 
                     <div class="task-actions-modern" style="display:flex; gap:2px; margin-left:auto; flex-shrink: 0; opacity: 1;" onclick="event.stopPropagation()">
-                        <button class="action-btn-modern" title="Edit Inline" onclick="event.stopPropagation(); toggleInlineEdit('section-${section.id || 'null'}')">✏️</button>
-                        ${section.id ? `<button class="action-btn-modern" title="Section Details" onclick="event.stopPropagation(); openSectionEditor(${section.id})">ℹ️</button>` : ''}
-                        ${section.id ? `<button class="action-btn-modern del" title="Delete Section" onclick="event.stopPropagation(); deleteSection(${section.id}, '${sectionTitle.replace(/'/g, "\\'")}')">🗑️</button>` : ''}
+                        <button class="action-btn-modern" title="Edit Inline" onclick="event.stopPropagation(); toggleInlineEdit('section-${section.id || 'null'}')"><i class="ph ph-pencil-simple"></i></button>
+                        ${section.id ? `<button class="action-btn-modern" title="Section Details" onclick="event.stopPropagation(); openSectionEditor(${section.id})"><i class="ph ph-info"></i></button>` : ''}
+                        ${section.id ? `<button class="action-btn-modern del" title="Delete Section" onclick="event.stopPropagation(); deleteSection(${section.id}, '${sectionTitle.replace(/'/g, "\\'")}')"><i class="ph ph-trash"></i></button>` : ''}
                     </div>
                 </div>
                 <div class="section-content collapsed"></div>
@@ -3149,10 +3149,10 @@
                                 <div class="geom-stats">${statsHtml || 'No stats recorded'}</div>
                             </div>
                             <div style="display:flex; gap:6px;">
-                                <button class="action-btn-modern" title="Details & Metadata" onclick="event.stopPropagation(); triggerGeomInfo(${task.task_id}, '${g.kind}', ${g.waypoint_id || g.track_id})">ℹ️</button>
-                                <button class="action-btn-modern" title="Show/Hide" onclick="event.stopPropagation(); toggleGeomVisibility('${g.kind}', '${g.track_id || g.anchor_id}', this)">👁️</button>
-                                <button class="action-btn-modern" title="Edit Geometry" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})">⚙️</button>
-                                <button class="action-btn-modern del" title="Remove from Task" onclick="event.stopPropagation(); unlinkGeometry(${task.task_id}, ${g.anchor_id})">🗑️</button>
+                                <button class="action-btn-modern" title="Details & Metadata" onclick="event.stopPropagation(); triggerGeomInfo(${task.task_id}, '${g.kind}', ${g.waypoint_id || g.track_id})"><i class="ph ph-info"></i></button>
+                                <button class="action-btn-modern" title="Show/Hide" onclick="event.stopPropagation(); toggleGeomVisibility('${g.kind}', '${g.track_id || g.anchor_id}', this)"><i class="ph ph-eye"></i></button>
+                                <button class="action-btn-modern" title="Edit Geometry" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})"><i class="ph ph-gear"></i></button>
+                                <button class="action-btn-modern del" title="Remove from Task" onclick="event.stopPropagation(); unlinkGeometry(${task.task_id}, ${g.anchor_id})"><i class="ph ph-trash"></i></button>
                             </div>
                         </div>
                     `;

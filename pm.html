@@ -311,14 +311,14 @@
 
     <div id="app-switcher" style="position: fixed; bottom: 80px; left: 15px; z-index: 100000;">
         <button onclick="document.getElementById('switcher-menu').classList.toggle('show')"
-            style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;">📱</button>
+            style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;"><i class="ph ph-squares-four"></i></button>
         <div id="switcher-menu"
             style="display: none; position: absolute; bottom: 65px; left: 0; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 220px; flex-direction: column; gap: 8px; border: 1px solid #e2e8f0;">
             <div style="font-size: 0.75em; font-weight: bold; color: #64748b; text-transform: uppercase; padding-left: 5px; margin-bottom: 2px;">Switch App</div>
             <a href="index.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;"><i class="ph ph-map-trifold"></i> Command Center</a>
             <a href="field.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;"><i class="ph ph-compass"></i> Field Map</a>
             <a href="pm.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;"><i class="ph ph-clipboard-text"></i> Mobile PM</a>
-            <a href="telemetry.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;"><i class="ph ph-trend-up"></i> Telemetry</a>
+            <a href="telemetry.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;"><i class="ph ph-chart-bar"></i> Telemetry</a>
         </div>
     </div>
     <style>
@@ -605,9 +605,9 @@
                         <div class="action-icons">
                             ${hasMapData ? `<button class="icon-btn" style="background:#f39c12; color:white;" title="Download All GPX" onclick="event.stopPropagation(); exportTaskToGPX(${task.task_id})"><i class="ph ph-upload-simple"></i></button>` : ''}
                             <button class="icon-btn edit" onclick="event.stopPropagation(); openTaskModal(${task.task_id})"><i class="ph ph-pencil-simple"></i></button>
-                            ${hasMapData ? `<a href="field.html?task_id=${task.task_id}" class="icon-btn map" title="View on Map" onclick="event.stopPropagation();"><i class="ph ph-map-trifold"></i></a>` : ''}
+                            ${hasMapData ? `<a href="field.html?task_id=${task.task_id}" class="icon-btn map" title="View on Map" onclick="event.stopPropagation();"><i class="ph ph-compass"></i></a>` : ''}
                             <button class="icon-btn ${task.is_completed ? '' : 'complete'}" onclick="event.stopPropagation(); toggleComplete(${task.task_id}, ${!task.is_completed})">
-                                ${task.is_completed ? '<i class="ph ph-arrow-u-up-left"></i>' : '<i class="ph ph-check"></i>'}
+                                ${task.is_completed ? '<i class="ph ph-arrow-u-up-left"></i>' : '<i class="ph ph-check-circle"></i>'}
                             </button>
                         </div>
                     </div>
