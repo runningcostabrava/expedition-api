@@ -825,6 +825,13 @@
 
             window.initGoogleSearch = async () => {
                 try {
+                    // Defensive check for google maps core before importing library
+                    if (!window.google || !window.google.maps) {
+                        console.warn("Google Maps not ready, retrying library import...");
+                        setTimeout(window.initGoogleSearch, 500);
+                        return;
+                    }
+
                     // Explicitly load the Places library
                     const placesLib = await google.maps.importLibrary("places");
                     const { Place } = placesLib; 
@@ -846,10 +853,14 @@
                         background: rgba(255,255,255,0.1); 
                         color: white;
                         box-sizing: border-box;
+                        display: block;
                     `;
 
                     const container = document.getElementById('google-search-container');
-                    if (container) container.appendChild(searchInput);
+                    if (container) {
+                        container.innerHTML = ''; // Clear any existing items to prevent duplicates
+                        container.appendChild(searchInput);
+                    }
 
                     searchInput.addEventListener('keydown', async (e) => {
                         if (e.key === 'Enter') {
