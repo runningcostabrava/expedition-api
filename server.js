@@ -326,6 +326,55 @@ const aiTools = [
         required: ["new_memory_text"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_section",
+      description: "Create a new section/day for the itinerary.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Name of the day/section" },
+          section_date: { type: "string", description: "Date in YYYY-MM-DD format" },
+          description: { type: "string", description: "General notes for the day" }
+        },
+        required: ["title"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_category",
+      description: "Create a new visual category for tasks (e.g., Hiking, Transport).",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          color: { type: "string", description: "Hex color code, e.g., #3498db" },
+          icon: { type: "string", description: "Phosphor icon class, e.g., ph-car" },
+          line_type: { type: "string", enum: ["solid", "dashed", "dotted"] }
+        },
+        required: ["name"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_task_type",
+      description: "Create a new task type (e.g., Logistics, Briefing).",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          color: { type: "string" },
+          icon: { type: "string" }
+        },
+        required: ["name"]
+      }
+    }
   }
 ];
 
@@ -478,6 +527,27 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
                 else if (name === "update_core_memory") {
                     await pool.query('UPDATE ai_memory SET memory_text = $1 WHERE id = 1', [args.new_memory_text]);
                     toolResult = `SUCCESS: Permanent memory updated.`;
+                }
+                else if (name === "create_section") {
+                    const res = await pool.query(
+                        'INSERT INTO sections (title, section_date, description) VALUES ($1, $2, $3) RETURNING id',
+                        [args.title, args.section_date || null, args.description || null]
+                    );
+                    toolResult = `SUCCESS: Section created with ID ${res.rows[0].id}`;
+                }
+                else if (name === "create_category") {
+                    const res = await pool.query(
+                        'INSERT INTO categories (name, color, icon, line_type) VALUES ($1, $2, $3, $4) RETURNING id',
+                        [args.name, args.color || '#3498db', args.icon || 'ph-map-pin', args.line_type || 'solid']
+                    );
+                    toolResult = `SUCCESS: Category created with ID ${res.rows[0].id}`;
+                }
+                else if (name === "create_task_type") {
+                    const res = await pool.query(
+                        'INSERT INTO task_types (name, color, icon) VALUES ($1, $2, $3) RETURNING id',
+                        [args.name, args.color || '#95a5a6', args.icon || 'ph-tag']
+                    );
+                    toolResult = `SUCCESS: Task type created with ID ${res.rows[0].id}`;
                 }
             } catch (err) {
                 console.error(`[AI Tool Error] ${name}:`, err);
