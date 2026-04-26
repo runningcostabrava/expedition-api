@@ -181,6 +181,17 @@
         <button onclick="window.location.href='telemetry.html'"
             style="width:100%; margin-bottom: 15px; background:#3498db; color:white; border:none; padding:12px; border-radius:8px; cursor:pointer; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📊
             View Raw Data Logs</button>
+
+        <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:8px; color:#34495e;">Show Map
+            History (Tail)</label>
+        <select id="fleet-time-filter" onchange="window.forceFleetUpdate()"
+            style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; margin-bottom: 15px; font-weight: bold;">
+            <option value="15">Last 15 Minutes</option>
+            <option value="60" selected>Last 1 Hour</option>
+            <option value="240">Last 4 Hours</option>
+            <option value="720">Last 12 Hours</option>
+        </select>
+
         <div id="field-fleet-list" style="display: flex; flex-direction: column; gap: 10px;">Loading...</div>
     </div>
 
@@ -300,8 +311,6 @@
                 const selector = document.getElementById('day-selector');
                 selector.innerHTML = '<option value="all">🌍 Show All Days</option>';
                 sections.forEach(s => selector.innerHTML += `<option value="${s.id}">${s.title}</option>`);
-
-                setInterval(fetchTeamLocations, 10000); fetchTeamLocations();
 
                 // ---> NEW: Start transmitting MY location <---
                 startLocationBroadcast();
