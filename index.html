@@ -514,15 +514,15 @@
                 });
 
                 draw = new MapboxDraw({ displayControlsDefault: false, controls: { trash: true } });
-                map.addControl(draw);
-                map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+                map.addControl(draw, 'bottom-right');
+                map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
 
                 // --- NEW: NATIVE GPS TRACKING (BLUE DOT) ---
                 map.addControl(new mapboxgl.GeolocateControl({
                     positionOptions: { enableHighAccuracy: true },
                     trackUserLocation: true,
                     showUserHeading: true
-                }), 'top-right');
+                }), 'bottom-right');
 
                 // 1. Unified Click Handler for Routing and Analysis
                 map.on('click', async (e) => {
