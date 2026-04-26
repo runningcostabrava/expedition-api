@@ -423,11 +423,43 @@
                 parsedCharacteristics = marked.parse(task.characteristics, { renderer: renderer, breaks: true });
             }
 
+            // --- NEW: Generate sub-items (Tracks & Waypoints) ---
+            let geometryHtml = '';
+            if (task.geometries && task.geometries.length > 0) {
+                geometryHtml = `<div style="margin-top: 10px; border-top: 1px dashed #e2e8f0; padding-top: 10px;">`;
+
+                task.geometries.forEach(g => {
+                    const icon = g.kind === 'point' ? (g.icon || '📍') : (g.kind === 'polygon' ? '🛑' : '📈');
+                    let stats = '';
+
+                    // Format stats cleanly
+                    if (g.distance) stats += `📏 ${parseFloat(g.distance).toFixed(2)}km `;
+                    if (g.gain) stats += `▲ ${parseFloat(g.gain).toFixed(0)}m `;
+                    if (g.loss) stats += `▼ ${Math.abs(parseFloat(g.loss)).toFixed(0)}m`;
+
+                    geometryHtml += `
+                        <div style="background: #f8fafc; padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0;">
+                            <div style="min-width: 0; flex: 1;">
+                                <div style="font-weight: 600; font-size: 0.9em; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                    ${icon} ${g.title || 'Unnamed Location'}
+                                </div>
+                                ${stats ? `<div style="font-size: 0.8em; color: #64748b; margin-top: 2px;">${stats}</div>` : ''}
+                            </div>
+                            <div style="display: flex; gap: 5px;">
+                                ${g.link ? `<button onclick="window.open('${g.link}', '_blank')" class="icon-btn" style="width:28px; height:28px; font-size:0.9em; background:#38bdf8; color:white;">🌐</button>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                geometryHtml += `</div>`;
+            }
+
             row.innerHTML = `
                 <div class="task-title-bar">
                     <div class="task-title">${isSubtask ? '↳ ' : ''}${task.task_name}</div>
                 </div>
-                ${parsedCharacteristics ? `<div class="task-desc" style="overflow-wrap: anywhere;">${parsedCharacteristics}</div>` : ''}
+                ${parsedCharacteristics ? `<div class="task-desc" style="overflow-wrap: anywhere; margin-top: 8px;">${parsedCharacteristics}</div>` : ''}
+                ${geometryHtml}
                 <div class="task-meta-bar">
                     <div class="task-meta">
                         ${time ? `<span class="meta-badge">🕒 ${time}</span>` : ''}
