@@ -2982,6 +2982,13 @@
             const content = document.getElementById('task-detail-content');
             if (!panel || !content) return;
 
+            panel.classList.add('open');
+
+            // ON MOBILE: Hide the list panel so the details are full-screen
+            if (window.innerWidth <= 768) {
+                document.getElementById('left-panel').classList.add('hidden');
+            }
+
             // Wire up the edit button in the header
             const editBtn = document.getElementById('detail-edit-btn');
             if (editBtn) editBtn.onclick = () => openTaskEditor(task.task_id);
@@ -3092,6 +3099,11 @@
         function closeTaskDetailPanel() {
             const panel = document.getElementById('task-detail-panel');
             if (panel) panel.classList.remove('open');
+
+            // ON MOBILE: Bring the list back when details are closed
+            if (window.innerWidth <= 768) {
+                document.getElementById('left-panel').classList.remove('hidden');
+            }
             // Remove active highlighting from sidebar
             //document.querySelectorAll('.task-row, .fite-row').forEach(row => row.classList.remove('active-task'));
             // AppStore.set('activeTaskId', null);
