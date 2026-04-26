@@ -239,8 +239,6 @@ const OfflineManager = (() => {
     function toggleOSM() {
         const next = !osmVisible;
         setOSMVisible(next);
-        // When switching TO osm — immediately cache what's visible
-        if (next) downloadVisibleTiles();
     }
 
 
@@ -352,11 +350,12 @@ const OfflineManager = (() => {
         style.textContent = `
             #om-container {
                 position: fixed;
-                bottom: 80px;
-                right: 15px;
+                bottom: 150px; 
+                left: 15px;    
+                right: auto;
                 display: flex;
                 flex-direction: column;
-                align-items: flex-end;
+                align-items: flex-start;
                 gap: 8px;
                 z-index: 500;
                 font-family: sans-serif;

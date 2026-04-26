@@ -308,20 +308,16 @@
         </div>
     </div>
 
-    <div id="app-switcher" style="position: fixed; bottom: 45px; left: 15px; z-index: 100000;">
+    <div id="app-switcher" style="position: fixed; bottom: 80px; left: 15px; z-index: 100000;">
         <button onclick="document.getElementById('switcher-menu').classList.toggle('show')"
-            style="width: 45px; height: 45px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.3em; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;">📱</button>
+            style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;">📱</button>
         <div id="switcher-menu"
-            style="display: none; position: absolute; bottom: 55px; left: 0; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 220px; flex-direction: column; gap: 8px; border: 1px solid #e2e8f0;">
+            style="display: none; position: absolute; bottom: 65px; left: 0; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 220px; flex-direction: column; gap: 8px; border: 1px solid #e2e8f0;">
             <div style="font-size: 0.75em; font-weight: bold; color: #64748b; text-transform: uppercase; padding-left: 5px; margin-bottom: 2px;">Switch App</div>
-            <a href="index.html"
-                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">🗺️ Command Center</a>
-            <a href="field.html"
-                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">🧭 Field Map</a>
-            <a href="pm.html"
-                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">📋 Mobile PM</a>
-            <a href="telemetry.html"
-                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">📊 Telemetry</a>
+            <a href="index.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">🗺️ Command Center</a>
+            <a href="field.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">🧭 Field Map</a>
+            <a href="pm.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">📋 Mobile PM</a>
+            <a href="telemetry.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">📊 Telemetry</a>
         </div>
     </div>
     <style>
@@ -486,6 +482,62 @@
             chevron.classList.toggle('open');
         };
 
+        function exportTaskToGPX(taskId) {
+            const task = fullItinerary.find(t => t.task_id === taskId);
+            if (!task || !task.geometries || task.geometries.length === 0) return alert('No locations to export for this task.');
+
+            let gpx = '<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="ExpeditionApp">';
+            task.geometries.forEach(g => {
+                if (g.kind === 'point') {
+                    gpx += `<wpt lat="${g.lat}" lon="${g.lng}"><name>${(g.title || 'Waypoint').replace(/&/g, '&')}</name></wpt>`;
+                } else if (g.geojson) {
+                    gpx += `<trk><name>${(g.title || 'Track').replace(/&/g, '&')}</name><trkseg>`;
+                    const coords = g.geojson.features[0].geometry.type === 'Polygon' ? g.geojson.features[0].geometry.coordinates[0] : g.geojson.features[0].geometry.coordinates;
+                    coords.forEach(c => { gpx += `<trkpt lat="${c[1]}" lon="${c[0]}"><ele>${c[2] || 0}</ele></trkpt>`; });
+                    gpx += `</trkseg></trk>`;
+                }
+            });
+            gpx += '</gpx>';
+
+            triggerDownload(gpx, `${(task.task_name || 'export').replace(/[^a-z0-9]/gi, '_')}.gpx`);
+        }
+
+        function exportGeomToGPX(kind, id) {
+            let geom = null;
+            for (const t of fullItinerary) {
+                if (t.geometries) {
+                    const found = t.geometries.find(g => (kind === 'point' ? g.waypoint_id === id : g.track_id === id));
+                    if (found) { geom = found; break; }
+                }
+            }
+            if (!geom) return alert('Geometry not found.');
+
+            let gpx = '<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="ExpeditionApp">';
+            if (kind === 'point') {
+                gpx += `<wpt lat="${geom.lat}" lon="${geom.lng}"><name>${(geom.title || 'Waypoint').replace(/&/g, '&')}</name></wpt>`;
+            } else if (geom.geojson) {
+                gpx += `<trk><name>${(geom.title || 'Track').replace(/&/g, '&')}</name><trkseg>`;
+                const coords = geom.geojson.features[0].geometry.type === 'Polygon' ? geom.geojson.features[0].geometry.coordinates[0] : geom.geojson.features[0].geometry.coordinates;
+                coords.forEach(c => { gpx += `<trkpt lat="${c[1]}" lon="${c[0]}"><ele>${c[2] || 0}</ele></trkpt>`; });
+                gpx += `</trkseg></trk>`;
+            }
+            gpx += '</gpx>';
+
+            triggerDownload(gpx, `${(geom.title || 'export').replace(/[^a-z0-9]/gi, '_')}.gpx`);
+        }
+
+        function triggerDownload(content, filename) {
+            const blob = new Blob([content], { type: 'application/gpx+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
         function buildTaskRow(task, isSubtask) {
             const time = task.starts_at ? task.starts_at.substring(11, 16) : '';
             const hasMapData = task.geometries && task.geometries.length > 0;
@@ -522,7 +574,8 @@
                                 ${stats ? `<div style="font-size: 0.8em; color: #64748b; margin-top: 2px;">${stats}</div>` : ''}
                             </div>
                             <div style="display: flex; gap: 5px;">
-                                ${g.link ? `<button onclick="window.open('${g.link}', '_blank')" class="icon-btn" style="width:28px; height:28px; font-size:0.9em; background:#38bdf8; color:white;">🌐</button>` : ''}
+                                <button onclick="event.stopPropagation(); exportGeomToGPX('${g.kind}', ${g.waypoint_id || g.track_id})" class="icon-btn" style="width:28px; height:28px; font-size:0.9em; background:#f39c12; color:white;" title="Download GPX">📥</button>
+                                ${g.link ? `<button onclick="window.open('${g.link}', '_blank'); event.stopPropagation();" class="icon-btn" style="width:28px; height:28px; font-size:0.9em; background:#38bdf8; color:white;">🌐</button>` : ''}
                             </div>
                         </div>
                     `;
@@ -549,6 +602,7 @@
                             ${task.responsible ? `<span class="meta-badge">👤 ${task.responsible}</span>` : ''}
                         </div>
                         <div class="action-icons">
+                            ${hasMapData ? `<button class="icon-btn" style="background:#f39c12; color:white;" title="Download All GPX" onclick="event.stopPropagation(); exportTaskToGPX(${task.task_id})">📥</button>` : ''}
                             <button class="icon-btn edit" onclick="event.stopPropagation(); openTaskModal(${task.task_id})">✏️</button>
                             ${hasMapData ? `<a href="field.html?task_id=${task.task_id}" class="icon-btn map" title="View on Map" onclick="event.stopPropagation();">🗺️</a>` : ''}
                             <button class="icon-btn ${task.is_completed ? '' : 'complete'}" onclick="event.stopPropagation(); toggleComplete(${task.task_id}, ${!task.is_completed})">

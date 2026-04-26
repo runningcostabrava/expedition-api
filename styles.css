@@ -96,6 +96,12 @@ body {
     color: rgba(255, 255, 255, 0.6) !important;
 }
 
+#internal-search-results {
+    z-index: 99999 !important;
+    max-height: 50vh !important; /* Ensures it doesn't drop past the bottom of the screen */
+    border: 1px solid #cbd5e0;
+}
+
 /* 2. Left Panel: Light Glass */
 #left-panel {
     position: absolute;
@@ -1240,7 +1246,7 @@ body.zen-mode #fleet-panel {
         height: auto !important;
         padding: 12px !important; /* Added padding so inputs don't touch the glass edges */
         flex-wrap: nowrap !important;
-        overflow: hidden !important;
+        overflow: visible !important;
         flex-direction: column !important;
         align-items: stretch !important;
         gap: 10px !important;
