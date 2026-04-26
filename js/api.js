@@ -162,22 +162,34 @@ async function authFetch(url, options = {}) {
     }
 }
 
+// Function to ensure Mapbox recalculates its canvas size smoothly during CSS transitions
+function smoothMapResize() {
+    if (typeof map === 'undefined' || !map.resize) return;
+    const interval = setInterval(() => map.resize(), 30);
+    setTimeout(() => clearInterval(interval), 350); // Stop after CSS transition ends
+}
+
 window.closeAiChat = function() {
     const modal = document.getElementById('ai-multimodal-assistant');
     if (modal) {
         modal.classList.add('ai-chat-hidden');
-        setTimeout(() => { modal.style.display = 'none'; }, 300); // Wait for slide animation
+        document.body.classList.remove('ai-chat-open'); // Restore map width
+        smoothMapResize();
+        
+        setTimeout(() => { modal.style.display = 'none'; }, 300);
     }
 };
 
 window.openAiChat = function() {
     const modalId = 'ai-multimodal-assistant';
     
-    // 1. STATE PRESERVATION: If chat exists, just slide it back into view
+    // 1. STATE PRESERVATION: If chat exists, slide it back in
     const existingModal = document.getElementById(modalId);
     if (existingModal) {
         existingModal.style.display = 'flex';
-        // Small delay to allow display:flex to apply before animating transform
+        document.body.classList.add('ai-chat-open'); // Shrink map width
+        smoothMapResize();
+        
         setTimeout(() => {
             existingModal.classList.remove('ai-chat-hidden');
             document.getElementById('ai-prompt-text').focus();
@@ -185,11 +197,16 @@ window.openAiChat = function() {
         return;
     }
 
-    // 2. INJECT RESPONSIVE STYLES
+    // 2. INJECT DOCKED & RESPONSIVE STYLES
     if (!document.getElementById('ai-chat-styles')) {
         const style = document.createElement('style');
         style.id = 'ai-chat-styles';
         style.innerHTML = `
+            /* Smooth transitions for the UI elements being pushed */
+            #map-wrapper, #mobile-fab-container, #right-panel, #fleet-panel {
+                transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            }
+
             #ai-multimodal-assistant {
                 position: fixed;
                 z-index: 1000000;
@@ -207,17 +224,17 @@ window.openAiChat = function() {
                 pointer-events: auto; /* Chat is always clickable */
             }
             
-            /* DESKTOP: Snap to Right, Pass-through background */
+            /* DESKTOP: True Docked Panel */
             @media (min-width: 769px) {
                 #ai-multimodal-assistant {
-                    top: 85px; /* Clear command bar */
+                    top: 85px; 
                     right: 15px;
-                    bottom: 25px;
+                    bottom: 15px; /* Matches left-panel height */
                     width: 400px;
-                    pointer-events: none; /* Let clicks pass through to map/sidebar */
+                    pointer-events: none; /* Let clicks pass through background */
                 }
                 #ai-multimodal-assistant.ai-chat-hidden {
-                    transform: translateX(450px); /* Slide off screen */
+                    transform: translateX(450px);
                 }
                 .ai-chat-box {
                     width: 100%;
@@ -226,9 +243,19 @@ window.openAiChat = function() {
                     border: 1px solid rgba(0,0,0,0.1);
                     box-shadow: 0 20px 40px rgba(0,0,0,0.4);
                 }
+
+                /* --- THE MAGIC: Shrink map and push UI when chat is open --- */
+                body.ai-chat-open #map-wrapper {
+                    right: 430px !important; /* Physically shrinks the map canvas */
+                }
+                body.ai-chat-open #mobile-fab-container,
+                body.ai-chat-open #right-panel,
+                body.ai-chat-open #fleet-panel {
+                    right: 430px !important; /* Pushes floating buttons/panels left */
+                }
             }
             
-            /* MOBILE: Centered Modal with Dark Backdrop */
+            /* MOBILE: Centered Modal */
             @media (max-width: 768px) {
                 #ai-multimodal-assistant {
                     inset: 0;
@@ -237,10 +264,10 @@ window.openAiChat = function() {
                     align-items: center;
                     justify-content: center;
                     padding: 15px;
-                    pointer-events: auto; /* Block background clicks */
+                    pointer-events: auto;
                 }
                 #ai-multimodal-assistant.ai-chat-hidden {
-                    transform: translateY(100%); /* Slide down */
+                    transform: translateY(100%);
                 }
                 .ai-chat-box {
                     width: 100%;
@@ -279,7 +306,6 @@ window.openAiChat = function() {
             </div>
 
             <div style="background: white; padding: 12px 15px; border-top: 1px solid #cbd5e0; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0;">
-                
                 <div id="ai-attachment-preview" style="display:none; align-items:center; justify-content:space-between; background:#f1f5f9; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0; font-size:0.85em;">
                     <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
                         <span style="font-size:1.2em;">📎</span>
@@ -287,20 +313,19 @@ window.openAiChat = function() {
                     </div>
                     <button onclick="window.clearAiAttachment()" style="background:none; border:none; color:#ef4444; cursor:pointer; font-weight:bold; font-size:1.2em; padding:0 5px;">×</button>
                 </div>
-
                 <div style="display: flex; gap: 8px; align-items: flex-end;">
                     <input type="file" id="ai-image-upload" accept="image/*" style="display: none;">
-                    
                     <button onclick="document.getElementById('ai-image-upload').click()" style="background: #f8fafc; color: #475569; border: 1px solid #cbd5e0; border-radius: 50%; width: 42px; height: 42px; display:flex; align-items:center; justify-content:center; cursor: pointer; flex-shrink: 0; font-size:1.2em; transition:0.2s;">➕</button>
-                    
                     <textarea id="ai-prompt-text" rows="1" placeholder="Message..." style="flex: 1; padding: 12px 15px; border: 1px solid #cbd5e0; border-radius: 20px; font-family: inherit; resize: none; overflow-y:hidden; box-sizing: border-box; font-size:0.95em; outline:none; max-height:120px;" oninput="this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 120) + 'px';"></textarea>
-                    
                     <button id="ai-submit-btn" style="background: #27ae60; color: white; border: none; border-radius: 50%; width: 42px; height: 42px; display:flex; align-items:center; justify-content:center; cursor: pointer; flex-shrink: 0; font-size:1.2em; box-shadow: 0 4px 10px rgba(39,174,96,0.3); transition:transform 0.1s;">➤</button>
                 </div>
             </div>
         </div>
     `;
+    
     document.body.appendChild(modal);
+    document.body.classList.add('ai-chat-open'); // Trigger layout shift
+    smoothMapResize(); // Ensure map scales cleanly
 
     const textarea = document.getElementById('ai-prompt-text');
     const history = document.getElementById('ai-chat-history');
