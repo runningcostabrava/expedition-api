@@ -3,8 +3,6 @@ let liveFleetMarkers = {}; // Stores the Emoji HTML markers
 
 // 1. Toggle the UI Panel
 window.toggleFleetPanel = function () {
-    if (document.body.classList.contains('zen-mode')) window.toggleZenMode();
-
     const panel = document.getElementById('fleet-panel');
     const isHidden = panel.classList.contains('hidden');
 

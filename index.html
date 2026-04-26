@@ -47,27 +47,17 @@
             &times;</div>
     </div>
 
-    <button id="zen-toggle-btn" onclick="toggleZenMode()" title="Toggle Zen Mode">
-        🗺️
-    </button>
     <script>
         window.getResponsivePadding = function () {
             const isMobile = window.innerWidth <= 768;
-            const isZen = document.body.classList.contains('zen-mode');
             const leftHidden = document.getElementById('left-panel').classList.contains('hidden');
             const leftWide = document.getElementById('left-panel').classList.contains('wide');
 
             if (isMobile) {
-                // If Zen mode is on, no bottom sheet is there. Use the whole screen.
-                return isZen
-                    ? { top: 20, bottom: 20, left: 20, right: 20 }
-                    : { top: 180, bottom: window.innerHeight * 0.75 + 20, left: 20, right: 20 };
+                return { top: 180, bottom: window.innerHeight * 0.75 + 20, left: 20, right: 20 };
             } else {
-                // Desktop: calculate padding strictly based on actual sidebar state
-                let leftPad = 20; // Default small gap if hidden
-                if (!isZen && !leftHidden) {
-                    leftPad = leftWide ? 620 : 420;
-                }
+                let leftPad = 20;
+                if (!leftHidden) leftPad = leftWide ? 620 : 420;
                 return { top: 80, bottom: 80, left: leftPad, right: 80 };
             }
         };
@@ -432,9 +422,6 @@
         };
 
         function openRightPanel(title, htmlContent) {
-            if (document.body.classList.contains('zen-mode')) {
-                window.toggleZenMode();
-            }
             document.getElementById('right-panel-title').innerHTML = title;
             document.getElementById('right-panel-content').innerHTML = htmlContent;
             document.getElementById('right-panel').classList.remove('hidden');
@@ -1650,11 +1637,6 @@
             }
 
             function cycleSidebar() {
-                // Force exit Zen Mode if it's active so the user can see what they are toggling
-                if (document.body.classList.contains('zen-mode')) {
-                    window.toggleZenMode();
-                }
-
                 const panel = document.getElementById('left-panel');
                 if (window.innerWidth <= 768) {
                     panel.classList.toggle('hidden');
@@ -2961,9 +2943,6 @@
             }
 
             function openTaskDetailPanel(task) {
-                if (document.body.classList.contains('zen-mode')) {
-                    window.toggleZenMode();
-                }
                 const panel = document.getElementById('task-detail-panel');
                 const content = document.getElementById('task-detail-content');
                 if (!panel || !content) return;
@@ -3416,28 +3395,6 @@
                 document.getElementById('lightbox-modal').style.display = 'flex';
             };
 
-            window.toggleZenMode = function () {
-                const body = document.body;
-                const btn = document.getElementById('zen-toggle-btn');
-
-                // Toggle the class
-                const isZen = body.classList.toggle('zen-mode');
-
-                // Visual feedback on the button
-                btn.innerHTML = isZen ? '🔍' : '🗺️';
-
-                // Notify the user
-                if (typeof showToast !== 'undefined') {
-                    showToast(isZen ? "Map Focus Enabled" : "UI Restored", "info");
-                }
-
-                // Wait for the CSS sliding transition to finish (300ms),
-                // then force Mapbox to recalculate its canvas size so it fills the screen perfectly.
-                setTimeout(() => {
-                    if (typeof map !== 'undefined' && map) map.resize();
-                }, 350);
-            };
-
             window.renderAttachmentManager = function (textareaId, containerId) {
                 const textarea = document.getElementById(textareaId);
                 const container = document.getElementById(containerId);
@@ -3520,8 +3477,6 @@
     <style>
         #switcher-menu.show { display: flex !important; }
         #switcher-menu a:hover { background: #e2e8f0 !important; }
-        /* Hide the switcher when Zen Mode is active in the main app */
-        body.zen-mode #app-switcher { transform: translateX(-150%); opacity: 0; pointer-events: none; }
     </style>
 </body>
 
