@@ -280,6 +280,7 @@
 
         let map, elevationChartInstance = null;
         let isDroppingPin = false;
+        let itineraryMarkers = []; // NEW: Array to store only itinerary markers
 
         async function initFieldMap() {
             try {
@@ -502,12 +503,13 @@
         }
 
         async function loadDayTracks(sectionId) {
-            // 1. Clean up existing layers and markers
+            // 1. Clean up existing layers
             if (map.getLayer('daily-route')) map.removeLayer('daily-route');
             if (map.getSource('daily-route')) map.removeSource('daily-route');
-            
-            // Remove existing markers (standardized way)
-            document.querySelectorAll('.mapboxgl-marker').forEach(m => m.remove());
+
+            // 2. SELECTIVE CLEANUP: Remove only itinerary markers, NOT guide markers
+            itineraryMarkers.forEach(m => m.remove());
+            itineraryMarkers = [];
 
             const url = sectionId === 'all' ? `${API_URL}/itinerary` : `${API_URL}/itinerary?section_id=${sectionId}`;
             const res = await fetch(url);
@@ -530,7 +532,7 @@
                     // Process Waypoints (Points)
                     if (g.kind === 'point' && g.lng && g.lat) {
                         boundsFeatures.push(turf.point([g.lng, g.lat]));
-                        
+
                         const el = document.createElement('div');
                         el.innerHTML = `<div style="background:${g.color || '#3498db'}; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3); font-size:12px;">${g.icon || '📍'}</div>`;
 
@@ -540,7 +542,14 @@
                                 <button onclick="window.location.href='pm.html?task_id=${task.task_id}'" style="background:#0f172a; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.9em;">⬅️ Back to Task</button>
                             </div>
                         `;
-                        new mapboxgl.Marker({ element: el }).setLngLat([g.lng, g.lat]).setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML(popupHtml)).addTo(map);
+
+                        // NEW: Save the marker to the array so we can delete it later without touching guides
+                        const marker = new mapboxgl.Marker({ element: el })
+                            .setLngLat([g.lng, g.lat])
+                            .setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML(popupHtml))
+                            .addTo(map);
+
+                        itineraryMarkers.push(marker);
                     }
                 });
             });
