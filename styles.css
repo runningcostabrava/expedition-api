@@ -1256,15 +1256,25 @@ body.zen-mode #fleet-panel {
         gap: 10px !important;
     }
 
-    /* 2. Constrain the Search Group width so it doesn't crowd the right-side buttons */
+    /* styles.css (Inside the @media block) */
     #search-group {
+        display: none !important;
+        /* Hidden by default on mobile */
+    }
+
+    #search-group.show-mobile {
         display: flex !important;
         flex-direction: column !important;
-        gap: 8px !important;
-        width: 100% !important;
-        max-width: 82% !important;
-        /* Prevents overlap with right buttons */
-        align-self: flex-start;
+        position: absolute;
+        top: 70px;
+        /* Sits just below the top bar */
+        left: 10px;
+        right: 10px;
+        background: var(--glass-dark);
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: var(--card-shadow);
+        z-index: 1000;
     }
 
     #task-detail-panel {
