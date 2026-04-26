@@ -73,6 +73,34 @@ body, input, button, select, textarea, .inline-edit {
     z-index: 160;
 }
 
+/* --- ENHANCED DESKTOP ACTION BUTTONS (Robot, Car, Upload, etc.) --- */
+#mobile-fab-container .action-btn-modern {
+    font-size: 1.4em !important;            /* Make icons significantly bigger */
+    background: rgba(255, 255, 255, 0.15) !important; /* Sleek translucent white background */
+    color: white !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 8px !important;
+    width: 42px !important;                 /* Uniform square size */
+    height: 42px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all 0.2s ease !important;
+}
+
+/* Add a nice lift and glow effect when hovered */
+#mobile-fab-container .action-btn-modern:hover {
+    background: rgba(255, 255, 255, 0.3) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Preserve the bright red color specifically for the Camera/GPS button */
+#mobile-fab-container .action-btn-modern[title="Mark Current Location"] {
+    background: #ef4444 !important;
+    border-color: #ef4444 !important;
+}
+
 /* Overrides for dark bar legibility */
 #command-bar div[style*="color: #0f172a"] {
     color: white !important;
