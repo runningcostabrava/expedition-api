@@ -1258,8 +1258,11 @@ body.zen-mode #fleet-panel {
         box-sizing: border-box !important;
     }
 
-    #command-bar>div:first-child {
-        display: none !important;
+    #style-switcher select {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        font-size: 1em !important;
+        padding: 10px !important;
     }
 
     /* Hide 'EXPEDITION v2' text */
