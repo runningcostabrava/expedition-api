@@ -48,11 +48,12 @@ body {
     z-index: 150 !important;
     display: flex;
     align-items: center;
-    /* Leave a 320px gap on the right so it doesn't overlap our newly extracted buttons */
-    padding: 0 320px 0 15px;
+    /* Remove the hardcoded 320px gap */
+    padding: 0 15px;
     box-shadow: var(--card-shadow);
     gap: 15px;
     color: white;
+    justify-content: space-between; /* Pushes brand left, search center, FABs right */
 }
 
 /* Base Desktop Styling for the newly extracted FAB container */
@@ -90,6 +91,20 @@ body {
     background: rgba(255, 255, 255, 0.1) !important;
     border: 1px solid rgba(255, 255, 255, 0.2) !important;
     color: white !important;
+}
+
+#search-group {
+    display: flex;
+    flex-direction: row !important; /* Boxes next to each other */
+    gap: 15px;
+    flex: 1;
+    max-width: 700px; /* Prevents them from getting too wide */
+    margin: 0 20px;
+}
+
+#internal-map-search, 
+#google-search-container {
+    flex: 1; /* Both boxes take equal width */
 }
 
 #internal-map-search::placeholder {
