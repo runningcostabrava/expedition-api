@@ -2,6 +2,8 @@ let activeCategoryIdForEdit = null;
 const API_URL = 'https://mapbox-api-uz9a.onrender.com';
 let AUTH_TOKEN = sessionStorage.getItem('expedition_token');
 
+let aiConversationMemory = [];
+
 function showToast(message, type = 'success') {
     const toast = document.createElement('div');
     toast.style.cssText = `
@@ -431,12 +433,20 @@ window.openAiChat = function() {
             const res = await authFetch(`${API_URL}/api/ai/command`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: promptText, imageUrl: uploadedImageUrl })
+                body: JSON.stringify({ 
+                    prompt: promptText, 
+                    imageUrl: uploadedImageUrl,
+                    history: aiConversationMemory // Inject memory here!
+                })
             });
             
             if (!res || res.status === 401) throw new Error("Unauthorized"); 
             const data = await res.json();
             if (data.error) throw new Error(data.error);
+
+            // Save the exchange to short-term memory
+            aiConversationMemory.push({ role: 'user', content: promptText });
+            aiConversationMemory.push({ role: 'assistant', content: data.message });
 
             typingIndicator.remove();
             appendMessage('ai', data.message);

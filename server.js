@@ -292,7 +292,7 @@ const aiTools = [
 ];
 
 app.post('/api/ai/command', adminAuth, async (req, res) => {
-  const { prompt, imageUrl } = req.body;
+  const { prompt, imageUrl, history = [] } = req.body;
   if (!prompt && !imageUrl) return res.status(400).json({ error: "Prompt or Image is required" });
 
   try {
@@ -353,9 +353,8 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
     const currentTasks = await pool.query(currentTasksQuery);
     const contextString = JSON.stringify(currentTasks.rows);
 
-    const response = await deepseek.chat.completions.create({
-      model: "deepseek-chat",
-      messages: [
+    // --- DEEPSEEK BRAIN ---
+    const messages = [
         { 
           role: "system", 
           content: `You are an expert logistics coordinator for mountain guides. 
@@ -363,15 +362,25 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
           Current Active Tasks (with Map Data): ${contextString}.
           
           RULES:
-          1. Answer questions about the route, distances, elevation (gain/loss), attachments, or locations using the 'map_data' provided in the tasks.
-          2. If a user references a day by name (e.g., 'the day we go to Selinunte'), look up the correct Section ID and section_date from the Expedition Days list.
-          3. When creating or moving a task for a specific day, combine the section_date with the requested time to form the correct ISO timestamp (YYYY-MM-DDTHH:mm:ss.000Z), and include the section_id.
-          4. If modifying an existing task, find the exact 'id' from the Active Tasks list.
+          1. NEVER output raw database IDs (e.g., "Task ID 400") to the user. Always refer to tasks naturally by their 'task_name' and the associated Section Title (e.g., "the Run Long on Day 3").
+          2. Maintain conversational context based on the user's history.
+          3. Answer questions about the route, distances, or locations using the 'map_data'.
+          4. When creating or moving a task for a specific day, combine the section_date with the requested time to form the correct ISO timestamp (YYYY-MM-DDTHH:mm:ss.000Z), and include the section_id.
           5. 'Fite' means milestone (set is_milestone true).
-          6. If the user provides raw OCR text from a receipt, ticket, or screenshot, automatically extract the logical tasks, times, and notes and use the tools to add them to the itinerary.` 
-        },
-        { role: "user", content: finalPrompt }
-      ],
+          6. Automatically extract logical tasks from OCR text.` 
+        }
+    ];
+
+    // Inject the last 10 messages of conversational history
+    const recentHistory = history.slice(-10);
+    recentHistory.forEach(msg => messages.push({ role: msg.role, content: msg.content }));
+
+    // Add the newest prompt
+    messages.push({ role: "user", content: finalPrompt });
+
+    const response = await deepseek.chat.completions.create({
+      model: "deepseek-chat",
+      messages: messages,
       tools: aiTools,
       tool_choice: "auto"
     });
