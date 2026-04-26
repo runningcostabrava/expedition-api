@@ -1459,9 +1459,8 @@ body.zen-mode #fleet-panel {
     }
 }
 
-/* Force iOS to treat UI panels as top-level layers */
+/* FIX: Use will-change instead of transform: translateZ to avoid visibility overrides */
 #left-panel, #task-detail-panel, #right-panel, #app-switcher, #om-container {
-    -webkit-transform: translateZ(0);
-    transform: translateZ(0);
     will-change: transform;
+    -webkit-font-smoothing: antialiased;
 }
