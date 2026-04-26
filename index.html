@@ -682,6 +682,10 @@
                     // 1. Don't trigger if they right-click while drawing a route
                     if (isAnalyzingSegment || isRouting || isEditingGeometry) return;
 
+                    const activeTaskId = AppStore.get('activeTaskId');
+                    const activeTask = activeTaskId ? AppStore.get('itinerary').find(t => t.task_id === activeTaskId) : null;
+                    const searchName = activeTask ? activeTask.task_name : 'trails';
+
                     const { lng, lat } = e.lngLat;
 
                     // 2. Clear any existing popups to keep the UI clean
@@ -704,7 +708,7 @@
                                         onclick="openStreetView(${lat}, ${lng}); this.closest('.mapboxgl-popup').remove();">
                                     🚶‍♂️ Street View Here
                                 </button>
-                                <button class="popup-btn" style="width: 100%; background: #84cc16; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s; margin-top: 5px;" onclick="window.open('https://www.wikiloc.com/trails/outdoor?q=' + encodeURIComponent('${task.task_name}') + '+near:' + ${lat} + ',' + ${lng}, '_blank'); this.closest('.mapboxgl-popup').remove();">⛰️ View on Wikiloc</button>
+                                <button class="popup-btn" style="width: 100%; background: #84cc16; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s; margin-top: 5px;" onclick="window.open('https://www.wikiloc.com/trails/outdoor?q=' + encodeURIComponent('${searchName}') + '+near:' + ${lat} + ',' + ${lng}, '_blank'); this.closest('.mapboxgl-popup').remove();">⛰️ View on Wikiloc</button>
                             </div>
                         `)
                         .addTo(map);
