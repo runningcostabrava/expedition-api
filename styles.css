@@ -1261,8 +1261,18 @@ body.zen-mode #fleet-panel {
         flex-direction: column !important;
         gap: 8px !important;
         width: 100% !important;
-        max-width: 82% !important; /* Prevents overlap with right buttons */
+        max-width: 82% !important;
+        /* Prevents overlap with right buttons */
         align-self: flex-start;
+    }
+
+    #task-detail-panel {
+        z-index: 200 !important;
+        /* Ensure details sit on top of everything */
+    }
+
+    #left-panel {
+        z-index: 180 !important;
     }
 
     /* Ensure the Google container has height and visibility */
