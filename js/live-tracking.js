@@ -52,7 +52,7 @@ window.fetchFleetDirectory = async function () {
             card.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div style="font-weight: bold; color: #1e293b; font-size: 1.05em;">
-                        ${d.icon || '🏃‍♂️'} ${d.display_name}
+                        ${(d.icon && d.icon.startsWith('ph-')) ? `<i class="ph ${d.icon}"></i>` : (d.icon || '🏃‍♂️')} ${d.display_name}
                     </div>
                     <button onclick="event.stopPropagation(); toggleDeviceVisibility(${d.id}, ${!d.is_visible})" style="background: none; border: none; cursor: pointer; font-size: 1.2em;" title="Toggle Map Visibility">
                         ${d.is_visible ? '<i class="ph ph-eye"></i>' : '<i class="ph ph-eye-slash"></i>'}
@@ -176,7 +176,7 @@ async function fetchAndDrawTelemetry() {
                         box-shadow: 0 0 10px ${track.color}80;
                         font-size: ${Math.max(12, track.icon_size - 10)}px;
                     ">
-                        ${track.icon}
+                        ${track.icon && track.icon.startsWith('ph-') ? `<i class="ph ${track.icon}"></i>` : (track.icon || '🏃‍♂️')}
                     </div>
                     <div class="fleet-label-container" style="
                         position: absolute;

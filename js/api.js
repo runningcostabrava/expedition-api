@@ -224,6 +224,7 @@ window.openAiChat = function() {
                 flex-direction: column;
                 overflow: hidden;
                 pointer-events: auto; /* Chat is always clickable */
+                font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             }
             
             /* DESKTOP: True Docked Panel */

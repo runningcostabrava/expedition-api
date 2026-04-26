@@ -277,12 +277,16 @@ const aiTools = [
           id: { type: "integer", description: "The database ID of the task to update" },
           updates: {
             type: "object",
+            description: "The fields to update. Allowed fields: task_name, section_id, starts_at, responsible, is_completed, is_milestone, characteristics, comments.",
             properties: {
               task_name: { type: "string" },
-              section_id: { type: "integer" },
-              starts_at: { type: "string" },
-              responsible: { type: "string" },
-              is_completed: { type: "boolean" }
+              section_id: { type: "integer", nullable: true },
+              starts_at: { type: "string", nullable: true },
+              responsible: { type: "string", nullable: true },
+              is_completed: { type: "boolean" },
+              is_milestone: { type: "boolean" },
+              characteristics: { type: "string", description: "The description or main notes of the task." },
+              comments: { type: "string", description: "Internal comments or attachments." }
             }
           }
         },
@@ -384,7 +388,8 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
           5. GEOMETRY: Answer questions about the route, distances, or locations using the 'map_data'.
           6. SEARCH: If asked to find information you don't know, use the 'search_internet' tool first, read the results, and then fulfill the user's request.
           7. TIME: When creating or moving a task for a specific day, combine the section_date with the requested time to form the correct ISO timestamp (YYYY-MM-DDTHH:mm:ss.000Z), and include the section_id.
-          8. VOCAB: 'Fite' means milestone (set is_milestone true).` 
+          8. VOCAB: 'Fite' means milestone (set is_milestone true).
+          9. CHATTY SEARCH: If the user asks you to look up information or read a website, you MUST write a human-readable summary of what you found in your final reply. Never silently complete the action.` 
         }
     ];
 

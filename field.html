@@ -12,6 +12,7 @@
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
 
     <script src="/js/api.js"></script>
     <script src="/js/offline-manager.js"></script>
@@ -23,7 +24,7 @@
             padding: 0;
             overflow: hidden;
             background: #0f172a;
-            font-family: sans-serif;
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
 
         #map {
@@ -186,16 +187,16 @@
     </div>
 
     <div
-        style="position: absolute; top: 85px; right: 15px; display: flex; flex-direction: column; gap: 15px; z-index: 100;">
-        <button class="fab-fleet" style="position: static; width: 44px; height: 44px; background: #8b5cf6;" onclick="processAiCommand()"><i class="ph ph-robot"></i></button>
-        <button class="fab-pin" style="position: static; width: 44px; height: 44px; margin: 0;"
+        style="position: absolute; top: 85px; right: 15px; display: flex; flex-direction: column; gap: 8px; z-index: 100;">
+        <button class="fab-fleet" style="position: static; width: 36px; height: 36px; background: #8b5cf6;" onclick="processAiCommand()"><i class="ph ph-robot"></i></button>
+        <button class="fab-pin" style="position: static; width: 36px; height: 36px; margin: 0;"
             onclick="enableDropPinMode()"><i class="ph ph-map-pin"></i></button>
-        <button class="fab-fleet" style="position: static; width: 44px; height: 44px; margin: 0;"
+        <button class="fab-fleet" style="position: static; width: 36px; height: 36px; margin: 0;"
             onclick="openFieldFleet()"><i class="ph ph-radar"></i></button>
-        <button id="fab-record" class="fab-fleet" style="position: static; width: 44px; height: 44px; margin: 0; background: #e74c3c;"
+        <button id="fab-record" class="fab-fleet" style="position: static; width: 36px; height: 36px; margin: 0; background: #e74c3c;"
             onclick="toggleRecording()"><i class="ph ph-record"></i></button>
         <button onclick="map.setTerrain(null); map.setPitch(0); showToast('3D Disabled (Stability Mode)', 'info')" 
-                style="background: #34495e; color: white; border-radius: 50%; width: 44px; height: 44px; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
+                style="background: #34495e; color: white; border-radius: 50%; width: 36px; height: 36px; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
             2D
         </button>
     </div>
@@ -255,7 +256,7 @@
         </div>
     </div>
 
-    <div id="app-switcher" style="position: fixed; bottom: 80px; left: 15px; z-index: 100000;">
+    <div id="app-switcher" style="position: fixed; bottom: 25px; left: 15px; z-index: 100000;">
         <button onclick="document.getElementById('switcher-menu').classList.toggle('show')"
             style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;"><i class="ph ph-squares-four"></i></button>
         <div id="switcher-menu"
@@ -279,6 +280,12 @@
     <script>
         // NOTE: API_URL, AUTH_TOKEN, and authFetch() are inherited natively from /js/api.js
         // DO NOT redeclare them here or it will crash.
+
+        window.getSafeIconHtml = function(iconVal, fallbackClass, isFill = false) {
+            const val = (iconVal && iconVal !== 'marker' && iconVal.trim() !== '') ? iconVal : fallbackClass;
+            if (val.startsWith('ph-')) return `<i class="ph ${val} ${isFill ? 'ph-fill' : ''}"></i>`;
+            return val; 
+        };
 
         let map, elevationChartInstance = null;
         let isDroppingPin = false;
@@ -547,7 +554,8 @@
                         boundsFeatures.push(turf.point([g.lng, g.lat]));
 
                         const el = document.createElement('div');
-                        el.innerHTML = `<div style="background:${g.color || '#3498db'}; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3); font-size:12px;"><i class="ph ${g.icon || 'ph-map-pin'} ph-fill"></i></div>`;
+                        const iconHtml = window.getSafeIconHtml(g.icon, 'ph-map-pin', true);
+                        el.innerHTML = `<div style="background:${g.color || '#3498db'}; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3); font-size:12px;">${iconHtml}</div>`;
 
                         const popupHtml = `
                             <div style="text-align: center;">

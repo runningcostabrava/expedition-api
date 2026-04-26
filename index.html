@@ -1327,6 +1327,10 @@
                                     </div>
                                 </div>
                     <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display:flex; gap:10px; margin-bottom: 10px;">
+                        <button onclick="exportTaskToGPX(${task.task_id})" style="flex:1; background:#f39c12; color:white; border:none; border-radius:6px; padding:10px; cursor:pointer; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"><i class="ph ph-download-simple"></i> GPX</button>
+                        <button onclick="exportTaskToKML(${task.task_id})" style="flex:1; background:#3498db; color:white; border:none; border-radius:6px; padding:10px; cursor:pointer; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"><i class="ph ph-globe"></i> KML</button>
+                    </div>
                         ${geom.link ? `<button onclick="window.open('${geom.link.startsWith('http') ? geom.link : 'https://' + geom.link}', '_blank')" style="width:100%; background:#10b981; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; margin-bottom: 10px;">🔗 Open Track Link</button>` : ''}
                         <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="width:100%; background:#f59e0b; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; margin-bottom: 10px;">🗺️ Edit Route Geometry</button>
                         <button onclick="openGeomEditor('${geom.kind}', ${geom.waypoint_id || geom.track_id})" style="width:100%; background:#0ea5e9; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">✏️ Edit Metadata</button>
@@ -1639,6 +1643,10 @@
                         </div>
                     </div>
                     <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display:flex; gap:10px; margin-bottom: 10px;">
+                        <button onclick="exportTaskToGPX(${task.task_id})" style="flex:1; background:#f39c12; color:white; border:none; border-radius:6px; padding:10px; cursor:pointer; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"><i class="ph ph-download-simple"></i> GPX</button>
+                        <button onclick="exportTaskToKML(${task.task_id})" style="flex:1; background:#3498db; color:white; border:none; border-radius:6px; padding:10px; cursor:pointer; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"><i class="ph ph-globe"></i> KML</button>
+                    </div>
                         ${geom.link ? `<button onclick="window.open('${geom.link.startsWith('http') ? geom.link : 'https://' + geom.link}', '_blank')" style="width:100%; background:#10b981; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; margin-bottom: 10px;">🔗 Open Track Link</button>` : ''}
                         <button onclick="startEditGeometry(${task.task_id}, ${geom.anchor_id})" style="width:100%; background:#f59e0b; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; margin-bottom: 10px;">🗺️ Edit Route Geometry</button>
                         <button onclick="openGeomEditor('${geom.kind}', ${geom.waypoint_id || geom.track_id})" style="width:100%; background:#0ea5e9; color:white; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">⚙️ Edit Metadata</button>
