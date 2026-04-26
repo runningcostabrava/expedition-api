@@ -688,6 +688,11 @@
                     const activeTask = activeTaskId ? AppStore.get('itinerary').find(t => t.task_id === activeTaskId) : null;
                     const searchName = activeTask ? activeTask.task_name : 'trails';
 
+                    const offset = 0.01; // Creates roughly a 1km bounding box
+                    const sw = (lat - offset) + '%2C' + (lng - offset);
+                    const ne = (lat + offset) + '%2C' + (lng + offset);
+                    const wikilocUrl = `https://www.wikiloc.com/wikiloc/map.do?sw=${sw}&ne=${ne}&page=1`;
+
                     // 2. Clear any existing popups to keep the UI clean
                     const popups = document.getElementsByClassName("mapboxgl-popup");
                     while (popups.length > 0) popups[0].remove();
@@ -709,7 +714,7 @@
                                     🚶‍♂️ Street View Here
                                 </button>
                                 <button class="popup-btn" style="width: 100%; background: #84cc16; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s; margin-top: 5px;" 
-                                        onclick="window.open('https://www.wikiloc.com/wikiloc/find.do?near=' + ${lat} + ',' + ${lng} + '&q=' + encodeURIComponent('${searchName.replace(/'/g, "\\'")}'), '_blank'); this.closest('.mapboxgl-popup').remove();">
+                                        onclick="window.open('${wikilocUrl}', '_blank'); this.closest('.mapboxgl-popup').remove();">
                                     ⛰️ View on Wikiloc
                                 </button>
                             </div>
