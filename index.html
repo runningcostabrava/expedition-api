@@ -693,10 +693,6 @@
                 });
 
                 map.on('load', () => {
-                    map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
-                    map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
-                    map.setLight({ anchor: 'map' });
-                    map.addLayer({ 'id': 'sky', 'type': 'sky', 'paint': { 'sky-type': 'atmosphere', 'sky-atmosphere-sun-intensity': 15 } });
                     refreshData();
 
 
@@ -2073,19 +2069,30 @@
                 }
             }
 
-            function changeMapStyle(style) {
+            window.changeMapStyle = function (style) {
                 map.setStyle(style);
                 map.once('style.load', () => {
-                    // Re-inject 3D Terrain
-                    if (!map.getSource('mapbox-dem')) {
-                        map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
+                    // Only activate 3D Terrain on the Satellite view
+                    if (style.includes('satellite')) {
+                        if (!map.getSource('mapbox-dem')) {
+                            map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
+                        }
+                        map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
+                        map.setLight({ anchor: 'map' });
+                        if (!map.getLayer('sky')) {
+                            map.addLayer({ 'id': 'sky', 'type': 'sky', 'paint': { 'sky-type': 'atmosphere', 'sky-atmosphere-sun-intensity': 15 } });
+                        }
+                    } else {
+                        // Revert to flat 2D for all other styles
+                        map.setTerrain(null);
+                        if (map.getLayer('sky')) map.removeLayer('sky');
                     }
-                    map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
 
-                    // Re-render all your tracks and waypoints from the database
-                    renderMapGeometries();
+                    // Re-render map data
+                    if (typeof renderMapGeometries === 'function') renderMapGeometries();
+                    if (typeof loadDayTracks === 'function') loadDayTracks(document.getElementById('day-selector').value || 'all');
                 });
-            }
+            };
 
             document.getElementById('unified-save-btn').onclick = async () => {
                 // 1. Grab the ID first so we can fetch existing data
