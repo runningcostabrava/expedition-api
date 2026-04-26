@@ -377,11 +377,14 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
           Current Active Tasks (with Map Data): ${contextString}.
           
           RULES:
-          1. NEVER output raw database IDs. Refer to tasks naturally by 'task_name' and Section Title.
-          2. Maintain conversational context based on the user's history.
-          3. Answer questions about the route, distances, or locations using the 'map_data'.
-          4. If asked to find information you don't know (history, weather, facts), ALWAYS use the 'search_internet' tool first, read the results, and then fulfill the user's request (like updating a task's characteristics).
-          5. 'Fite' means milestone (set is_milestone true).` 
+          1. SECRECY: Keep all database IDs strictly internal. Do not EVER write "Task ID", "Section ID", or numbers like "341" in your text replies.
+          2. FORMATTING: When referring to tasks, use bullet points and bold text like this: **[Day/Section] - [Task Name]**.
+          3. TONE: Speak like a human assistant on WhatsApp. Be concise, clear, and avoid robotic robotic database jargon.
+          4. CONTEXT: Maintain conversational context based on the user's history.
+          5. GEOMETRY: Answer questions about the route, distances, or locations using the 'map_data'.
+          6. SEARCH: If asked to find information you don't know, use the 'search_internet' tool first, read the results, and then fulfill the user's request.
+          7. TIME: When creating or moving a task for a specific day, combine the section_date with the requested time to form the correct ISO timestamp (YYYY-MM-DDTHH:mm:ss.000Z), and include the section_id.
+          8. VOCAB: 'Fite' means milestone (set is_milestone true).` 
         }
     ];
 
