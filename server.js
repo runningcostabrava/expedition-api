@@ -682,25 +682,24 @@ app.delete('/tasks/:task_id/anchors/:anchor_id', adminAuth, async (req, res) => 
 // 1. TRACCAR LOCATION WEBHOOK (From the native mobile app)
 app.all('/api/location', async (req, res) => {
     try {
-        // ADD THIS LINE:
         console.log('[Traccar DEBUG] query:', req.query, '| body:', req.body);
 
-        const id = req.query.id || req.body.id;
-        const lat = req.query.lat || req.query.latitude || req.body.lat || req.body.latitude;
-        const lon = req.query.lon || req.query.longitude || req.body.lon || req.body.longitude;
+        // Support BOTH Background Geolocation plugin (nested) AND OsmAnd-style (flat)
+        const id  = req.body.device_id      || req.query.id  || req.body.id;
+        const lat = req.body.location?.coords?.latitude  || req.query.lat || req.body.lat;
+        const lon = req.body.location?.coords?.longitude || req.query.lon || req.body.lon;
 
         if (!id || !lat || !lon) return res.status(400).send("Missing GPS parameters");
 
-        // Save EXACTLY what Traccar sends (e.g. "pablo")
         await pool.query(
             'INSERT INTO location_logs (guide_id, lat, lng) VALUES ($1, $2, $3)',
             [id.toString().trim(), lat, lon]
         );
 
-        console.log(`[Fleet Radar] 📍 Saved Traccar location for: ${id}`);
+        console.log(`[Fleet Radar] 📍 Saved location for: ${id} @ ${lat}, ${lon}`);
         res.status(200).send("OK");
     } catch (err) {
-        console.error("Traccar Webhook Error:", err);
+        console.error("Location Webhook Error:", err);
         res.status(500).send("Server Error");
     }
 });
