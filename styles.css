@@ -1112,12 +1112,27 @@ body.zen-mode #fleet-panel {
     flex: 1;
 }
 
-/* FIX: Shrink Fite Time Inputs */
+/* --- ENHANCED TIME PILLS FOR TASKS & FITES --- */
+.task-row input[type="time"].modern-inline-input,
 .fite-text input[type="time"].modern-inline-input {
-    font-size: 0.7em !important;
-    padding: 0 !important;
-    width: 55px;
-    /* Restrict width */
+    font-size: 0.95em !important;    /* Much larger text */
+    font-weight: 700 !important;     /* Bold text */
+    color: #0f172a !important;       /* High-contrast dark slate */
+    background: #f1f5f9 !important;  /* Light gray pill background */
+    border: 1px solid #cbd5e0 !important; 
+    padding: 4px 6px !important;     /* Comfortable padding */
+    border-radius: 6px !important;
+    width: 85px !important;          /* Gives the time plenty of room */
+    text-align: center;
+    margin-right: 5px;
+}
+
+/* Ensure the time pill pops with the blue highlight when in Edit Mode */
+.is-editing input[type="time"].modern-inline-input {
+    background: #ffffff !important;
+    border-color: #38bdf8 !important;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2) !important;
+    color: #0f172a !important;
 }
 
 .compact-geom-row {
