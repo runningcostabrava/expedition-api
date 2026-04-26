@@ -102,6 +102,8 @@
     </div>
 
     <div id="mobile-fab-container">
+        <button onclick="createWaypointAtCurrentLocation()" class="action-btn-modern"
+            style="background: #ef4444 !important; color: white !important;" title="Mark Current Location">📸</button>
         <button onclick="startSmartRoute()" class="action-btn-modern" style="font-size: 1.1em;"
             title="Smart Route">🚗</button>
         <input type="file" id="gpx-file" accept=".gpx" style="display: none;">
@@ -432,6 +434,34 @@
     <script src="js/offline-manager.js"></script>
 
     <script>
+        // index.html - Add this function
+        window.createWaypointAtCurrentLocation = function () {
+            if (!navigator.geolocation) return alert("GPS not supported on this browser.");
+
+            // Show a small toast or change icon to "loading"
+            if (typeof showToast !== 'undefined') showToast("📡 Fetching GPS...", "info");
+
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const lng = pos.coords.longitude;
+                const lat = pos.coords.latitude;
+
+                // 1. Center map on you
+                map.flyTo({ center: [lng, lat], zoom: 17 });
+
+                // 2. Open the popup with a default icon and title
+                const geom = { type: "Point", coordinates: [lng, lat] };
+                showGeometryContextPopup([lng, lat], geom, "Current Location", "📍 Captured via GPS", null, '📸');
+
+                // 3. Automatically trigger the file upload after a tiny delay so the panel is open
+                setTimeout(() => {
+                    const uploadBtn = document.getElementById('btn-upload-new-geom');
+                    if (uploadBtn) uploadBtn.click();
+                }, 500);
+            }, (err) => {
+                alert("GPS Error: " + err.message);
+            }, { enableHighAccuracy: true });
+        };
+
         window.createWaypointFromContext = function (lat, lng) {
             if (isEditingGeometry || isRouting || isAnalyzingSegment) return;
             if (typeof draw === "undefined") return;
@@ -1140,12 +1170,22 @@
 
                         const el = document.createElement('div');
                         el.className = 'custom-map-pin'; // Links to our dynamic CSS scaling
+
+                        // If the icon is a camera, give it a specific "Photo Spot" ring
+                        const isPhotoSpot = renderIcon === '📸';
                         el.innerHTML = `
-                    <div style="background-color: ${markerColor}; border-radius: 50%; width: 28px; height: 28px; display: flex; justify-content: center; align-items: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); font-size: 14px; overflow: hidden; white-space: nowrap;">
-                        ${renderIcon}
-                    </div>
-                    <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid ${markerColor}; margin: -1px auto 0;"></div>
-                `;
+                            <div style="background-color: ${isPhotoSpot ? '#ef4444' : markerColor}; 
+                                        border-radius: 50%; width: 28px; height: 28px; 
+                                        display: flex; justify-content: center; align-items: center; 
+                                        border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); 
+                                        font-size: 14px; transform: ${isPhotoSpot ? 'scale(1.2)' : 'scale(1)'};">
+                                ${renderIcon}
+                            </div>
+                            <div style="width: 0; height: 0; border-left: 6px solid transparent; 
+                                        border-right: 6px solid transparent; 
+                                        border-top: 8px solid ${isPhotoSpot ? '#ef4444' : markerColor}; 
+                                        margin: -1px auto 0;"></div>
+                        `;
                         el.style.cursor = 'pointer';
 
                         // focusAfterOpen: false prevents the ARIA warning
