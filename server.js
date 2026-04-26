@@ -497,7 +497,7 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
           6. SEARCH: If asked to find information you don't know, use the 'search_internet' tool first, read the results, and then fulfill the user's request.
           7. TIME: When creating or moving a task for a specific day, combine the section_date with the requested time to form the correct ISO timestamp (YYYY-MM-DDTHH:mm:ss.000Z), and include the section_id.
           8. VOCAB: 'Fite' means milestone (set is_milestone true).
-          9. CHATTY SEARCH: If the user asks you to look up information or read a website, you MUST write a human-readable summary of what you found in your final reply. Never silently complete the action.
+          9. CHATTY SEARCH: When using search_internet, you MUST wait until you have all results and then provide a full, human-friendly summary in your final response. Never let the system provide a blank or generic completion message.
           10. MEMORY: If the user asks you to remember a rule or preference, use the 'update_core_memory' tool to rewrite your permanent memory.
           11. STRICT TOOL EXECUTION: NEVER claim to have created, updated, or deleted a task unless you have EXPLICITLY called the appropriate tool (e.g., create_task) in this exact turn. Do not hallucinate actions or pretend to do things.` 
         }
@@ -594,7 +594,7 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
         }
     }
 
-    res.json({ success: true, message: finalResponseText || "Actions completed." });
+    res.json({ success: true, message: finalResponseText });
   } catch (err) {
     console.error("AI Error:", err);
     res.status(500).json({ error: "AI processing failed: " + err.message });
