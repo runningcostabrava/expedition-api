@@ -70,14 +70,11 @@
         }
     </script>
     <div id="command-bar">
-        <div style="font-weight: 900; color: white !important; margin: 0; flex-shrink: 0;">
-            EXPEDITION v2
-        </div>
+        <div style="font-weight: 900; color: white !important; margin-right: 5px; flex-shrink: 0;">EXPEDITION v2</div>
 
         <button id="mobile-search-btn" class="mobile-only-btn"
-            onclick="document.getElementById('search-group').classList.toggle('show-mobile')">
-            🔍
-        </button>
+            onclick="document.getElementById('search-group').classList.toggle('show-mobile')"
+            style="background: transparent; border: none; color: white; font-size: 1.2em; cursor: pointer; padding: 0; display: none;">🔍</button>
 
         <div id="search-group" class="search-group">
             <div style="position: relative; flex: 1; max-width: 300px; width: 100%;">
@@ -102,6 +99,7 @@
     </div>
 
     <div id="mobile-fab-container">
+        <button onclick="processAiCommand()" class="action-btn-modern" title="AI Assistant">🤖</button>
         <button onclick="createWaypointAtCurrentLocation()" class="action-btn-modern"
             style="background: #ef4444 !important; color: white !important;" title="Mark Current Location">📸</button>
         <button onclick="startSmartRoute()" class="action-btn-modern" style="font-size: 1.1em;"
@@ -587,6 +585,12 @@
                         } else {
                             document.getElementById('map').classList.remove('show-pin-labels');
                         }
+
+                        // Dynamic scale for fleet: 0.3x size at zoom 10, up to 1.2x size at zoom 18
+                        const fleetScale = Math.max(0.3, Math.min(1.2, (zoom - 10) / 8 + 0.3));
+                        document.querySelectorAll('.fleet-avatar-wrapper').forEach(el => {
+                            el.style.transform = `scale(${fleetScale})`;
+                        });
                     });
 
                     // Trigger once on load to set initial state

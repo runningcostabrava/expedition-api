@@ -1,5 +1,11 @@
 const express = require('express');
 const cors = require('cors');
+const { OpenAI } = require('openai');
+
+const deepseek = new OpenAI({
+  baseURL: 'https://api.deepseek.com',
+  apiKey: process.env.DEEPSEEK_API_KEY 
+});
 const jwt = require('jsonwebtoken'); // 1. Import JWT
 const { Pool } = require('pg');
 const bodyParser = require('body-parser');
@@ -235,6 +241,152 @@ app.put('/tasks/:id', adminAuth, async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- AI LOGISTICS ASSISTANT ---
+const aiTools = [
+  {
+    type: "function",
+    function: {
+      name: "create_task",
+      description: "Create a new logistics task in the expedition plan.",
+      parameters: {
+        type: "object",
+        properties: {
+          task_name: { type: "string", description: "Title of the task" },
+          section_id: { type: "integer", description: "The database ID of the matching section/day" },
+          starts_at: { type: "string", description: "ISO timestamp (YYYY-MM-DDTHH:mm:ss.000Z) or null" },
+          responsible: { type: "string", description: "Name of the guide responsible" },
+          characteristics: { type: "string", description: "Notes or description" },
+          is_milestone: { type: "boolean", description: "True if it is a milestone or 'Fite'" }
+        },
+        required: ["task_name"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_task",
+      description: "Modify an existing task's details.",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "integer", description: "The database ID of the task to update" },
+          updates: {
+            type: "object",
+            properties: {
+              task_name: { type: "string" },
+              section_id: { type: "integer" },
+              starts_at: { type: "string" },
+              responsible: { type: "string" },
+              is_completed: { type: "boolean" }
+            }
+          }
+        },
+        required: ["id", "updates"]
+      }
+    }
+  }
+];
+
+app.post('/api/ai/command', adminAuth, async (req, res) => {
+  const { prompt } = req.body;
+  if (!prompt) return res.status(400).json({ error: "Prompt is required" });
+
+  try {
+    // 1. Fetch Expedition Days
+    const sectionsRes = await pool.query('SELECT id, title, section_date FROM sections ORDER BY section_date ASC');
+    const sectionsContext = JSON.stringify(sectionsRes.rows);
+
+    // 2. Fetch Tasks AND their attached Map Geometries (Distance, Elev, Links, Comments)
+    const currentTasksQuery = `
+      SELECT t.id, t.task_name, t.starts_at, t.responsible, t.section_id, t.characteristics,
+             COALESCE(
+               (
+                 SELECT json_agg(
+                   json_build_object(
+                     'kind', sa.kind,
+                     'title', COALESCE(w.title, tr.title),
+                     'distance_km', COALESCE(w.distance, tr.distance),
+                     'elevation_gain_m', COALESCE(w.gain, tr.gain),
+                     'elevation_loss_m', COALESCE(w.loss, tr.loss),
+                     'comments_attachments', COALESCE(w.comments, tr.comments),
+                     'url_link', COALESCE(w.link, tr.link),
+                     'lat', w.lat, 'lng', w.lng
+                   )
+                 )
+                 FROM task_anchors ta
+                 JOIN spatial_anchors sa ON ta.anchor_id = sa.id
+                 LEFT JOIN waypoints w ON sa.waypoint_id = w.id
+                 LEFT JOIN tracks tr ON sa.track_id = tr.id
+                 WHERE ta.task_id = t.id
+               ), '[]'
+             ) as map_data
+      FROM tasks t
+      WHERE t.is_completed = false
+      ORDER BY t.starts_at ASC
+      LIMIT 50
+    `;
+    const currentTasks = await pool.query(currentTasksQuery);
+    const contextString = JSON.stringify(currentTasks.rows);
+
+    const response = await deepseek.chat.completions.create({
+      model: "deepseek-chat",
+      messages: [
+        { 
+          role: "system", 
+          content: `You are an expert logistics coordinator for mountain guides. 
+          Expedition Days (Sections): ${sectionsContext}.
+          Current Active Tasks (with Map Data): ${contextString}.
+          
+          RULES:
+          1. Answer questions about the route, distances, elevation (gain/loss), attachments, or locations using the 'map_data' provided in the tasks.
+          2. If a user references a day by name (e.g., 'the day we go to Selinunte'), look up the correct Section ID and section_date from the Expedition Days list.
+          3. When creating or moving a task for a specific day, combine the section_date with the requested time to form the correct ISO timestamp (YYYY-MM-DDTHH:mm:ss.000Z), and include the section_id.
+          4. If modifying an existing task, find the exact 'id' from the Active Tasks list.
+          5. 'Fite' means milestone (set is_milestone true).` 
+        },
+        { role: "user", content: prompt }
+      ],
+      tools: aiTools,
+      tool_choice: "auto"
+    });
+
+    const message = response.choices[0].message;
+
+    // If the AI decides to use a tool (execute a DB command)
+    if (message.tool_calls && message.tool_calls.length > 0) {
+      let executionResults = [];
+      
+      for (const toolCall of message.tool_calls) {
+        const name = toolCall.function.name;
+        const args = JSON.parse(toolCall.function.arguments);
+
+        if (name === "create_task") {
+          const result = await pool.query(
+            'INSERT INTO tasks (task_name, section_id, starts_at, responsible, characteristics, is_milestone) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [args.task_name, args.section_id || null, args.starts_at || null, args.responsible || null, args.characteristics || null, args.is_milestone || false]
+          );
+          executionResults.push(`Created task: ${args.task_name}`);
+        }
+
+        if (name === "update_task") {
+          const fields = Object.keys(args.updates).map((key, i) => `${key} = $${i + 2}`).join(', ');
+          const values = Object.values(args.updates);
+          await pool.query(`UPDATE tasks SET ${fields} WHERE id = $1`, [args.id, ...values]);
+          executionResults.push(`Updated task ID: ${args.id}`);
+        }
+      }
+      return res.json({ success: true, message: "AI Action Completed: " + executionResults.join(' | ') });
+    }
+
+    // If the AI just wants to talk/clarify
+    res.json({ success: true, message: message.content });
+  } catch (err) {
+    console.error("AI Error:", err);
+    res.status(500).json({ error: "AI processing failed: " + err.message });
+  }
 });
 
 app.get('/tracks', async (req, res) => {

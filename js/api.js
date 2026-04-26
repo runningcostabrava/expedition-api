@@ -161,3 +161,33 @@ async function authFetch(url, options = {}) {
         console.error("Critical Sync Failure:", err);
     }
 }
+
+window.processAiCommand = async function() {
+    const promptText = prompt("🤖 AI Assistant\nWhat would you like to know or update?");
+    if (!promptText) return;
+
+    if (typeof showToast === 'function') showToast("🧠 AI is thinking...", "info");
+
+    try {
+        const res = await authFetch(`${API_URL}/api/ai/command`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: promptText })
+        });
+        
+        if (!res || res.status === 401) return; 
+        const data = await res.json();
+        
+        if (data.error) throw new Error(data.error);
+        
+        // Show AI response
+        if (typeof showToast === 'function') showToast(data.message, "success");
+        else alert(data.message);
+        
+        // Reload UI to show DB changes
+        if (typeof refreshData === 'function') refreshData();
+        if (typeof loadData === 'function') loadData(); 
+    } catch (err) {
+        alert("AI Command Failed: " + err.message);
+    }
+};
