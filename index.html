@@ -825,42 +825,44 @@
 
             window.initGoogleSearch = async () => {
                 try {
-                    // Defensive check for google maps core before importing library
+                    // 1. Defensive check: ensures Google Maps core is actually present
                     if (!window.google || !window.google.maps) {
                         console.warn("Google Maps not ready, retrying library import...");
                         setTimeout(window.initGoogleSearch, 500);
                         return;
                     }
 
-                    // Explicitly load the Places library
+                    // 2. Await the specific library import
                     const placesLib = await google.maps.importLibrary("places");
                     const { Place } = placesLib; 
                     
                     // Save to window so search listeners can find it
                     window.GooglePlaceClass = Place;
 
+                    // 3. Clear container and create input
+                    const container = document.getElementById('google-search-container');
+                    if (!container) return;
+                    container.innerHTML = ''; 
+
                     const searchInput = document.createElement('input');
                     searchInput.id = 'google-discovery-input';
                     searchInput.placeholder = '🔍 Find "restaurants", "hotels"...';
 
-                    // Updated style to be more mobile-friendly and less wide
+                    // 4. Force mobile visibility and constrain width
                     searchInput.style.cssText = `
+                        display: block !important;
                         width: 100%; 
-                        padding: 8px 12px; 
+                        padding: 10px; 
                         border-radius: 8px; 
                         border: 1px solid rgba(255,255,255,0.2); 
                         outline: none; 
                         background: rgba(255,255,255,0.1); 
                         color: white;
                         box-sizing: border-box;
-                        display: block;
+                        font-size: 16px; /* Prevents iOS zoom-on-focus */
                     `;
 
-                    const container = document.getElementById('google-search-container');
-                    if (container) {
-                        container.innerHTML = ''; // Clear any existing items to prevent duplicates
-                        container.appendChild(searchInput);
-                    }
+                    container.appendChild(searchInput);
 
                     searchInput.addEventListener('keydown', async (e) => {
                         if (e.key === 'Enter') {
