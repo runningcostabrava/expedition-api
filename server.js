@@ -682,6 +682,9 @@ app.delete('/tasks/:task_id/anchors/:anchor_id', adminAuth, async (req, res) => 
 // 1. TRACCAR LOCATION WEBHOOK (From the native mobile app)
 app.all('/api/location', async (req, res) => {
     try {
+        // ADD THIS LINE:
+        console.log('[Traccar DEBUG] query:', req.query, '| body:', req.body);
+
         const id = req.query.id || req.body.id;
         const lat = req.query.lat || req.body.lat;
         const lon = req.query.lon || req.body.lon;
