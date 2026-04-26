@@ -2496,7 +2496,7 @@
             const container = document.getElementById('asana-container');
             const searchInput = document.getElementById('search-filter');
 
-            // SAFETY: If we are in "Google Search Mode", the list is gone, so stop rendering
+            // SAFETY: If search input is missing (e.g. while in Google Search Mode), stop rendering
             if (!container || !searchInput) return;
 
             const searchTerm = searchInput.value.toLowerCase();
