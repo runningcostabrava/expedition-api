@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <title>Telemetry Data Inspector</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { background: #f1f5f9; font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 0; padding-bottom: 90px; }
+        header { background: #0f172a; color: white; padding: env(safe-area-inset-top, 20px) 20px 20px 20px; font-weight: bold; font-size: 1.2em; text-align: center; position: sticky; top: 0; z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .container { padding: 20px; max-width: 1000px; margin: 0 auto; }
+        .data-table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); font-size: 0.9em; }
+        .data-table th, .data-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        .data-table th { background: #f8fafc; font-weight: bold; color: #475569; text-transform: uppercase; font-size: 0.8em; letter-spacing: 0.5px; }
+        .data-table tr:hover { background: #f8fafc; }
+        .badge { background: #e2e8f0; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85em; color: #334155; }
+        .btn-refresh { background: #38bdf8; border: none; padding: 6px 12px; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <span>📊 Data Inspector</span>
+        <button class="btn-refresh" onclick="fetchLogs()">🔄 Refresh</button>
+    </header>
+
+    <div class="container">
+        <div style="margin-bottom: 15px; color: #64748b; font-size: 0.9em;">Showing the last 200 raw GPS transmissions.</div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Device / Guide</th>
+                    <th>Coordinates</th>
+                    <th>Map</th>
+                </tr>
+            </thead>
+            <tbody id="log-body">
+                <tr><td colspan="4" style="text-align: center; padding: 30px; color: #64748b;">Loading telemetry...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div id="app-switcher" style="position: fixed; bottom: 25px; left: 20px; z-index: 100000;">
+        <button onclick="document.getElementById('switcher-menu').classList.toggle('show')" style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center;">📱</button>
+        <div id="switcher-menu" style="display: none; position: absolute; bottom: 65px; left: 0; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 220px; flex-direction: column; gap: 8px; border: 1px solid #e2e8f0;">
+            <div style="font-size: 0.75em; font-weight: bold; color: #64748b; text-transform: uppercase; padding-left: 5px; margin-bottom: 2px;">Switch App</div>
+            <a href="index.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block;">🗺️ Command Center</a>
+            <a href="field.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block;">🧭 Field Map</a>
+            <a href="pm.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block;">📋 Mobile PM</a>
+            <a href="telemetry.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block;">📊 Telemetry</a>
+        </div>
+    </div>
+    <style>#switcher-menu.show { display: flex !important; }</style>
+
+    <script>
+        const API_URL = 'https://mapbox-api-uz9a.onrender.com';
+
+        async function fetchLogs() {
+            const tbody = document.getElementById('log-body');
+            try {
+                const res = await fetch(`${API_URL}/api/fleet/logs?_t=${Date.now()}`);
+                const logs = await res.json();
+
+                if (logs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #64748b;">No data found in database.</td></tr>';
+                    return;
+                }
+
+                let html = '';
+                logs.forEach(log => {
+                    const date = new Date(log.timestamp);
+                    const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    const dateString = date.toLocaleDateString();
+                    const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${log.lat},${log.lng}`;
+
+                    html += `
+                        <tr>
+                            <td>
+                                <strong>${timeString}</strong><br>
+                                <span style="font-size: 0.8em; color: #94a3b8;">${dateString}</span>
+                            </td>
+                            <td>
+                                <span class="badge">${log.display_name || 'Unknown'}</span><br>
+                                <span style="font-size: 0.75em; color: #94a3b8;">Raw ID: ${log.guide_id}</span>
+                            </td>
+                            <td style="font-family: monospace; color: #475569;">
+                                ${log.lat.toFixed(5)}, ${log.lng.toFixed(5)}
+                            </td>
+                            <td>
+                                <a href="${googleMapsUrl}" target="_blank" style="background: #10b981; color: white; padding: 4px 8px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 0.85em;">🗺️ View</a>
+                            </td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #ef4444;">Error fetching data: ${err.message}</td></tr>`;
+            }
+        }
+
+        // Auto-refresh every 10 seconds
+        fetchLogs();
+        setInterval(fetchLogs, 10000);
+    </script>
+</body>
+</html>

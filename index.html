@@ -222,6 +222,7 @@
                     <option value="720">Last 12 Hours</option>
                     <option value="1440">Last 24 Hours</option>
                 </select>
+                <button onclick="window.open('telemetry.html', '_blank')" style="width:100%; margin-top: 15px; background:#3498db; color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📊 View Raw Data Logs</button>
             </div>
 
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -418,6 +419,7 @@
     <script src="js/elevation.js"></script>
     <script src="js/route-editor.js"></script>
     <script src="js/live-tracking.js"></script>
+    <script src="/js/offline-manager.js"></script>
 
     <script>
         window.createWaypointFromContext = function (lat, lng) {
@@ -738,6 +740,8 @@
                     document.getElementById('map').style.setProperty('--pin-scale', Math.max(0.4, Math.min(1.5, initZoom / 14)));
                     if (initZoom < 14) document.getElementById('map').classList.add('hide-markers');
                     if (initZoom >= 15.5) document.getElementById('map').classList.add('show-pin-labels');
+
+                    OfflineManager.init(map);
 
                     map.on('draw.create', (e) => {
                         const feature = e.features[0];
@@ -3506,6 +3510,9 @@
             </a>
             <a href="pm.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">
                 📋 Mobile PM
+            </a>
+            <a href="telemetry.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">
+                📊 Telemetry
             </a>
         </div>
     </div>
