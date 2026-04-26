@@ -1390,7 +1390,8 @@ body.zen-mode #fleet-panel {
 
     /* Push Mapbox zoom/compass controls down so they don't overlap the search bars */
     .mapboxgl-ctrl-top-right {
-        top: 110px !important;
+        top: 240px !important; /* Pushes Mapbox controls safely below the 3 custom FABs */
+        right: 10px !important;
         right: 10px !important;
     }
 

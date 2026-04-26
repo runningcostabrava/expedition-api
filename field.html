@@ -117,6 +117,7 @@
             z-index: 1000;
             border-top: 2px solid #ccc;
             padding: 15px;
+            padding-bottom: 90px; /* CRITICAL: Adds scrolling space for the App Switcher */
             box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.1);
             border-radius: 20px 20px 0 0;
             overflow-y: auto;
@@ -184,7 +185,7 @@
     </div>
 
     <div
-        style="position: absolute; top: 75px; right: 15px; display: flex; flex-direction: column; gap: 15px; z-index: 100;">
+        style="position: absolute; top: 85px; right: 15px; display: flex; flex-direction: column; gap: 15px; z-index: 100;">
         <button class="fab-pin" style="position: static; width: 44px; height: 44px; margin: 0;"
             onclick="enableDropPinMode()">📍</button>
         <button class="fab-fleet" style="position: static; width: 44px; height: 44px; margin: 0;"
@@ -248,11 +249,11 @@
         </div>
     </div>
 
-    <div id="app-switcher" style="position: fixed; bottom: 45px; left: 15px; z-index: 100000;">
+    <div id="app-switcher" style="position: fixed; bottom: 80px; left: 15px; z-index: 100000;">
         <button onclick="document.getElementById('switcher-menu').classList.toggle('show')"
-            style="width: 45px; height: 45px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.3em; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;">📱</button>
+            style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;">📱</button>
         <div id="switcher-menu"
-            style="display: none; position: absolute; bottom: 55px; left: 0; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 220px; flex-direction: column; gap: 8px; border: 1px solid #e2e8f0;">
+            style="display: none; position: absolute; bottom: 65px; left: 0; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 220px; flex-direction: column; gap: 8px; border: 1px solid #e2e8f0;">
             <div style="font-size: 0.75em; font-weight: bold; color: #64748b; text-transform: uppercase; padding-left: 5px; margin-bottom: 2px;">Switch App</div>
             <a href="index.html"
                 style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">🗺️ Command Center</a>
