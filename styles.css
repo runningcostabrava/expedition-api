@@ -40,20 +40,21 @@ body {
     top: 15px;
     left: 15px;
     right: 15px;
-    height: 55px;
     background: var(--glass-dark);
     backdrop-filter: var(--glass-blur);
     border: var(--border-light);
     border-radius: 12px;
     z-index: 150 !important;
-    display: flex;
-    align-items: center;
-    /* Remove the hardcoded 320px gap */
-    padding: 0 15px;
     box-shadow: var(--card-shadow);
     gap: 15px;
     color: white;
-    justify-content: space-between; /* Pushes brand left, search center, FABs right */
+    /* Remove the 320px padding that blocks the search boxes */
+    padding: 0 15px !important; 
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center;
+    justify-content: space-between;
+    height: 55px;
 }
 
 /* Base Desktop Styling for the newly extracted FAB container */
@@ -94,17 +95,17 @@ body {
 }
 
 #search-group {
-    display: flex;
-    flex-direction: row !important; /* Boxes next to each other */
-    gap: 15px;
+    display: flex !important;
+    flex-direction: row !important; /* Forces side-by-side */
+    gap: 10px;
     flex: 1;
-    max-width: 700px; /* Prevents them from getting too wide */
+    max-width: 650px;
     margin: 0 20px;
 }
 
 #internal-map-search, 
 #google-search-container {
-    flex: 1; /* Both boxes take equal width */
+    flex: 1; /* Both boxes share space equally */
 }
 
 #internal-map-search::placeholder {
@@ -1253,43 +1254,39 @@ body.zen-mode #fleet-panel {
 }
 
 @media (max-width: 768px) {
-
-    /* Simplify Top Bar to just Search */
     #command-bar {
-        top: env(safe-area-inset-top, 10px) !important;
-        left: 10px !important;
-        right: 10px !important;
-        height: auto !important;
-        min-height: 60px !important;
-        padding: 12px !important; /* Added padding so inputs don't touch the glass edges */
-        padding-right: 70px !important; /* Explicit gap for the right-side button stack */
-        padding-bottom: 15px !important;
-        flex-wrap: nowrap !important;
-        overflow: visible !important;
-        flex-direction: column !important;
-        align-items: flex-start !important;
-        gap: 10px !important;
+        height: 55px !important; /* Forces one line */
+        padding-right: 15px !important;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        align-items: center !important;
     }
 
-    /* styles.css (Inside the @media block) */
+    /* Move the toggle button inline with title */
+    #mobile-search-btn {
+        display: block !important;
+        margin: 0 !important;
+        order: 2; /* Put it on the right */
+    }
+
+    /* Hide search group and make it a floating drawer */
     #search-group {
         display: none !important;
-        /* Hidden by default on mobile */
-    }
-
-    #search-group.show-mobile {
-        display: flex !important;
         flex-direction: column !important;
         position: absolute;
-        top: 70px;
-        /* Sits just below the top bar */
+        top: 60px; /* Pops out below the bar */
         left: 10px;
         right: 10px;
-        background: var(--glass-dark);
-        padding: 15px;
+        background: rgba(15, 23, 42, 0.95);
+        padding: 10px;
         border-radius: 12px;
-        box-shadow: var(--card-shadow);
         z-index: 1000;
+        max-width: none !important;
+    }
+
+    /* Show the drawer when toggled */
+    #search-group.show-mobile {
+        display: flex !important;
     }
 
     #task-detail-panel {
