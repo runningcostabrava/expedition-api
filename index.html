@@ -688,9 +688,9 @@
                     const activeTask = activeTaskId ? AppStore.get('itinerary').find(t => t.task_id === activeTaskId) : null;
                     const searchName = activeTask ? activeTask.task_name : 'trails';
 
-                    const offset = 0.01; // Creates roughly a 1km bounding box
-                    const sw = (lat - offset) + '%2C' + (lng - offset);
-                    const ne = (lat + offset) + '%2C' + (lng + offset);
+                    const offset = 0.013; // Approx 1.5km radius
+                    const sw = (lat - offset).toFixed(6) + '%2C' + (lng - offset).toFixed(6);
+                    const ne = (lat + offset).toFixed(6) + '%2C' + (lng + offset).toFixed(6);
                     const wikilocUrl = `https://www.wikiloc.com/wikiloc/map.do?sw=${sw}&ne=${ne}&page=1`;
 
                     // 2. Clear any existing popups to keep the UI clean
@@ -1255,9 +1255,9 @@
                                 parsedComments = geom.comments || '';
                             }
 
-                            const offset = 0.01;
-                        const sw = (geom.lat - offset) + '%2C' + (geom.lng - offset);
-                        const ne = (geom.lat + offset) + '%2C' + (geom.lng + offset);
+                            const offset = 0.013;
+                        const sw = (geom.lat - offset).toFixed(6) + '%2C' + (geom.lng - offset).toFixed(6);
+                        const ne = (geom.lat + offset).toFixed(6) + '%2C' + (geom.lng + offset).toFixed(6);
                         const wikilocUrl = `https://www.wikiloc.com/wikiloc/map.do?sw=${sw}&ne=${ne}&page=1`;
 
                         const html = `
@@ -1574,9 +1574,9 @@
             } catch (e) { parsedComments = geom.comments || ''; }
 
             if (kind === 'point') {
-                const offset = 0.01;
-                const sw = (geom.lat - offset) + '%2C' + (geom.lng - offset);
-                const ne = (geom.lat + offset) + '%2C' + (geom.lng + offset);
+                const offset = 0.013;
+                const sw = (geom.lat - offset).toFixed(6) + '%2C' + (geom.lng - offset).toFixed(6);
+                const ne = (geom.lat + offset).toFixed(6) + '%2C' + (geom.lng + offset).toFixed(6);
                 const wikilocUrl = `https://www.wikiloc.com/wikiloc/map.do?sw=${sw}&ne=${ne}&page=1`;
 
                 const html = `
