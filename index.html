@@ -20,8 +20,7 @@
         src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet"
         href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css"
         type="text/css">
@@ -58,7 +57,7 @@
                 return { top: 180, bottom: window.innerHeight * 0.75 + 20, left: 20, right: 20 };
             } else {
                 let leftPad = 20;
-                if (!leftHidden) leftPad = leftWide ? 620 : 420;
+                if (!leftHidden) leftPad = leftWide ? 620 : 460;
                 return { top: 80, bottom: 80, left: leftPad, right: 80 };
             }
         };
@@ -433,6 +432,14 @@
     <script src="js/offline-manager.js"></script>
 
     <script>
+        window.getSafeIconHtml = function(iconVal, fallbackClass, isFill = false) {
+            const val = (iconVal && iconVal !== 'marker' && iconVal.trim() !== '') ? iconVal : fallbackClass;
+            // If it's a Phosphor class, wrap it in the proper HTML tag
+            if (val.startsWith('ph-')) return `<i class="ph ${val} ${isFill ? 'ph-fill' : ''}"></i>`;
+            // Otherwise, it's a legacy emoji, just return it as text
+            return val; 
+        };
+
         // index.html - Add this function
         window.createWaypointAtCurrentLocation = function () {
             if (!navigator.geolocation) return alert("GPS not supported on this browser.");
@@ -855,7 +862,7 @@
                     let html = '';
                     uniqueGeoms.forEach(item => {
                         const g = item.geom;
-                        const icon = g.kind === 'point' ? (g.icon || '📍') : (g.kind === 'polygon' ? '🛑' : '📈');
+                        const icon = g.kind === 'point' ? window.getSafeIconHtml(g.icon, 'ph-map-pin') : (g.kind === 'polygon' ? '<i class="ph ph-hexagon"></i>' : '<i class="ph ph-trend-up"></i>');
 
                         // Extract fallback center coordinates
                         let centerLng = g.lng;
@@ -1178,13 +1185,14 @@
 
                         // If the icon is a camera, give it a specific "Photo Spot" ring
                         const isPhotoSpot = renderIcon === 'ph-camera';
+                        const iconHtml = window.getSafeIconHtml(renderIcon, 'ph-map-pin', true);
                         el.innerHTML = `
                             <div style="background-color: ${isPhotoSpot ? '#ef4444' : markerColor}; 
                                         border-radius: 50%; width: 28px; height: 28px; 
                                         display: flex; justify-content: center; align-items: center; 
                                         border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); 
                                         font-size: 14px; transform: ${isPhotoSpot ? 'scale(1.2)' : 'scale(1)'};">
-                                <i class="ph ${renderIcon} ph-fill"></i>
+                                ${iconHtml}
                             </div>
                             <div style="width: 0; height: 0; border-left: 6px solid transparent; 
                                         border-right: 6px solid transparent; 
@@ -1257,7 +1265,7 @@
                         ⛰️ View on Wikiloc
                     </button>
                 `;
-                            openRightPanel(`${renderIcon} ${geom.title}`, html);
+                            openRightPanel(`${window.getSafeIconHtml(renderIcon, 'ph-map-pin')} ${geom.title}`, html);
                         });
 
                         activeMarkers.push(marker);
@@ -1322,7 +1330,7 @@
                         <button onclick="unlinkGeometry(${task.task_id}, ${geom.anchor_id})" style="width:100%; background:#fee2e2; color:#ef4444; padding:12px; border-radius:6px; border:none; cursor:pointer; font-weight:bold;">🗑️ Remove from Task</button>
                     </div>
                             `;
-                            openRightPanel(`${geom.kind === 'polygon' ? '🛑' : '📈'} ${geom.title}`, html);
+                             openRightPanel(`${geom.kind === 'polygon' ? '<i class="ph ph-hexagon"></i>' : '<i class="ph ph-trend-up"></i>'} ${geom.title}`, html);
 
                             const props = geom.geojson.features[0].properties || {};
                             showElevationProfile(geom.geojson, geom.title, {
@@ -1895,14 +1903,14 @@
                 const currentFilterCat = filterCatSelect.value;
                 filterCatSelect.innerHTML = '<option value="">All Categories</option>';
                 allCategories.forEach(cat => {
-                    const opt = `<option value="${cat.id}">${cat.icon || '🏷️'} ${cat.name}</option>`;
+                    const opt = `<option value="${cat.id}">${cat.name}</option>`;
                     catSelect.insertAdjacentHTML('beforeend', opt);
                     filterCatSelect.insertAdjacentHTML('beforeend', opt);
                 });
                 filterCatSelect.value = currentFilterCat;
             } else {
                 allCategories.forEach(cat => {
-                    catSelect.insertAdjacentHTML('beforeend', `<option value="${cat.id}">${cat.icon || '🏷️'} ${cat.name}</option>`);
+                    catSelect.insertAdjacentHTML('beforeend', `<option value="${cat.id}">${cat.name}</option>`);
                 });
             }
             catSelect.value = currentVal;
@@ -1964,7 +1972,7 @@
             if (!list) return;
             list.innerHTML = allCategories.map(cat => `
         <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #eee;">
-            <span>${cat.icon} <strong style="color:${cat.color}">${cat.name}</strong></span>
+            <span>${window.getSafeIconHtml(cat.icon, 'ph-tag')} <strong style="color:${cat.color}">${cat.name}</strong></span>
             <div style="display:flex; gap:5px;">
                 <button onclick="startEditCategory(${cat.id})" style="width:auto; padding:4px 8px; background:#3498db; font-size:12px;">Edit</button>
                 <button onclick="deleteCategory(${cat.id})" style="width:auto; padding:4px 8px; background:#e74c3c; font-size:12px;">Delete</button>
@@ -2758,7 +2766,7 @@
                 let catOptions = `<option value="">🏷️</option>`;
                 allCategories.forEach(c => {
                     const sel = (c.id === task.category_id) ? 'selected' : '';
-                    catOptions += `<option value="${c.id}" ${sel}>${c.icon} ${c.name}</option>`;
+                    catOptions += `<option value="${c.id}" ${sel}>${c.name}</option>`;
                 });
 
                 taskEl.innerHTML = `
@@ -2947,7 +2955,7 @@
             filterSelect.innerHTML = '<option value="">All Types</option>';
 
             allTaskTypes.forEach(t => {
-                const opt = `<option value="${t.id}">${t.icon || '🏷️'} ${t.name}</option>`;
+                const opt = `<option value="${t.id}">${t.name}</option>`;
                 typeSelect.insertAdjacentHTML('beforeend', opt);
                 filterSelect.insertAdjacentHTML('beforeend', opt);
             });
@@ -2961,7 +2969,7 @@
             if (!list) return;
             list.innerHTML = allTaskTypes.map(t => `
                 <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #eee;">
-                    <span>${t.icon} <strong style="color:${t.color}">${t.name}</strong></span>
+                    <span>${window.getSafeIconHtml(t.icon, 'ph-tag')} <strong style="color:${t.color}">${t.name}</strong></span>
                     <div style="display:flex; gap:5px;">
                         <button onclick="startEditTaskType(${t.id})" style="width:auto; padding:4px 8px; background:#3498db; font-size:12px;">Edit</button>
                         <button onclick="deleteTaskType(${t.id})" style="width:auto; padding:4px 8px; background:#e74c3c; font-size:12px;">Delete</button>
@@ -3050,6 +3058,7 @@
             const content = document.getElementById('task-detail-content');
             if (!panel || !content) return;
 
+            panel.style.transform = ''; // CRITICAL FIX: Clear sticky inline styles
             panel.classList.add('open');
 
             // Hide the list panel so the details are full-screen (Mobile only)
@@ -3109,8 +3118,8 @@
                     if (!sortedGeoms.includes(g)) sortedGeoms.push(g);
                 });
 
-                sortedGeoms.forEach(g => {
-                    const icon = g.kind === 'point' ? (g.icon || '📍') : (g.kind === 'polygon' ? '🛑' : '📈');
+                 sortedGeoms.forEach(g => {
+                    const icon = g.kind === 'point' ? window.getSafeIconHtml(g.icon, 'ph-map-pin') : (g.kind === 'polygon' ? '<i class="ph ph-hexagon"></i>' : '<i class="ph ph-trend-up"></i>');
                     const title = g.title || 'Location';
                     const layerId = `layer-${g.track_id}`;
                     let statsHtml = '';
@@ -3169,8 +3178,7 @@
             const panel = document.getElementById('task-detail-panel');
             if (panel) {
                 panel.classList.remove('open');
-                // Force manual hide to bypass any CSS conflicts
-                panel.style.transform = 'translateX(-120%)';
+                panel.style.transform = ''; // Let the responsive CSS handle the hiding animation natively
             }
             document.getElementById('left-panel').classList.remove('hidden');
             if (map) map.resize();
