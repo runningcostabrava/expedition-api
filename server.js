@@ -406,6 +406,21 @@ const aiTools = [
         required: ["name"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_nearby_places",
+      description: "Search for points of interest (restaurants, hotels, gas stations, etc.) near a specific location or city name.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "What to search for (e.g., 'Coffee', 'Pharmacy')" },
+          location_context: { type: "string", description: "The city or area name to search in" }
+        },
+        required: ["query", "location_context"]
+      }
+    }
   }
 ];
 
@@ -579,6 +594,24 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
                         [args.name, args.color || '#95a5a6', args.icon || 'ph-tag']
                     );
                     toolResult = `SUCCESS: Task type created with ID ${res.rows[0].id}`;
+                }
+                else if (name === "search_nearby_places") {
+                    try {
+                        const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN;
+                        const searchUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(args.query + ' ' + args.location_context)}.json?access_token=${mapboxToken}&limit=5`;
+                        const response = await axios.get(searchUrl);
+                        
+                        const results = response.data.features.map(f => ({
+                            name: f.text,
+                            address: f.place_name,
+                            coordinates: f.center,
+                            category: f.properties.category
+                        }));
+                        
+                        toolResult = JSON.stringify(results);
+                    } catch (err) {
+                        toolResult = "Error searching for places: " + err.message;
+                    }
                 }
             } catch (err) {
                 console.error(`[AI Tool Error] ${name}:`, err);
