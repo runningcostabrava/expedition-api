@@ -566,6 +566,14 @@ const OfflineManager = (() => {
             updateOnlineStatus();
             updateQueueBadge();
 
+            // CRITICAL FIX: Re-inject OSM layer if user swaps Mapbox styles
+            map.on('style.load', () => {
+                if (!map.getSource('osm-tiles')) {
+                    addOSMLayer(map);
+                    setOSMVisible(osmVisible); // Restore previous visibility state
+                }
+            });
+
             window.addEventListener('online', updateOnlineStatus);
             window.addEventListener('offline', updateOnlineStatus);
 
