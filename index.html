@@ -3051,8 +3051,10 @@
 
             panel.classList.add('open');
 
-            // Hide the list panel so the details are full-screen (Desktop & Mobile)
-            document.getElementById('left-panel').classList.add('hidden');
+            // Hide the list panel so the details are full-screen (Mobile only)
+            if (window.innerWidth <= 768) {
+                document.getElementById('left-panel').classList.add('hidden');
+            }
 
             // Wire up the edit button in the header
             const editBtn = document.getElementById('detail-edit-btn');
