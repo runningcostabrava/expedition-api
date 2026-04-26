@@ -686,8 +686,8 @@ app.all('/api/location', async (req, res) => {
         console.log('[Traccar DEBUG] query:', req.query, '| body:', req.body);
 
         const id = req.query.id || req.body.id;
-        const lat = req.query.lat || req.body.lat;
-        const lon = req.query.lon || req.body.lon;
+        const lat = req.query.lat || req.query.latitude || req.body.lat || req.body.latitude;
+        const lon = req.query.lon || req.query.longitude || req.body.lon || req.body.longitude;
 
         if (!id || !lat || !lon) return res.status(400).send("Missing GPS parameters");
 
