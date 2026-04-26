@@ -842,16 +842,14 @@
                         const query = searchInput.value.trim();
                         if (!query) return;
 
-                        // Constrain search to the area the user is currently looking at
-                        const bounds = map.getBounds();
+                        // Constrain search to the center of the user's screen
+                        const center = map.getCenter();
                         const request = {
                             textQuery: query,
-                            // STRICT BOUNDARY
-                            locationRestriction: {
-                                north: bounds.getNorth(),
-                                south: bounds.getSouth(),
-                                east: bounds.getEast(),
-                                west: bounds.getWest()
+                            // SAFER APPROACH: Use a radial bias instead of Mapbox bounds to prevent Google geometry crashes
+                            locationBias: {
+                                center: { lat: center.lat, lng: center.lng },
+                                radius: 15000 // 15km search radius
                             },
                             fields: ['id', 'displayName', 'location', 'photos', 'rating', 'userRatingCount', 'formattedAddress', 'websiteURI', 'googleMapsURI', 'nationalPhoneNumber'],
                             maxResultCount: 10
