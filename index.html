@@ -879,12 +879,13 @@
                         const query = searchInput.value.trim();
                         if (!query || !window.GooglePlaceClass) return;
                         const center = map.getCenter();
-                        const { places } = await window.GooglePlaceClass.searchByText({
-                            textQuery: query,
-                            locationBias: { center: { lat: center.lat, lng: center.lng }, radius: 10000 },
-                            fields: ['id', 'displayName', 'location', 'photos', 'rating', 'userRatingCount', 'formattedAddress', 'websiteURI', 'googleMapsURI', 'nationalPhoneNumber'],
-                            maxResultCount: 12
-                        });
+                const { places } = await window.GooglePlaceClass.searchByText({
+                    textQuery: query,
+                    locationBias: { center: map.getCenter(), radius: 10000 },
+                    // Ensure 'location' is requested so we can place pins!
+                    fields: ['id', 'displayName', 'location', 'photos', 'rating', 'userRatingCount', 'formattedAddress', 'websiteURI', 'googleMapsURI', 'nationalPhoneNumber'],
+                    maxResultCount: 12
+                });
                         if (places && places.length > 0) {
                             window.lastSearchResults = places;
                             // FORCE the sidebar to show so the user can see the Google results
@@ -3116,10 +3117,13 @@
 
         function closeTaskDetailPanel() {
             const panel = document.getElementById('task-detail-panel');
-            if (panel) panel.classList.remove('open');
-
-            // Bring the main list back when details are closed (Desktop & Mobile)
+            if (panel) {
+                panel.classList.remove('open');
+                // Force manual hide to bypass any CSS conflicts
+                panel.style.transform = 'translateX(-120%)';
+            }
             document.getElementById('left-panel').classList.remove('hidden');
+            if (map) map.resize();
             // Remove active highlighting from sidebar
             //document.querySelectorAll('.task-row, .fite-row').forEach(row => row.classList.remove('active-task'));
             // AppStore.set('activeTaskId', null);
