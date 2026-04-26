@@ -317,7 +317,7 @@ window.openAiChat = function() {
                     <button onclick="window.clearAiAttachment()" style="background:none; border:none; color:#ef4444; cursor:pointer; font-weight:bold; font-size:1.2em; padding:0 5px;"><i class="ph ph-x"></i></button>
                 </div>
                 <div style="display: flex; gap: 8px; align-items: flex-end;">
-                    <input type="file" id="ai-image-upload" accept="image/*" style="display: none;">
+                    <input type="file" id="ai-image-upload" accept="image/*,application/pdf,text/plain,audio/*" style="display: none;">
                     <button onclick="document.getElementById('ai-image-upload').click()" style="background: #f8fafc; color: #475569; border: 1px solid #cbd5e0; border-radius: 50%; width: 42px; height: 42px; display:flex; align-items:center; justify-content:center; cursor: pointer; flex-shrink: 0; font-size:1.2em; transition:0.2s;"><i class="ph ph-plus"></i></button>
                     <textarea id="ai-prompt-text" rows="1" placeholder="Message..." style="flex: 1; padding: 12px 15px; border: 1px solid #cbd5e0; border-radius: 20px; font-family: inherit; resize: none; overflow-y:hidden; box-sizing: border-box; font-size:0.95em; outline:none; max-height:120px;" oninput="this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 120) + 'px';"></textarea>
                     <button id="ai-submit-btn" style="background: #27ae60; color: white; border: none; border-radius: 50%; width: 42px; height: 42px; display:flex; align-items:center; justify-content:center; cursor: pointer; flex-shrink: 0; font-size:1.2em; box-shadow: 0 4px 10px rgba(39, 174, 96, 0.3); transition:transform 0.1s;"><i class="ph ph-paper-plane-right"></i></button>
@@ -421,21 +421,37 @@ window.openAiChat = function() {
 
         try {
             let uploadedImageUrl = null;
+            let documentContext = "";
 
             if (attachedFile) {
                 const formData = new FormData();
                 formData.append('file', attachedFile);
-                const uploadRes = await authFetch(`${API_URL}/api/upload`, { method: 'POST', body: formData });
-                if (!uploadRes.ok) throw new Error("Failed to upload image");
-                const uploadData = await uploadRes.json();
-                uploadedImageUrl = uploadData.secure_url;
+                
+                if (attachedFile.type.startsWith('image/')) {
+                    // Upload Image to Cloudinary
+                    const uploadRes = await authFetch(`${API_URL}/api/upload`, { method: 'POST', body: formData });
+                    if (!uploadRes.ok) throw new Error("Failed to upload image");
+                    const uploadData = await uploadRes.json();
+                    uploadedImageUrl = uploadData.secure_url;
+                } else {
+                    // Parse Document/Audio for Text
+                    typingIndicator.innerHTML = '<span style="color:#94a3b8; font-style:italic;">reading file...</span>';
+                    const parseRes = await authFetch(`${API_URL}/api/parse-media`, { method: 'POST', body: formData });
+                    if (!parseRes.ok) throw new Error("Failed to read file contents");
+                    const parseData = await parseRes.json();
+                    
+                    // Inject the extracted text invisibly into the prompt
+                    documentContext = `\n\n[CONTENTS OF ATTACHED FILE "${attachedFile.name}"]:\n${parseData.text}\n\n`;
+                }
             }
+
+            const finalPrompt = documentContext ? (promptText + documentContext) : promptText;
 
             const res = await authFetch(`${API_URL}/api/ai/command`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    prompt: promptText, 
+                    prompt: finalPrompt, 
                     imageUrl: uploadedImageUrl,
                     history: aiConversationMemory // Inject memory here!
                 })

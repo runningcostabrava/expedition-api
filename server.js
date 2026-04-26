@@ -15,6 +15,8 @@ const path = require('path');
 const axios = require('axios'); // Added for Traccar proxy
 const cloudinary = require('cloudinary').v2;
 const multer = require('multer');
+const pdfParse = require('pdf-parse');
+const FormData = require('form-data');
 
 cloudinary.config({ 
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME, 
@@ -203,6 +205,35 @@ app.post('/api/upload', adminAuth, upload.single('file'), (req, res) => {
     console.error("Server Upload Error:", error);
     res.status(500).json({ error: 'Server crash', details: error.message });
   }
+});
+
+app.post('/api/parse-media', adminAuth, upload.single('file'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    try {
+        const mime = req.file.mimetype;
+        
+        // 1. Handle PDFs
+        if (mime === 'application/pdf') {
+            const data = await pdfParse(req.file.buffer);
+            return res.json({ text: data.text });
+        }
+        
+        // 2. Handle Text files (WhatsApp exports, etc.)
+        if (mime === 'text/plain') {
+            return res.json({ text: req.file.buffer.toString('utf-8') });
+        }
+        
+        // 3. Handle Audio (Disabled)
+        const isAudio = mime.startsWith('audio/') || req.file.originalname.toLowerCase().endsWith('.opus') || req.file.originalname.toLowerCase().endsWith('.ogg');
+        if (isAudio) {
+            return res.json({ text: "[System: An audio file was attached, but audio transcription is currently disabled.]" });
+        }
+        
+        return res.status(400).json({ error: 'Unsupported file type for text extraction.' });
+    } catch (err) {
+        console.error("Media parsing error:", err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.delete('/api/upload', adminAuth, async (req, res) => {
@@ -1163,6 +1194,15 @@ app.get('/icons/:name', (req, res) => {
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
+
+// Auto-setup DB on startup to prevent 'relation missing' errors
+pool.query(`
+    CREATE TABLE IF NOT EXISTS ai_memory (
+      id SERIAL PRIMARY KEY,
+      memory_text TEXT
+    );
+    INSERT INTO ai_memory (id, memory_text) VALUES (1, '') ON CONFLICT DO NOTHING;
+`).catch(err => console.error("Auto DB setup failed:", err));
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => console.log(`API online on port ${PORT}`));

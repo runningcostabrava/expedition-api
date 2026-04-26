@@ -8,15 +8,17 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "axios": "^1.7.9",
+    "axios": "^1.15.2",
     "body-parser": "^2.2.2",
     "cloudinary": "^2.9.0",
     "cors": "^2.8.6",
     "duck-duck-scrape": "^2.2.7",
     "express": "^5.2.1",
+    "form-data": "^4.0.5",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
     "openai": "^6.34.0",
+    "pdf-parse": "^2.4.5",
     "pg": "^8.20.0",
     "tesseract.js": "^7.0.0"
   }
