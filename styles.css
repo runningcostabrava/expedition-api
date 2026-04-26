@@ -1245,16 +1245,26 @@ body.zen-mode #fleet-panel {
         right: 10px !important;
         height: auto !important;
         padding: 12px !important; /* Added padding so inputs don't touch the glass edges */
+        padding-right: 60px !important; /* Explicit gap for the right-side button stack */
         flex-wrap: nowrap !important;
         overflow: visible !important;
         flex-direction: column !important;
-        align-items: stretch !important;
+        align-items: flex-start !important;
         gap: 10px !important;
     }
 
-    /* Force Google Maps Search to match your custom search bar width */
+    /* 2. Constrain the Search Group width so it doesn't crowd the right-side buttons */
+    #search-group {
+        max-width: 80% !important; /* Leaves 20% breathing room for FABs */
+        align-self: flex-start;
+    }
+
+    /* 3. Make inputs slightly more compact */
+    #internal-map-search, 
     #google-discovery-input {
         width: 100% !important;
+        height: 38px !important; /* Slimmer height for mobile */
+        font-size: 0.9em !important;
         box-sizing: border-box !important;
     }
 
@@ -1286,7 +1296,7 @@ body.zen-mode #fleet-panel {
         right: 15px !important;
         flex-direction: column !important;
         gap: 12px !important;
-        z-index: 100 !important; /* CRITICAL: Lowers them so bottom-sheets slide OVER them cleanly! */
+        z-index: 200 !important; /* Raised above the 150 of the command bar */
         align-items: flex-end !important;
     }
 
@@ -1416,4 +1426,11 @@ body.zen-mode #fleet-panel {
         margin: 12px auto 5px auto;
         flex-shrink: 0;
     }
+}
+
+/* Force iOS to treat UI panels as top-level layers */
+#left-panel, #task-detail-panel, #right-panel, #app-switcher, #om-container {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    will-change: transform;
 }
