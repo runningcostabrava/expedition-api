@@ -47,7 +47,7 @@ body {
     z-index: 150 !important;
     box-shadow: var(--card-shadow);
     color: white;
-    padding: 0 20px !important; /* Remove the 320px right padding */
+    padding: 0 420px 0 20px !important; /* CRITICAL FIX: 420px right padding prevents overlap with FABs */
     display: flex !important;
     flex-direction: row !important;
     align-items: center !important;
