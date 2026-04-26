@@ -131,7 +131,12 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS section_id INTEGER REFERENCES sections(id) ON DELETE SET NULL",
       "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS section_id INTEGER REFERENCES sections(id) ON DELETE SET NULL",
       "DO $$ BEGIN ALTER TABLE waypoints ADD CONSTRAINT fk_parent_track FOREIGN KEY (parent_track_id) REFERENCES tracks(id) ON DELETE SET NULL; EXCEPTION WHEN duplicate_object THEN null; END $$;",
-      "DO $$ BEGIN ALTER TABLE tracks ADD CONSTRAINT fk_parent_track_self FOREIGN KEY (parent_track_id) REFERENCES tracks(id) ON DELETE SET NULL; EXCEPTION WHEN duplicate_object THEN null; END $$;"
+      "DO $$ BEGIN ALTER TABLE tracks ADD CONSTRAINT fk_parent_track_self FOREIGN KEY (parent_track_id) REFERENCES tracks(id) ON DELETE SET NULL; EXCEPTION WHEN duplicate_object THEN null; END $$;",
+      `CREATE TABLE IF NOT EXISTS ai_memory (
+        id SERIAL PRIMARY KEY,
+        memory_text TEXT
+      );`,
+      "INSERT INTO ai_memory (id, memory_text) VALUES (1, '') ON CONFLICT DO NOTHING;"
     ];
 
     // Execute safely one by one
@@ -251,16 +256,16 @@ const aiTools = [
     type: "function",
     function: {
       name: "create_task",
-      description: "Create a new logistics task in the expedition plan.",
+      description: "Use this tool to create a brand new task or milestone in the itinerary.",
       parameters: {
         type: "object",
         properties: {
-          task_name: { type: "string", description: "Title of the task" },
-          section_id: { type: "integer", description: "The database ID of the matching section/day" },
-          starts_at: { type: "string", description: "ISO timestamp (YYYY-MM-DDTHH:mm:ss.000Z) or null" },
-          responsible: { type: "string", description: "Name of the guide responsible" },
-          characteristics: { type: "string", description: "Notes or description" },
-          is_milestone: { type: "boolean", description: "True if it is a milestone or 'Fite'" }
+          task_name: { type: "string" },
+          section_id: { type: "number", nullable: true },
+          starts_at: { type: "string", nullable: true, description: "ISO string format" },
+          responsible: { type: "string", nullable: true },
+          is_milestone: { type: "boolean", description: "Set to true if this is a Fite/Milestone" },
+          characteristics: { type: "string", nullable: true, description: "Description or notes for the task" }
         },
         required: ["task_name"]
       }
@@ -307,6 +312,20 @@ const aiTools = [
         required: ["query"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_core_memory",
+      description: "Save or summarize important user preferences, rules, or context to your permanent long-term memory. Use this when the user explicitly asks you to remember something for the future. You should rewrite the existing memory to include the new facts seamlessly.",
+      parameters: {
+        type: "object",
+        properties: {
+          new_memory_text: { type: "string", description: "The comprehensive, updated summary of everything you need to remember. Incorporate the new information into the existing memory string." }
+        },
+        required: ["new_memory_text"]
+      }
+    }
   }
 ];
 
@@ -335,6 +354,10 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
         finalPrompt += `\n\n[SYSTEM NOTE: The user attached an image, but the OCR extraction failed.]`;
       }
     }
+
+    // Fetch AI's permanent memory
+    const memoryRes = await pool.query('SELECT memory_text FROM ai_memory WHERE id = 1');
+    const longTermMemory = memoryRes.rows[0]?.memory_text || "No specific memories or guidelines saved yet.";
 
     // 1. Fetch Expedition Days
     const sectionsRes = await pool.query('SELECT id, title, section_date FROM sections ORDER BY section_date ASC');
@@ -376,7 +399,12 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
     const messages = [
         { 
           role: "system", 
-          content: `You are an expert logistics coordinator for mountain guides. 
+          content: `You are an expert logistics coordinator for mountain guides.
+          
+          [YOUR PERMANENT LONG-TERM MEMORY]:
+          ${longTermMemory}
+          -----------------------------------
+
           Expedition Days (Sections): ${sectionsContext}.
           Current Active Tasks (with Map Data): ${contextString}.
           
@@ -389,7 +417,9 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
           6. SEARCH: If asked to find information you don't know, use the 'search_internet' tool first, read the results, and then fulfill the user's request.
           7. TIME: When creating or moving a task for a specific day, combine the section_date with the requested time to form the correct ISO timestamp (YYYY-MM-DDTHH:mm:ss.000Z), and include the section_id.
           8. VOCAB: 'Fite' means milestone (set is_milestone true).
-          9. CHATTY SEARCH: If the user asks you to look up information or read a website, you MUST write a human-readable summary of what you found in your final reply. Never silently complete the action.` 
+          9. CHATTY SEARCH: If the user asks you to look up information or read a website, you MUST write a human-readable summary of what you found in your final reply. Never silently complete the action.
+          10. MEMORY: If the user asks you to remember a rule or preference, use the 'update_core_memory' tool to rewrite your permanent memory.
+          11. STRICT TOOL EXECUTION: NEVER claim to have created, updated, or deleted a task unless you have EXPLICITLY called the appropriate tool (e.g., create_task) in this exact turn. Do not hallucinate actions or pretend to do things.` 
         }
     ];
 
@@ -444,6 +474,10 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
                     // Grab the top 3 results and feed the text snippets back to DeepSeek
                     const snippets = searchResults.results.slice(0, 3).map(r => r.description).join('\n\n');
                     toolResult = `WEB SEARCH RESULTS FOR "${args.query}":\n${snippets}\n\nAnalyze this information to fulfill the user's request.`;
+                }
+                else if (name === "update_core_memory") {
+                    await pool.query('UPDATE ai_memory SET memory_text = $1 WHERE id = 1', [args.new_memory_text]);
+                    toolResult = `SUCCESS: Permanent memory updated.`;
                 }
             } catch (err) {
                 console.error(`[AI Tool Error] ${name}:`, err);

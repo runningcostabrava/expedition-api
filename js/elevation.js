@@ -26,6 +26,8 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
     const waypointMeta = new Array(coords.length).fill(null);
     const customPointStyles = new Array(coords.length).fill('circle');
     const pointRadii = new Array(coords.length).fill(0);
+    const pointBgColors = new Array(coords.length).fill('transparent');
+    const pointBorderColors = new Array(coords.length).fill('transparent');
 
     coords.forEach((c, i) => {
         elevations.push(c[2] || 0);
@@ -52,15 +54,6 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                 });
 
                 if (minDist < 5) {
-                    const iconEmoji = (g.icon || 'ph-map-pin').split(' ')[0];
-                    const canvas = document.createElement('canvas');
-                    canvas.width = 24; canvas.height = 24;
-                    const ctx = canvas.getContext('2d');
-                    ctx.font = '18px sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(iconEmoji, 12, 14);
-
                     waypointData[nearestIdx] = elevations[nearestIdx];
                     waypointMeta[nearestIdx] = {
                         title: g.title,
@@ -69,8 +62,10 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                         lat: g.lat,
                         x: distances[nearestIdx]
                     };
-                    customPointStyles[nearestIdx] = canvas;
-                    pointRadii[nearestIdx] = 12;
+                    customPointStyles[nearestIdx] = 'circle';
+                    pointRadii[nearestIdx] = 7; // Good, visible dot size
+                    pointBgColors[nearestIdx] = g.color || '#e74c3c'; // Match the waypoint color
+                    pointBorderColors[nearestIdx] = '#ffffff'; // Crisp white border
                 }
             }
         });
@@ -91,7 +86,10 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                     showLine: false,
                     pointStyle: customPointStyles,
                     pointRadius: pointRadii,
-                    pointHoverRadius: pointRadii,
+                    pointHoverRadius: 10,
+                    pointBackgroundColor: pointBgColors,
+                    pointBorderColor: pointBorderColors,
+                    pointBorderWidth: 2,
                     backgroundColor: 'transparent',
                     borderColor: 'transparent',
                     zIndex: 10
@@ -117,7 +115,7 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                         label: (context) => {
                             if (context.dataset.label === 'Waypoints') {
                                 const meta = waypointMeta[context.dataIndex];
-                                if (meta) return `<i class="ph ph-map-pin"></i> ${meta.title}`;
+                                if (meta) return `${meta.title} (at ${meta.x}km)`;
                                 return null;
                             }
                             return `Elev: ${context.parsed.y}m`;
