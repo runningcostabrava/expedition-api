@@ -70,24 +70,23 @@
         }
     </script>
     <div id="command-bar">
-        <div style="font-weight: 900; color: #0f172a; margin-right: 10px;">EXPEDITION v2</div>
+        <div style="font-weight: 900; color: #0f172a; margin-right: 10px; flex-shrink: 0;">EXPEDITION v2</div>
 
-        <div style="position: relative; flex: 1; max-width: 300px;">
-            <input type="text" id="internal-map-search" placeholder="🔍 Search saved locations..."
-                style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ddd; outline: none;">
-            <div id="internal-search-results"
-                style="display:none; position:absolute; top:45px; left:0; right:0; background:white; border-radius:8px; box-shadow:var(--card-shadow); max-height:300px; overflow-y:auto; z-index:1000;">
+        <button id="mobile-search-btn" class="mobile-only-btn" onclick="document.getElementById('search-group').classList.toggle('show-mobile')" style="background: transparent; border: none; color: white; font-size: 1.5em; cursor: pointer; margin-left: auto; display: none;">🔍</button>
+
+        <div id="search-group" class="search-group">
+            <div style="position: relative; flex: 1; max-width: 300px; width: 100%;">
+                <input type="text" id="internal-map-search" placeholder="🔍 Search saved locations..."
+                    style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ddd; outline: none; box-sizing: border-box;">
+                <div id="internal-search-results" style="display:none; position:absolute; top:45px; left:0; right:0; background:white; border-radius:8px; box-shadow:var(--card-shadow); max-height:300px; overflow-y:auto; z-index:1000;"></div>
             </div>
+            <div id="google-search-container" style="position: relative; width: 100%; max-width: 300px;"></div>
         </div>
 
-        <div id="google-search-container" style="position: relative;"></div>
-        <div id="section-pills"
-            style="display:flex; gap:8px; flex: 1; margin-left: 10px; overflow-x: auto; min-width: 0;"></div>
-
-        <div id="style-switcher">
+        <div id="style-switcher" style="margin-left: auto;">
             <select onchange="changeMapStyle(this.value)"
-                style="padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); font-weight: bold; cursor: pointer; outline: none; background: rgba(255,255,255,0.1); color: white; margin-right: 10px;">
-                <option value="mapbox://styles/mapbox/outdoors-v12">⛰️ Outdoors (Hiking)</option>
+                style="padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); font-weight: bold; cursor: pointer; outline: none; background: rgba(255,255,255,0.1); color: white;">
+                <option value="mapbox://styles/mapbox/outdoors-v12">⛰️ Outdoors</option>
                 <option value="mapbox://styles/mapbox/satellite-streets-v12">🌍 Satellite 3D</option>
                 <option value="mapbox://styles/mapbox/dark-v11">🌙 Dark Mode</option>
                 <option value="mapbox://styles/mapbox/streets-v12">🛣️ Standard</option>
@@ -3457,6 +3456,22 @@
 
             initializeApp();
     </script>
+    <div id="app-switcher" style="position: fixed; bottom: 80px; left: 15px; z-index: 100000;">
+        <button onclick="document.getElementById('switcher-menu').classList.toggle('show')"
+            style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;">📱</button>
+        <div id="switcher-menu"
+            style="display: none; position: absolute; bottom: 65px; left: 0; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 220px; flex-direction: column; gap: 8px; border: 1px solid #e2e8f0;">
+            <div style="font-size: 0.75em; font-weight: bold; color: #64748b; text-transform: uppercase; padding-left: 5px; margin-bottom: 2px;">Switch App</div>
+            <a href="index.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">🗺️ Command Center</a>
+            <a href="field.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">🧭 Field Map</a>
+            <a href="pm.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">📋 Mobile PM</a>
+            <a href="telemetry.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">📊 Telemetry</a>
+        </div>
+    </div>
+    <style>
+        #switcher-menu.show { display: flex !important; }
+        #switcher-menu a:hover { background: #e2e8f0 !important; }
+    </style>
 </body>
 
 </html>
