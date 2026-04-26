@@ -825,30 +825,19 @@
 
             window.initGoogleSearch = async () => {
                 try {
-                    // 1. Defensive check: ensures Google Maps core is actually present
-                    if (!window.google || !window.google.maps) {
-                        console.warn("Google Maps not ready, retrying library import...");
-                        setTimeout(window.initGoogleSearch, 500);
-                        return;
-                    }
-
-                    // 2. Await the specific library import
-                    const placesLib = await google.maps.importLibrary("places");
-                    const { Place } = placesLib; 
-                    
-                    // Save to window so search listeners can find it
+                    // 1. Defensively wait for the library
+                    const { Place } = await google.maps.importLibrary("places");
                     window.GooglePlaceClass = Place;
 
-                    // 3. Clear container and create input
                     const container = document.getElementById('google-search-container');
                     if (!container) return;
-                    container.innerHTML = ''; 
+                    container.innerHTML = ''; // Clear any existing fragments
 
                     const searchInput = document.createElement('input');
                     searchInput.id = 'google-discovery-input';
                     searchInput.placeholder = '🔍 Find "restaurants", "hotels"...';
-
-                    // 4. Force mobile visibility and constrain width
+                    
+                    // 2. Force visibility for mobile and desktop
                     searchInput.style.cssText = `
                         display: block !important;
                         width: 100%; 
@@ -859,40 +848,32 @@
                         background: rgba(255,255,255,0.1); 
                         color: white;
                         box-sizing: border-box;
-                        font-size: 16px; /* Prevents iOS zoom-on-focus */
+                        font-size: 16px;
                     `;
 
                     container.appendChild(searchInput);
 
+                    // 3. Add the listener
                     searchInput.addEventListener('keydown', async (e) => {
                         if (e.key === 'Enter') {
                             const query = searchInput.value.trim();
-                            if (!query) return;
-
+                            if (!query || !window.GooglePlaceClass) return;
                             const center = map.getCenter();
-                            const request = {
+                            const { places } = await window.GooglePlaceClass.searchByText({
                                 textQuery: query,
-                                locationBias: { center: { lat: center.lat, lng: center.lng }, radius: 15000 },
+                                locationBias: { center: { lat: center.lat, lng: center.lng }, radius: 10000 },
                                 fields: ['id', 'displayName', 'location', 'photos', 'rating', 'userRatingCount', 'formattedAddress', 'websiteURI', 'googleMapsURI', 'nationalPhoneNumber'],
-                                maxResultCount: 10
-                            };
-
-                            try {
-                                // Use the class from the window or the loaded library
-                                const { places } = await window.GooglePlaceClass.searchByText(request);
-                                if (places && places.length > 0) {
-                                    window.lastSearchResults = places;
-                                    renderDiscoverySidebar(places);
-                                } else {
-                                    alert("No results found in this area.");
-                                }
-                            } catch (err) {
-                                console.error("Search Execution Error:", err);
+                                maxResultCount: 12
+                            });
+                            if (places && places.length > 0) {
+                                window.lastSearchResults = places;
+                                renderDiscoverySidebar(places);
                             }
                         }
                     });
+                    console.log("✅ Google Places search box initialized");
                 } catch (err) {
-                    console.error("Google Library Load Error:", err);
+                    console.error("Google Load Failure:", err);
                 }
             };
 
