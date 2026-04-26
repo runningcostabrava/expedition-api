@@ -162,64 +162,169 @@ async function authFetch(url, options = {}) {
     }
 }
 
-window.processAiCommand = function() {
-    // 1. Create the Modal UI Dynamically
+window.openAiChat = function() {
     const modalId = 'ai-multimodal-assistant';
-    if (document.getElementById(modalId)) document.getElementById(modalId).remove();
+    
+    // If the chat already exists, just show it (preserves history!)
+    if (document.getElementById(modalId)) {
+        document.getElementById(modalId).style.display = 'flex';
+        // Focus the input
+        document.getElementById('ai-prompt-text').focus();
+        return;
+    }
 
     const modal = document.createElement('div');
     modal.id = modalId;
     modal.style.cssText = `
-        position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000000;
-        display: flex; align-items: center; justify-content: center; padding: 20px;
+        position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000000;
+        display: flex; align-items: center; justify-content: center; padding: 15px;
+        backdrop-filter: blur(4px);
     `;
 
+    // WhatsApp-style Chat UI
     modal.innerHTML = `
-        <div style="background: white; width: 100%; max-width: 400px; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3); display: flex; flex-direction: column;">
+        <div style="background: #f8fafc; width: 100%; max-width: 450px; height: 85vh; max-height: 800px; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.4); display: flex; flex-direction: column;">
             <div style="background: #0f172a; color: white; padding: 15px 20px; font-weight: bold; font-size: 1.1em; display: flex; justify-content: space-between; align-items: center;">
-                <span>🤖 DeepSeek Logistics</span>
-                <span onclick="document.getElementById('${modalId}').remove()" style="cursor: pointer; font-size: 1.2em;">×</span>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="width:34px; height:34px; background:#8b5cf6; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.2em;">🤖</div>
+                    <div style="display:flex; flex-direction:column;">
+                        <span style="line-height:1.1;">DeepSeek Guide</span>
+                        <span style="font-size:0.7em; color:#94a3b8; font-weight:normal;">Online</span>
+                    </div>
+                </div>
+                <span onclick="document.getElementById('${modalId}').style.display='none'" style="cursor: pointer; font-size: 1.8em; line-height: 1; padding: 0 5px;">×</span>
             </div>
-            <div style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
-                <textarea id="ai-prompt-text" rows="4" placeholder="What would you like to update? (e.g., 'Extract the flights from this image and add them to Day 1')" style="width: 100%; padding: 12px; border: 1px solid #cbd5e0; border-radius: 8px; font-family: inherit; resize: vertical; box-sizing: border-box;"></textarea>
+
+            <div id="ai-chat-history" style="flex: 1; overflow-y: auto; padding: 20px 15px; display: flex; flex-direction: column; gap: 15px; background: #e2e8f0; background-image: radial-gradient(#cbd5e0 1px, transparent 0); background-size: 20px 20px;">
+                <div style="text-align: center; color: #64748b; font-size: 0.85em; margin-bottom: 10px; background: rgba(255,255,255,0.6); padding: 4px 12px; border-radius: 12px; align-self: center;">
+                    Chat started. Ask me to update the itinerary, read receipts, or analyze map data!
+                </div>
+            </div>
+
+            <div style="background: white; padding: 12px 15px; border-top: 1px solid #cbd5e0; display: flex; flex-direction: column; gap: 10px;">
                 
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <input type="file" id="ai-image-upload" accept="image/*" style="display: none;">
-                    <button onclick="document.getElementById('ai-image-upload').click()" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e0; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; flex-shrink: 0;">📸 Attach Photo</button>
-                    <span id="ai-image-name" style="font-size: 0.85em; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">No image selected</span>
+                <div id="ai-attachment-preview" style="display:none; align-items:center; justify-content:space-between; background:#f1f5f9; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0; font-size:0.85em;">
+                    <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
+                        <span style="font-size:1.2em;">📎</span>
+                        <span id="ai-image-name" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#475569; font-weight:bold;">No image</span>
+                    </div>
+                    <button onclick="window.clearAiAttachment()" style="background:none; border:none; color:#ef4444; cursor:pointer; font-weight:bold; font-size:1.2em; padding:0 5px;">×</button>
                 </div>
 
-                <button id="ai-submit-btn" style="background: #8b5cf6; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.05em; cursor: pointer; box-shadow: 0 4px 10px rgba(139, 92, 246, 0.3);">Send to DeepSeek</button>
+                <div style="display: flex; gap: 8px; align-items: flex-end;">
+                    <input type="file" id="ai-image-upload" accept="image/*" style="display: none;">
+                    
+                    <button onclick="document.getElementById('ai-image-upload').click()" style="background: #f8fafc; color: #475569; border: 1px solid #cbd5e0; border-radius: 50%; width: 42px; height: 42px; display:flex; align-items:center; justify-content:center; cursor: pointer; flex-shrink: 0; font-size:1.2em; transition:0.2s;">➕</button>
+                    
+                    <textarea id="ai-prompt-text" rows="1" placeholder="Message..." style="flex: 1; padding: 12px 15px; border: 1px solid #cbd5e0; border-radius: 20px; font-family: inherit; resize: none; overflow-y:hidden; box-sizing: border-box; font-size:0.95em; outline:none; max-height:120px;" oninput="this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 120) + 'px';"></textarea>
+                    
+                    <button id="ai-submit-btn" style="background: #27ae60; color: white; border: none; border-radius: 50%; width: 42px; height: 42px; display:flex; align-items:center; justify-content:center; cursor: pointer; flex-shrink: 0; font-size:1.2em; box-shadow: 0 4px 10px rgba(39,174,96,0.3); transition:transform 0.1s;">➤</button>
+                </div>
             </div>
         </div>
     `;
-
     document.body.appendChild(modal);
 
-    // 2. Handle File Selection
+    const textarea = document.getElementById('ai-prompt-text');
+    const history = document.getElementById('ai-chat-history');
+
+    // Auto-send on Enter (Shift+Enter for new line)
+    textarea.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            document.getElementById('ai-submit-btn').click();
+        }
+    });
+
+    // Attachment Handlers
     let attachedFile = null;
+    window.clearAiAttachment = function() {
+        attachedFile = null;
+        document.getElementById('ai-image-upload').value = '';
+        document.getElementById('ai-attachment-preview').style.display = 'none';
+    };
+
     document.getElementById('ai-image-upload').addEventListener('change', function(e) {
         if (e.target.files.length > 0) {
             attachedFile = e.target.files[0];
             document.getElementById('ai-image-name').innerText = attachedFile.name;
+            document.getElementById('ai-attachment-preview').style.display = 'flex';
+            textarea.focus();
         }
     });
 
-    // 3. Handle Submission
+    // Chat Bubble Generator
+    function appendMessage(role, text, imageUrl = null) {
+        const msgDiv = document.createElement('div');
+        msgDiv.style.cssText = `max-width: 85%; padding: 10px 14px; font-size: 0.95em; line-height: 1.4; word-wrap: break-word; box-shadow: 0 1px 2px rgba(0,0,0,0.1); display:flex; flex-direction:column; gap:5px;`;
+
+        if (role === 'user') {
+            msgDiv.style.alignSelf = 'flex-end';
+            msgDiv.style.background = '#dcf8c6'; // WhatsApp light green
+            msgDiv.style.color = '#0f172a';
+            msgDiv.style.borderRadius = '16px 16px 4px 16px';
+        } else {
+            msgDiv.style.alignSelf = 'flex-start';
+            msgDiv.style.background = 'white';
+            msgDiv.style.color = '#1e293b';
+            msgDiv.style.borderRadius = '16px 16px 16px 4px';
+        }
+
+        let contentHtml = '';
+        
+        // Show local image preview for user messages
+        if (imageUrl) {
+            contentHtml += `<img src="${imageUrl}" style="max-width:100%; border-radius:8px; border:1px solid rgba(0,0,0,0.1);">`;
+        }
+        
+        // Use Marked.js to nicely format the AI's response (bolding, lists, etc)
+        if (role === 'ai') {
+            contentHtml += typeof marked !== 'undefined' ? marked.parse(text) : text.replace(/\n/g, '<br>');
+        } else {
+            contentHtml += text.replace(/</g, '<').replace(/>/g, '>').replace(/\n/g, '<br>');
+        }
+
+        msgDiv.innerHTML = contentHtml;
+        
+        // Fix markdown margins
+        const paras = msgDiv.querySelectorAll('p');
+        paras.forEach(p => p.style.margin = '0 0 8px 0');
+        if (paras.length > 0) paras[paras.length-1].style.margin = '0';
+
+        history.appendChild(msgDiv);
+        
+        // Smooth scroll to bottom
+        setTimeout(() => { history.scrollTo({ top: history.scrollHeight, behavior: 'smooth' }); }, 50);
+        return msgDiv;
+    }
+
+    // Submit Handler
     document.getElementById('ai-submit-btn').addEventListener('click', async function() {
-        const promptText = document.getElementById('ai-prompt-text').value.trim();
-        if (!promptText && !attachedFile) return alert("Please enter text or attach an image.");
+        const promptText = textarea.value.trim();
+        if (!promptText && !attachedFile) return;
 
         const btn = this;
-        btn.innerText = "⏳ Processing...";
         btn.disabled = true;
+        btn.style.transform = 'scale(0.9)';
+
+        // 1. Render User Message instantly
+        let previewUrl = null;
+        if (attachedFile) previewUrl = URL.createObjectURL(attachedFile);
+        appendMessage('user', promptText, previewUrl);
+
+        // 2. Reset Input Area
+        textarea.value = '';
+        textarea.style.height = 'auto';
+        textarea.focus();
+
+        // 3. Render "AI is typing" indicator
+        const typingIndicator = appendMessage('ai', '<span style="color:#94a3b8; font-style:italic;">thinking...</span>');
 
         try {
             let uploadedImageUrl = null;
 
-            // Upload the image to your existing Cloudinary setup first
+            // Upload image if attached
             if (attachedFile) {
-                if (typeof showToast === 'function') showToast("Uploading image...", "info");
                 const formData = new FormData();
                 formData.append('file', attachedFile);
                 const uploadRes = await authFetch(`${API_URL}/api/upload`, { method: 'POST', body: formData });
@@ -228,9 +333,7 @@ window.processAiCommand = function() {
                 uploadedImageUrl = uploadData.secure_url;
             }
 
-            if (typeof showToast === 'function') showToast("🧠 DeepSeek is analyzing...", "info");
-
-            // Send text and image URL to the backend
+            // Send to Backend
             const res = await authFetch(`${API_URL}/api/ai/command`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -239,20 +342,26 @@ window.processAiCommand = function() {
             
             if (!res || res.status === 401) throw new Error("Unauthorized"); 
             const data = await res.json();
-            
             if (data.error) throw new Error(data.error);
-            
-            if (typeof showToast === 'function') showToast(data.message, "success");
-            else alert(data.message);
-            
-            modal.remove();
+
+            // 4. Remove typing indicator and render AI Response
+            typingIndicator.remove();
+            appendMessage('ai', data.message);
+            window.clearAiAttachment();
+
+            // Refresh underlying map/data in the background quietly
             if (typeof refreshData === 'function') refreshData();
             if (typeof loadData === 'function') loadData(); 
             
         } catch (err) {
-            alert("AI Command Failed: " + err.message);
-            btn.innerText = "Send to DeepSeek";
+            typingIndicator.remove();
+            appendMessage('ai', `<strong style="color:#ef4444;">Error:</strong> ${err.message}`);
+        } finally {
             btn.disabled = false;
+            btn.style.transform = 'scale(1)';
         }
     });
 };
+
+// Ensure all buttons trigger the new chat interface
+window.processAiCommand = window.openAiChat;
