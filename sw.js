@@ -95,6 +95,8 @@ self.addEventListener('message', async event => {
 
 // ─── FETCH INTERCEPTOR ───────────────────────────────────────────────────────
 self.addEventListener('fetch', event => {
+    if (!event.request.url.startsWith('http')) return;
+
     // Never intercept non-GET requests (POST/PUT/DELETE go straight through)
     if (event.request.method !== 'GET') return;
 

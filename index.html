@@ -1008,18 +1008,16 @@
                     listContainer.appendChild(row);
                 });
 
-                async function renderRichPlaceProfile(place, coords, isFromSearchList = false) {
-                    const container = document.getElementById('asana-container');
-                    const photoUrl = place.photos && place.photos.length > 0 ? place.photos[0].getURI({ maxWidth: 600 }) : 'https://via.placeholder.com/600x300?text=No+Photo';
-                    const title = place.displayName || 'Unknown Place';
-                    // NEW API FIX: isOpen() is an asynchronous call and requires an await
-                    let isOpen = '';
-                    try {
-                        if (place.regularOpeningHours) {
-                            const isOpenNow = await place.isOpen();
-                            isOpen = isOpenNow ? '<span style="color:#27ae60; font-weight:bold;">🟢 Open Now</span>' : '<span style="color:#e74c3c; font-weight:bold;">🔴 Closed</span>';
-                        }
-                    } catch (e) { /* Ignore if Google fails to parse the current time */ }
+            async function renderRichPlaceProfile(place, coords, isFromSearchList = false) {
+                const container = document.getElementById('asana-container');
+                const photoUrl = place.photos && place.photos.length > 0 ? place.photos[0].getURI({ maxWidth: 600 }) : 'https://via.placeholder.com/600x300?text=No+Photo';
+                const title = place.displayName || 'Unknown Place';
+                // NEW API FIX: isOpen() is an asynchronous call and requires an await
+                let isOpen = '';
+                try {
+                    const isOpenNow = await place.isOpen();
+                    isOpen = isOpenNow ? '<span style="color:#27ae60; font-weight:bold;">🟢 Open Now</span>' : '<span style="color:#e74c3c; font-weight:bold;">🔴 Closed</span>';
+                } catch (e) { /* Ignore if Google fails to parse the current time */ }
 
                     const googleData = {
                         photoUrl: photoUrl,
@@ -2093,7 +2091,7 @@
             }
 
             window.changeMapStyle = function(style) {
-                // 1. Tell the GPU to stop rendering 3D before we switch styles
+                // 1. Tell the GPU to stop rendering 3D before we switch styles to prevent vertex explosion
                 map.setTerrain(null); 
                 
                 map.setStyle(style);
