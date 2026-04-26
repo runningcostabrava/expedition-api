@@ -1255,17 +1255,31 @@ body.zen-mode #fleet-panel {
 
     /* 2. Constrain the Search Group width so it doesn't crowd the right-side buttons */
     #search-group {
-        max-width: 80% !important; /* Leaves 20% breathing room for FABs */
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+        width: 100% !important;
+        max-width: 85% !important; /* Leave room for FABs */
         align-self: flex-start;
     }
 
-    /* 3. Make inputs slightly more compact */
+    /* Ensure the Google container has height and visibility */
+    #google-search-container {
+        display: block !important;
+        min-height: 40px !important;
+        width: 100% !important;
+    }
+
+    /* 3. Make inputs slightly more compact and ensure visibility */
     #internal-map-search, 
     #google-discovery-input {
+        display: block !important;
         width: 100% !important;
-        height: 38px !important; /* Slimmer height for mobile */
+        height: 40px !important; /* Standard height for mobile touch */
         font-size: 0.9em !important;
         box-sizing: border-box !important;
+        visibility: visible !important;
+        opacity: 1 !important;
     }
 
     #style-switcher select {
