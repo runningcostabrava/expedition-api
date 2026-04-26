@@ -1505,3 +1505,10 @@ body.zen-mode #fleet-panel {
     will-change: transform;
     -webkit-font-smoothing: antialiased;
 }
+
+/* Hide Offline Manager controls on desktop */
+@media (min-width: 769px) {
+    #om-container {
+        display: none !important;
+    }
+}
