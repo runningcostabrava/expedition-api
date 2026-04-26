@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { OpenAI } = require('openai');
+const Tesseract = require('tesseract.js');
 
 const deepseek = new OpenAI({
   baseURL: 'https://api.deepseek.com',
@@ -291,10 +292,31 @@ const aiTools = [
 ];
 
 app.post('/api/ai/command', adminAuth, async (req, res) => {
-  const { prompt } = req.body;
-  if (!prompt) return res.status(400).json({ error: "Prompt is required" });
+  const { prompt, imageUrl } = req.body;
+  if (!prompt && !imageUrl) return res.status(400).json({ error: "Prompt or Image is required" });
 
   try {
+    let finalPrompt = prompt || "Please process the extracted text from the attached image.";
+
+    // --- TESSERACT OCR ENGINE ---
+    if (imageUrl) {
+      try {
+        console.log("[AI] Scanning image with Tesseract OCR...");
+        // Use eng+spa+ita (English, Spanish, Italian) since the expedition is in Europe
+        const { data: { text } } = await Tesseract.recognize(
+          imageUrl,
+          'eng+spa+ita', 
+          { logger: m => console.log(m) } // Optional: logs progress in the console
+        );
+        
+        finalPrompt += `\n\n[RAW TEXT EXTRACTED FROM IMAGE VIA OCR]:\n${text}`;
+        console.log("[AI] Tesseract Extraction Complete.");
+      } catch (ocrErr) {
+        console.error("[AI] Tesseract OCR Failed:", ocrErr);
+        finalPrompt += `\n\n[SYSTEM NOTE: The user attached an image, but the OCR extraction failed.]`;
+      }
+    }
+
     // 1. Fetch Expedition Days
     const sectionsRes = await pool.query('SELECT id, title, section_date FROM sections ORDER BY section_date ASC');
     const sectionsContext = JSON.stringify(sectionsRes.rows);
@@ -345,9 +367,10 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
           2. If a user references a day by name (e.g., 'the day we go to Selinunte'), look up the correct Section ID and section_date from the Expedition Days list.
           3. When creating or moving a task for a specific day, combine the section_date with the requested time to form the correct ISO timestamp (YYYY-MM-DDTHH:mm:ss.000Z), and include the section_id.
           4. If modifying an existing task, find the exact 'id' from the Active Tasks list.
-          5. 'Fite' means milestone (set is_milestone true).` 
+          5. 'Fite' means milestone (set is_milestone true).
+          6. If the user provides raw OCR text from a receipt, ticket, or screenshot, automatically extract the logical tasks, times, and notes and use the tools to add them to the itinerary.` 
         },
-        { role: "user", content: prompt }
+        { role: "user", content: finalPrompt }
       ],
       tools: aiTools,
       tool_choice: "auto"

@@ -46,14 +46,12 @@ body {
     border-radius: 12px;
     z-index: 150 !important;
     box-shadow: var(--card-shadow);
-    gap: 15px;
     color: white;
-    /* Remove the 320px padding that blocks the search boxes */
-    padding: 0 15px !important; 
+    padding: 0 20px !important; /* Remove the 320px right padding */
     display: flex !important;
     flex-direction: row !important;
-    align-items: center;
-    justify-content: space-between;
+    align-items: center !important;
+    gap: 15px !important;
     height: 55px;
 }
 
@@ -96,11 +94,11 @@ body {
 
 #search-group {
     display: flex !important;
-    flex-direction: row !important; /* Forces side-by-side */
+    flex-direction: row !important;
     gap: 10px;
     flex: 1;
-    max-width: 650px;
-    margin: 0 20px;
+    max-width: 500px; /* Limits width so it doesn't crowd the bar */
+    margin: 0 !important;
 }
 
 #internal-map-search, 
@@ -650,6 +648,8 @@ body {
     background: transparent;
     box-shadow: none;
     padding: 0;
+    margin-left: auto !important; /* FIX: Pushes the switcher to the far right */
+    flex-shrink: 0;
 }
 
 /* Elevation Panel */
@@ -1199,9 +1199,24 @@ body.zen-mode #fleet-panel {
 }
 
 @keyframes pulse-ring {
-    0% {
-        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-    }
+    0% { transform: scale(0.8); opacity: 0.5; }
+    80%, 100% { transform: scale(2.2); opacity: 0; }
+}
+
+@keyframes pulse-radar {
+    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.fleet-avatar-pin {
+    animation: pulse-radar 2s infinite;
+}
+
+/* Hide labels when zoomed out too far */
+#map.hide-radar-labels .fleet-label-container {
+    display: none !important;
+}
 
     70% {
         box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
@@ -1255,29 +1270,29 @@ body.zen-mode #fleet-panel {
 
 @media (max-width: 768px) {
     #command-bar {
-        height: 55px !important; /* Forces one line */
-        padding-right: 15px !important;
+        height: 55px !important; /* Single line height */
+        justify-content: flex-start !important; /* Title and icon stay left */
+        padding-right: 80px !important; /* Safe area for the red camera button */
         flex-direction: row !important;
-        justify-content: space-between !important;
         align-items: center !important;
     }
 
     /* Move the toggle button inline with title */
     #mobile-search-btn {
-        display: block !important;
-        margin: 0 !important;
-        order: 2; /* Put it on the right */
+        display: inline-flex !important; /* Show next to title */
+        margin-left: 5px !important;
+        vertical-align: middle;
     }
 
     /* Hide search group and make it a floating drawer */
     #search-group {
-        display: none !important;
+        display: none !important; /* Hidden by default */
         flex-direction: column !important;
         position: absolute;
-        top: 60px; /* Pops out below the bar */
+        top: 60px; /* Drops down as a drawer */
         left: 10px;
         right: 10px;
-        background: rgba(15, 23, 42, 0.95);
+        background: var(--glass-dark);
         padding: 10px;
         border-radius: 12px;
         z-index: 1000;
@@ -1333,7 +1348,7 @@ body.zen-mode #fleet-panel {
     }
 
     #style-switcher {
-        display: none !important;
+        display: none !important; /* Hide switcher on mobile to save space */
     }
 
     /* Hide map styles on mobile to save space */
@@ -1446,9 +1461,13 @@ body.zen-mode #fleet-panel {
         display: none !important;
     }
 
-    .mobile-only-btn {
-        display: block !important;
-    }
+.mobile-only-btn {
+    display: none !important;
+}
+
+#mobile-search-btn {
+    display: none !important; /* Keep hidden on desktop */
+}
 
     .mobile-close-bar {
         display: block !important;

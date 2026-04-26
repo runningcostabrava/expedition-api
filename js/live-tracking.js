@@ -149,13 +149,22 @@ async function fetchAndDrawTelemetry() {
             // 2. Draw the Live Avatar (Mapbox HTML Marker)
             const latestCoord = track.coords[track.coords.length - 1];
 
+            // Calculate minutes since last ping
+            // Assuming the point object has the timestamp for the latest point
+            // In the grouped paths, we might need to store the timestamp of the last point
+            const lastPoint = data.filter(p => p.guide_id == id).sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+            const lastPing = new Date(lastPoint.timestamp);
+            const now = new Date();
+            const diffMinutes = Math.floor((now - lastPing) / 60000);
+            const timeLabel = diffMinutes < 1 ? 'Just now' : `${diffMinutes}m ago`;
+
             if (!liveFleetMarkers[id]) {
                 const el = document.createElement('div');
-                el.className = 'fleet-avatar-pin';
+                el.className = 'fleet-avatar-wrapper'; // Used for the CSS zoom scaling above
+                el.style.transition = 'transform 0.2s ease-out';
 
-                // Creates a circular pulsing pin with the Emoji inside
                 el.innerHTML = `
-                    <div style="
+                    <div class="fleet-avatar-pin" style="
                         background-color: ${track.color};
                         width: ${track.icon_size}px;
                         height: ${track.icon_size}px;
@@ -164,32 +173,40 @@ async function fetchAndDrawTelemetry() {
                         justify-content: center;
                         align-items: center;
                         border: 2px solid white;
-                        box-shadow: 0 0 15px ${track.color}80;
+                        box-shadow: 0 0 10px ${track.color}80;
                         font-size: ${Math.max(12, track.icon_size - 10)}px;
-                        animation: pulse-ring 2s infinite;
                     ">
                         ${track.icon}
                     </div>
-                    <div style="
+                    <div class="fleet-label-container" style="
                         position: absolute;
-                        top: -22px;
+                        top: -35px;
                         left: 50%;
                         transform: translateX(-50%);
-                        background: rgba(15, 23, 42, 0.85);
-                        color: white;
-                        padding: 2px 8px;
-                        border-radius: 4px;
-                        font-size: 11px;
-                        font-weight: bold;
-                        white-space: nowrap;
-                    ">${track.name}</div>
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                    ">
+                        <div style="background: rgba(15, 23, 42, 0.9); color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; white-space: nowrap;">
+                            ${track.name}
+                        </div>
+                        <div class="recency-label" style="background: ${diffMinutes > 15 ? '#ef4444' : '#10b981'}; color: white; padding: 1px 5px; border-radius: 3px; font-size: 8px; margin-top: 2px; white-space: nowrap;">
+                            ${timeLabel}
+                        </div>
+                    </div>
                 `;
 
                 liveFleetMarkers[id] = new mapboxgl.Marker({ element: el })
                     .setLngLat(latestCoord)
                     .addTo(map);
             } else {
+                // Update position AND time label for existing markers
                 liveFleetMarkers[id].setLngLat(latestCoord);
+                const label = liveFleetMarkers[id].getElement().querySelector('.recency-label');
+                if (label) {
+                    label.innerText = timeLabel;
+                    label.style.background = diffMinutes > 15 ? '#ef4444' : '#10b981';
+                }
             }
         });
 

@@ -162,32 +162,97 @@ async function authFetch(url, options = {}) {
     }
 }
 
-window.processAiCommand = async function() {
-    const promptText = prompt("🤖 AI Assistant\nWhat would you like to know or update?");
-    if (!promptText) return;
+window.processAiCommand = function() {
+    // 1. Create the Modal UI Dynamically
+    const modalId = 'ai-multimodal-assistant';
+    if (document.getElementById(modalId)) document.getElementById(modalId).remove();
 
-    if (typeof showToast === 'function') showToast("🧠 AI is thinking...", "info");
+    const modal = document.createElement('div');
+    modal.id = modalId;
+    modal.style.cssText = `
+        position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000000;
+        display: flex; align-items: center; justify-content: center; padding: 20px;
+    `;
 
-    try {
-        const res = await authFetch(`${API_URL}/api/ai/command`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: promptText })
-        });
-        
-        if (!res || res.status === 401) return; 
-        const data = await res.json();
-        
-        if (data.error) throw new Error(data.error);
-        
-        // Show AI response
-        if (typeof showToast === 'function') showToast(data.message, "success");
-        else alert(data.message);
-        
-        // Reload UI to show DB changes
-        if (typeof refreshData === 'function') refreshData();
-        if (typeof loadData === 'function') loadData(); 
-    } catch (err) {
-        alert("AI Command Failed: " + err.message);
-    }
+    modal.innerHTML = `
+        <div style="background: white; width: 100%; max-width: 400px; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3); display: flex; flex-direction: column;">
+            <div style="background: #0f172a; color: white; padding: 15px 20px; font-weight: bold; font-size: 1.1em; display: flex; justify-content: space-between; align-items: center;">
+                <span>🤖 DeepSeek Logistics</span>
+                <span onclick="document.getElementById('${modalId}').remove()" style="cursor: pointer; font-size: 1.2em;">×</span>
+            </div>
+            <div style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
+                <textarea id="ai-prompt-text" rows="4" placeholder="What would you like to update? (e.g., 'Extract the flights from this image and add them to Day 1')" style="width: 100%; padding: 12px; border: 1px solid #cbd5e0; border-radius: 8px; font-family: inherit; resize: vertical; box-sizing: border-box;"></textarea>
+                
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="file" id="ai-image-upload" accept="image/*" style="display: none;">
+                    <button onclick="document.getElementById('ai-image-upload').click()" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e0; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; flex-shrink: 0;">📸 Attach Photo</button>
+                    <span id="ai-image-name" style="font-size: 0.85em; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">No image selected</span>
+                </div>
+
+                <button id="ai-submit-btn" style="background: #8b5cf6; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.05em; cursor: pointer; box-shadow: 0 4px 10px rgba(139, 92, 246, 0.3);">Send to DeepSeek</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // 2. Handle File Selection
+    let attachedFile = null;
+    document.getElementById('ai-image-upload').addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            attachedFile = e.target.files[0];
+            document.getElementById('ai-image-name').innerText = attachedFile.name;
+        }
+    });
+
+    // 3. Handle Submission
+    document.getElementById('ai-submit-btn').addEventListener('click', async function() {
+        const promptText = document.getElementById('ai-prompt-text').value.trim();
+        if (!promptText && !attachedFile) return alert("Please enter text or attach an image.");
+
+        const btn = this;
+        btn.innerText = "⏳ Processing...";
+        btn.disabled = true;
+
+        try {
+            let uploadedImageUrl = null;
+
+            // Upload the image to your existing Cloudinary setup first
+            if (attachedFile) {
+                if (typeof showToast === 'function') showToast("Uploading image...", "info");
+                const formData = new FormData();
+                formData.append('file', attachedFile);
+                const uploadRes = await authFetch(`${API_URL}/api/upload`, { method: 'POST', body: formData });
+                if (!uploadRes.ok) throw new Error("Failed to upload image");
+                const uploadData = await uploadRes.json();
+                uploadedImageUrl = uploadData.secure_url;
+            }
+
+            if (typeof showToast === 'function') showToast("🧠 DeepSeek is analyzing...", "info");
+
+            // Send text and image URL to the backend
+            const res = await authFetch(`${API_URL}/api/ai/command`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: promptText, imageUrl: uploadedImageUrl })
+            });
+            
+            if (!res || res.status === 401) throw new Error("Unauthorized"); 
+            const data = await res.json();
+            
+            if (data.error) throw new Error(data.error);
+            
+            if (typeof showToast === 'function') showToast(data.message, "success");
+            else alert(data.message);
+            
+            modal.remove();
+            if (typeof refreshData === 'function') refreshData();
+            if (typeof loadData === 'function') loadData(); 
+            
+        } catch (err) {
+            alert("AI Command Failed: " + err.message);
+            btn.innerText = "Send to DeepSeek";
+            btn.disabled = false;
+        }
+    });
 };
