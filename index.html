@@ -709,7 +709,7 @@
                                     🚶‍♂️ Street View Here
                                 </button>
                                 <button class="popup-btn" style="width: 100%; background: #84cc16; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s; margin-top: 5px;" 
-                                        onclick="window.open('https://www.wikiloc.com/wikiloc/find.do?near=' + ${lat} + ',' + ${lng} + '&q=' + encodeURIComponent('${searchName}'), '_blank'); this.closest('.mapboxgl-popup').remove();">
+                                        onclick="window.open('https://www.wikiloc.com/wikiloc/find.do?near=' + ${lat} + ',' + ${lng} + '&q=' + encodeURIComponent('${searchName.replace(/'/g, "\\'")}'), '_blank'); this.closest('.mapboxgl-popup').remove();">
                                     ⛰️ View on Wikiloc
                                 </button>
                             </div>
