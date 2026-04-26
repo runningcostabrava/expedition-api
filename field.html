@@ -6,13 +6,16 @@
     <meta name="viewport"
         content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <title>Expedition Field Map</title>
+    <link rel="icon" type="image/png" href="icon-192.png">
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <script src="/js/api.js"></script>
     <script src="/js/offline-manager.js"></script>
     <script src="/js/live-tracking.js"></script>
+
     <style>
         body {
             margin: 0;
@@ -50,6 +53,17 @@
             border-radius: 8px;
             border: 1px solid #ddd;
             font-weight: bold;
+        }
+
+        /* Mobile Friendly Map Switcher */
+        #style-selector {
+            flex: 0 0 60px;
+            /* Fixed small width */
+            text-align: center;
+            font-size: 1.2em;
+            padding: 5px;
+            appearance: none;
+            background: #f8fafc;
         }
 
         /* Floating Buttons */
@@ -157,9 +171,17 @@
 <body>
 
     <div id="map"></div>
-    <div id="top-bar"><select id="day-selector" onchange="loadDayTracks(this.value)">
+    <div id="top-bar">
+        <select id="day-selector" onchange="loadDayTracks(this.value)">
             <option value="">Loading days...</option>
-        </select></div>
+        </select>
+        <select id="style-selector" onchange="changeMapStyle(this.value)">
+            <option value="mapbox://styles/mapbox/outdoors-v12" title="Hiking/Outdoors">⛰️</option>
+            <option value="mapbox://styles/mapbox/satellite-streets-v12" title="Satellite">🌍</option>
+            <option value="mapbox://styles/mapbox/dark-v11" title="Dark Mode">🌙</option>
+            <option value="mapbox://styles/mapbox/streets-v12" title="Standard">🛣️</option>
+        </select>
+    </div>
 
     <button class="fab-pin" onclick="enableDropPinMode()">📍</button>
     <button class="fab-fleet" onclick="openFieldFleet()">📡</button>
@@ -202,8 +224,7 @@
             <input type="text" id="pin-title" placeholder="Location Name">
 
             <label style="display:block; margin-bottom:5px; font-size:0.9em; font-weight:bold; color:#475569;">🔗 Link
-                to
-                Task (Optional)</label>
+                to Task (Optional)</label>
             <select id="pin-task-id"
                 style="width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 8px;">
                 <option value="">-- No Task (Loose Waypoint) --</option>
@@ -222,11 +243,11 @@
         </div>
     </div>
 
-    <div id="app-switcher" style="position: fixed; bottom: 25px; left: 20px; z-index: 100000;">
+    <div id="app-switcher" style="position: fixed; bottom: 35px; left: 15px; z-index: 100000;">
         <button onclick="document.getElementById('switcher-menu').classList.toggle('show')"
-            style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center;">📱</button>
+            style="width: 45px; height: 45px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.3em; cursor: pointer; display: flex; justify-content: center; align-items: center;">📱</button>
         <div id="switcher-menu"
-            style="display: none; position: absolute; bottom: 65px; left: 0; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 220px; flex-direction: column; gap: 8px;">
+            style="display: none; position: absolute; bottom: 55px; left: 0; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 220px; flex-direction: column; gap: 8px;">
             <a href="index.html"
                 style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block;">🗺️
                 Command Center</a>
@@ -245,45 +266,13 @@
     </style>
 
     <script>
-        const API_URL = 'https://mapbox-api-uz9a.onrender.com';
-        let AUTH_TOKEN = sessionStorage.getItem('expedition_token');
+        // NOTE: API_URL, AUTH_TOKEN, and authFetch() are inherited natively from /js/api.js
+        // DO NOT redeclare them here or it will crash.
+
         let map, elevationChartInstance = null;
         let isDroppingPin = false;
 
-        async function authFetch(url, options = {}) {
-            if (!AUTH_TOKEN) {
-                const pass = prompt("Enter Admin Password:");
-                if (!pass) return null;
-                try {
-                    const res = await fetch(`${API_URL}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pass }) });
-                    const data = await res.json();
-                    if (data.token) { AUTH_TOKEN = data.token; sessionStorage.setItem('expedition_token', AUTH_TOKEN); }
-                    else return null;
-                } catch (e) {
-                    alert("⚠️ Cannot log in while offline.");
-                    throw e;
-                }
-            }
-
-            options.headers = { ...options.headers, 'Authorization': `Bearer ${AUTH_TOKEN}` };
-
-            try {
-                // Try to make the network request
-                const response = await fetch(url, options);
-                return response;
-            } catch (error) {
-                // If the fetch completely fails (like when offline) AND they are trying to save data
-                if (options.method && options.method !== 'GET') {
-                    alert("📡 You are currently offline. This action cannot be saved to the database right now.");
-                    throw new Error("User is offline, mutative request aborted.");
-                }
-                // For GET requests, the Service Worker should theoretically catch it, but if it falls through:
-                throw error;
-            }
-        }
-
         async function initFieldMap() {
-            // 1. Fetch the real Mapbox Token from the server FIRST
             try {
                 const configRes = await fetch(`${API_URL}/api/config`);
                 const config = await configRes.json();
@@ -292,7 +281,6 @@
                 console.error("Failed to load map token:", e);
             }
 
-            // 2. NOW initialize the map (after we have the real token)
             map = new mapboxgl.Map({
                 container: 'map', style: 'mapbox://styles/mapbox/outdoors-v12', center: [12.5928, 38.0662], zoom: 11
             });
@@ -301,9 +289,15 @@
             map.addControl(geolocate, 'bottom-right');
 
             map.on('load', async () => {
+                // 3D Terrain Integration
+                map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
+                map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
+                map.setLight({ anchor: 'map' });
+                map.addLayer({ 'id': 'sky', 'type': 'sky', 'paint': { 'sky-type': 'atmosphere', 'sky-atmosphere-sun-intensity': 15 } });
+
                 geolocate.trigger();
 
-                // Start live telemetry polling for fleet
+                // Start live telemetry polling for fleet (from live-tracking.js)
                 startFleetTelemetry();
 
                 const secRes = await fetch(`${API_URL}/sections`);
@@ -312,7 +306,7 @@
                 selector.innerHTML = '<option value="all">🌍 Show All Days</option>';
                 sections.forEach(s => selector.innerHTML += `<option value="${s.id}">${s.title}</option>`);
 
-                // ---> NEW: Start transmitting MY location <---
+                // Start transmitting MY location
                 startLocationBroadcast();
 
                 // Catch PM.html URL redirect
@@ -343,6 +337,23 @@
             });
         }
 
+        // --- NEW: Map Swapping Engine ---
+        window.changeMapStyle = function (style) {
+            map.setStyle(style);
+            map.once('style.load', () => {
+                // Re-inject 3D Terrain
+                if (!map.getSource('mapbox-dem')) {
+                    map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
+                }
+                map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
+                map.setLight({ anchor: 'map' });
+                map.addLayer({ 'id': 'sky', 'type': 'sky', 'paint': { 'sky-type': 'atmosphere', 'sky-atmosphere-sun-intensity': 15 } });
+
+                // Re-render tracks
+                loadDayTracks(document.getElementById('day-selector').value || 'all');
+            });
+        };
+
         // Start the Field Map app
         initFieldMap();
 
@@ -351,7 +362,6 @@
         let broadcastWatchId = null;
 
         async function startLocationBroadcast() {
-            // 1. If we don't know who this is, ask them to pick their profile
             if (!myDeviceId) {
                 try {
                     const res = await fetch(`${API_URL}/api/fleet/devices?_t=${Date.now()}`);
@@ -374,14 +384,12 @@
                 }
             }
 
-            // 2. Start watching the GPS and sending it to the server
             if (navigator.geolocation) {
                 broadcastWatchId = navigator.geolocation.watchPosition(
                     async (position) => {
                         const { latitude, longitude, altitude, speed } = position.coords;
 
                         try {
-                            // Silently POST location to your database
                             await fetch(`${API_URL}/api/fleet/telemetry`, {
                                 method: 'POST',
                                 headers: {
@@ -389,17 +397,14 @@
                                     'Authorization': `Bearer ${AUTH_TOKEN}`
                                 },
                                 body: JSON.stringify({
-                                    device_id: myDeviceId, // or guide_id, depending on your DB column name
+                                    device_id: myDeviceId,
                                     lat: latitude,
                                     lng: longitude,
                                     altitude: altitude || 0,
                                     speed: speed || 0
                                 })
                             });
-                        } catch (e) {
-                            // Fail silently if offline, the Service Worker will catch the GETs,
-                            // but we just ignore failed POSTs until signal returns.
-                        }
+                        } catch (e) { }
                     },
                     (error) => console.error("GPS Error:", error),
                     { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
@@ -411,20 +416,17 @@
         let isRecording = false;
         let recordWatchId = null;
         let recordedCoords = [];
-        let recordingLineSource = null;
 
         function toggleRecording() {
             const btn = document.getElementById('fab-record');
 
             if (!isRecording) {
-                // START RECORDING
                 if (!confirm("Start recording a new GPS track?")) return;
                 isRecording = true;
                 recordedCoords = [];
                 btn.innerHTML = '⏹️';
-                btn.style.animation = 'pulse-ring 2s infinite'; // Optional: add a CSS pulse animation
+                btn.style.animation = 'pulse-ring 2s infinite';
 
-                // Setup visual line on map
                 if (map.getLayer('live-recording-layer')) map.removeLayer('live-recording-layer');
                 if (map.getSource('live-recording')) map.removeSource('live-recording');
 
@@ -435,14 +437,12 @@
                     const { longitude, latitude, altitude } = position.coords;
                     recordedCoords.push([longitude, latitude, altitude || 0]);
 
-                    // Update map line live
                     if (recordedCoords.length > 1) {
                         map.getSource('live-recording').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: recordedCoords } });
                     }
                 }, (err) => console.error(err), { enableHighAccuracy: true, maximumAge: 0 });
 
             } else {
-                // STOP RECORDING
                 isRecording = false;
                 navigator.geolocation.clearWatch(recordWatchId);
                 btn.innerHTML = '⏺️';
@@ -453,7 +453,6 @@
                     return;
                 }
 
-                // Calculate basic stats for the prompt
                 const lineGeom = { type: 'LineString', coordinates: recordedCoords };
                 const dist = turf.length(lineGeom, { units: 'kilometers' }).toFixed(2);
 
@@ -467,8 +466,6 @@
 
         async function saveRecordedTrack(geometry, distance) {
             const title = prompt("Name this track:") || "Recorded Track";
-            // Use the currently selected task dropdown from the Pin Modal logic if you want, or just save it loosely
-
             const payload = {
                 title: title,
                 color: '#e74c3c',
@@ -508,7 +505,6 @@
             tasks.forEach(task => {
                 if (task.geometries) task.geometries.forEach(g => {
                     if (g.kind === 'line' && g.geojson) {
-                        // Inject Task ID so we can link back when clicked
                         g.geojson.features.forEach(f => {
                             f.properties = { ...f.properties, taskId: task.task_id, title: g.title, color: g.color };
                             features.push(f);
@@ -518,7 +514,6 @@
                         const el = document.createElement('div');
                         el.innerHTML = `<div style="background:${g.color || '#3498db'}; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3); font-size:12px;">${g.icon || '📍'}</div>`;
 
-                        // Add link back to PM.html inside the map popup
                         const popupHtml = `
                             <div style="text-align: center;">
                                 <strong style="display:block; margin-bottom: 8px;">${g.title}</strong>
@@ -543,7 +538,7 @@
 
         async function openFieldFleet() {
             document.getElementById('fleet-panel-mobile').style.display = 'block';
-            fetchFleetDirectory();
+            fetchFleetDirectory(); // Driven globally by live-tracking.js
         }
 
         async function toggleDeviceVisibility(id, isVisible) {
@@ -552,15 +547,13 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ is_visible: isVisible })
             });
-            forceFleetUpdate(); // Instantly apply to map
-            fetchFleetDirectory();     // Refresh the list UI
+            forceFleetUpdate();
+            fetchFleetDirectory();
         }
 
-        // Elevation Profile Engine (Now includes "Back to Task" button)
         function showElevationProfile(geojson, title, metadata) {
             document.getElementById('elevation-panel').style.display = 'block';
 
-            // Generate the Back to Task button if a taskId was provided
             const backBtnHtml = metadata.taskId ? `<button onclick="window.location.href='pm.html?task_id=${metadata.taskId}'" style="background:#0f172a; color:white; border:none; padding:4px 10px; border-radius:4px; cursor:pointer; font-weight:bold; font-size: 0.9em; margin-left: auto;">⬅️ Back to Task</button>` : '';
 
             document.getElementById('elevation-stats-header').innerHTML = `<span style="color:#000;">🏁 <strong>${title}</strong></span> <span style="color:#000;">📏 <strong>${metadata.distance || 0} km</strong></span> ${backBtnHtml}`;
@@ -583,7 +576,6 @@
         }
 
         async function enableDropPinMode() {
-            // 1. Fetch the tasks to populate the dropdown
             try {
                 const res = await fetch(`${API_URL}/itinerary`);
                 const tasks = await res.json();
@@ -594,7 +586,6 @@
                 });
             } catch (e) { console.error("Failed to load tasks", e); }
 
-            // 2. Activate the pin drop logic
             isDroppingPin = true;
             map.getCanvas().style.cursor = 'crosshair';
             alert("Tap anywhere on the map to save a location.");
@@ -615,7 +606,7 @@
             const lat = document.getElementById('pin-lat').value;
             const lng = document.getElementById('pin-lng').value;
             const title = document.getElementById('pin-title').value || "Field Location";
-            const taskId = document.getElementById('pin-task-id').value; // Get the selected task
+            const taskId = document.getElementById('pin-task-id').value;
             const fileInput = document.getElementById('pin-photo');
 
             let photoUrl = '';
@@ -641,7 +632,7 @@
                         photo_url: photoUrl,
                         color: '#f39c12',
                         icon: '📸',
-                        existing_task_id: taskId ? parseInt(taskId) : null // Attach to task!
+                        existing_task_id: taskId ? parseInt(taskId) : null
                     })
                 });
                 document.getElementById('pin-modal').classList.remove('open');
@@ -653,7 +644,6 @@
 
             btn.innerText = "💾 Save"; btn.disabled = false;
         }
-
     </script>
 </body>
 
