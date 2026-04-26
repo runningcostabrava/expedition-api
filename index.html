@@ -1638,19 +1638,28 @@
 
             function cycleSidebar() {
                 const panel = document.getElementById('left-panel');
+                if (!panel) return;
+
                 if (window.innerWidth <= 768) {
+                    // Mobile behavior: Simple toggle
                     panel.classList.toggle('hidden');
-                    return;
-                }
-                if (panel.classList.contains('hidden')) {
-                    panel.classList.remove('hidden');
-                } else if (!panel.classList.contains('wide')) {
-                    panel.classList.add('wide');
                 } else {
-                    panel.classList.add('hidden');
-                    panel.classList.remove('wide');
+                    // Desktop behavior: Hidden -> Narrow -> Wide -> Hidden
+                    if (panel.classList.contains('hidden')) {
+                        panel.classList.remove('hidden');
+                        panel.classList.remove('wide');
+                    } else if (!panel.classList.contains('wide')) {
+                        panel.classList.add('wide');
+                    } else {
+                        panel.classList.add('hidden');
+                        panel.classList.remove('wide');
+                    }
                 }
-                setTimeout(() => map.resize(), 350);
+                
+                // CRITICAL: Tell the map to adjust its size to the new sidebar width
+                setTimeout(() => {
+                    if (map) map.resize();
+                }, 300);
             }
 
             function focusTaskInSidebar(taskId) {

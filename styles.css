@@ -1244,9 +1244,10 @@ body.zen-mode #fleet-panel {
         left: 10px !important;
         right: 10px !important;
         height: auto !important;
-        min-height: 55px;
+        min-height: 60px !important;
         padding: 12px !important; /* Added padding so inputs don't touch the glass edges */
         padding-right: 70px !important; /* Explicit gap for the right-side button stack */
+        padding-bottom: 15px !important;
         flex-wrap: nowrap !important;
         overflow: visible !important;
         flex-direction: column !important;
@@ -1260,7 +1261,7 @@ body.zen-mode #fleet-panel {
         flex-direction: column !important;
         gap: 8px !important;
         width: 100% !important;
-        max-width: 80% !important; /* Leaves 20% room on the right */
+        max-width: 82% !important; /* Prevents overlap with right buttons */
         align-self: flex-start;
     }
 
