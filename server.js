@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { OpenAI } = require('openai');
 const Tesseract = require('tesseract.js');
+const { search } = require('duck-duck-scrape');
 
 const deepseek = new OpenAI({
   baseURL: 'https://api.deepseek.com',
@@ -288,6 +289,20 @@ const aiTools = [
         required: ["id", "updates"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_internet",
+      description: "Search the internet for real-time information, history, weather, facts, or news.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "The exact search engine query (e.g., 'History of Erice Sicily' or 'Current weather in Palermo')" }
+        },
+        required: ["query"]
+      }
+    }
   }
 ];
 
@@ -353,7 +368,7 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
     const currentTasks = await pool.query(currentTasksQuery);
     const contextString = JSON.stringify(currentTasks.rows);
 
-    // --- DEEPSEEK BRAIN ---
+    // --- DEEPSEEK AGENT LOOP ---
     const messages = [
         { 
           role: "system", 
@@ -362,59 +377,81 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
           Current Active Tasks (with Map Data): ${contextString}.
           
           RULES:
-          1. NEVER output raw database IDs (e.g., "Task ID 400") to the user. Always refer to tasks naturally by their 'task_name' and the associated Section Title (e.g., "the Run Long on Day 3").
+          1. NEVER output raw database IDs. Refer to tasks naturally by 'task_name' and Section Title.
           2. Maintain conversational context based on the user's history.
           3. Answer questions about the route, distances, or locations using the 'map_data'.
-          4. When creating or moving a task for a specific day, combine the section_date with the requested time to form the correct ISO timestamp (YYYY-MM-DDTHH:mm:ss.000Z), and include the section_id.
-          5. 'Fite' means milestone (set is_milestone true).
-          6. Automatically extract logical tasks from OCR text.` 
+          4. If asked to find information you don't know (history, weather, facts), ALWAYS use the 'search_internet' tool first, read the results, and then fulfill the user's request (like updating a task's characteristics).
+          5. 'Fite' means milestone (set is_milestone true).` 
         }
     ];
 
-    // Inject the last 10 messages of conversational history
-    const recentHistory = history.slice(-10);
+    // Inject history
+    const recentHistory = history.slice(-8);
     recentHistory.forEach(msg => messages.push({ role: msg.role, content: msg.content }));
-
-    // Add the newest prompt
     messages.push({ role: "user", content: finalPrompt });
 
-    const response = await deepseek.chat.completions.create({
-      model: "deepseek-chat",
-      messages: messages,
-      tools: aiTools,
-      tool_choice: "auto"
-    });
+    let finalResponseText = "";
+    
+    // Allow the AI to "think" for up to 3 steps (e.g., Search Web -> Update Task -> Reply)
+    for (let step = 0; step < 3; step++) {
+        const response = await deepseek.chat.completions.create({
+            model: "deepseek-chat",
+            messages: messages,
+            tools: aiTools,
+            tool_choice: "auto"
+        });
 
-    const message = response.choices[0].message;
+        const message = response.choices[0].message;
+        messages.push(message); // Append AI's response to the internal memory
 
-    // If the AI decides to use a tool (execute a DB command)
-    if (message.tool_calls && message.tool_calls.length > 0) {
-      let executionResults = [];
-      
-      for (const toolCall of message.tool_calls) {
-        const name = toolCall.function.name;
-        const args = JSON.parse(toolCall.function.arguments);
-
-        if (name === "create_task") {
-          const result = await pool.query(
-            'INSERT INTO tasks (task_name, section_id, starts_at, responsible, characteristics, is_milestone) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [args.task_name, args.section_id || null, args.starts_at || null, args.responsible || null, args.characteristics || null, args.is_milestone || false]
-          );
-          executionResults.push(`Created task: ${args.task_name}`);
+        // If the AI didn't call any tools, it's done thinking! Break the loop.
+        if (!message.tool_calls || message.tool_calls.length === 0) {
+            finalResponseText = message.content;
+            break;
         }
 
-        if (name === "update_task") {
-          const fields = Object.keys(args.updates).map((key, i) => `${key} = $${i + 2}`).join(', ');
-          const values = Object.values(args.updates);
-          await pool.query(`UPDATE tasks SET ${fields} WHERE id = $1`, [args.id, ...values]);
-          executionResults.push(`Updated task ID: ${args.id}`);
+        // Otherwise, execute the tools the AI requested
+        for (const toolCall of message.tool_calls) {
+            const name = toolCall.function.name;
+            const args = JSON.parse(toolCall.function.arguments);
+            let toolResult = "";
+
+            try {
+                if (name === "create_task") {
+                    const result = await pool.query(
+                        'INSERT INTO tasks (task_name, section_id, starts_at, responsible, characteristics, is_milestone) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+                        [args.task_name, args.section_id || null, args.starts_at || null, args.responsible || null, args.characteristics || null, args.is_milestone || false]
+                    );
+                    toolResult = `SUCCESS: Task created with ID ${result.rows[0].id}`;
+                }
+                else if (name === "update_task") {
+                    const fields = Object.keys(args.updates).map((key, i) => `${key} = $${i + 2}`).join(', ');
+                    const values = Object.values(args.updates);
+                    await pool.query(`UPDATE tasks SET ${fields} WHERE id = $1`, [args.id, ...values]);
+                    toolResult = `SUCCESS: Task ${args.id} updated.`;
+                }
+                else if (name === "search_internet") {
+                    console.log(`[AI] Searching web for: ${args.query}`);
+                    const searchResults = await search(args.query, { safeSearch: "off" });
+                    // Grab the top 3 results and feed the text snippets back to DeepSeek
+                    const snippets = searchResults.results.slice(0, 3).map(r => r.description).join('\n\n');
+                    toolResult = `WEB SEARCH RESULTS FOR "${args.query}":\n${snippets}\n\nAnalyze this information to fulfill the user's request.`;
+                }
+            } catch (err) {
+                console.error(`[AI Tool Error] ${name}:`, err);
+                toolResult = `ERROR executing ${name}: ${err.message}`;
+            }
+
+            // Report the tool's result back to the AI so it can take the next step
+            messages.push({
+                role: "tool",
+                tool_call_id: toolCall.id,
+                content: toolResult
+            });
         }
-      }
-      return res.json({ success: true, message: "AI Action Completed: " + executionResults.join(' | ') });
     }
 
-    // If the AI just wants to talk/clarify
-    res.json({ success: true, message: message.content });
+    res.json({ success: true, message: finalResponseText || "Actions completed." });
   } catch (err) {
     console.error("AI Error:", err);
     res.status(500).json({ error: "AI processing failed: " + err.message });
