@@ -192,6 +192,10 @@
             onclick="openFieldFleet()">📡</button>
         <button id="fab-record" class="fab-fleet" style="position: static; width: 44px; height: 44px; margin: 0; background: #e74c3c;"
             onclick="toggleRecording()">⏺️</button>
+        <button onclick="map.setTerrain(null); map.setPitch(0); showToast('3D Disabled (Stability Mode)', 'info')" 
+                style="background: #34495e; color: white; border-radius: 50%; width: 44px; height: 44px; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
+            2D
+        </button>
     </div>
 
     <div id="elevation-panel" class="bottom-panel" style="height: 250px;">
@@ -337,27 +341,24 @@
         }
 
         // --- NEW: Map Swapping Engine ---
-        window.changeMapStyle = function (style) {
+        window.changeMapStyle = function(style) {
+            // 1. Tell the GPU to stop rendering 3D before we switch styles
+            map.setTerrain(null); 
+            
             map.setStyle(style);
+            
             map.once('style.load', () => {
-                // Only activate 3D Terrain on the Satellite view
+                // Only re-enable 3D if the user explicitly chose the "Satellite 3D" option
                 if (style.includes('satellite')) {
                     if (!map.getSource('mapbox-dem')) {
                         map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
                     }
                     map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
-                    map.setLight({ anchor: 'map' });
-                    if (!map.getLayer('sky')) {
-                        map.addLayer({ 'id': 'sky', 'type': 'sky', 'paint': { 'sky-type': 'atmosphere', 'sky-atmosphere-sun-intensity': 15 } });
-                    }
-                } else {
-                    // Revert to flat 2D for all other styles
-                    map.setTerrain(null);
-                    if (map.getLayer('sky')) map.removeLayer('sky');
                 }
-
-                // Re-render tracks
-                loadDayTracks(document.getElementById('day-selector').value || 'all');
+                
+                // Always refresh your tracks/pins
+                if (typeof loadDayTracks === 'function') loadDayTracks(document.getElementById('day-selector').value || 'all');
+                if (typeof renderMapGeometries === 'function') renderMapGeometries();
             });
         };
 
@@ -501,23 +502,35 @@
         }
 
         async function loadDayTracks(sectionId) {
+            // 1. Clean up existing layers and markers
             if (map.getLayer('daily-route')) map.removeLayer('daily-route');
             if (map.getSource('daily-route')) map.removeSource('daily-route');
+            
+            // Remove existing markers (standardized way)
+            document.querySelectorAll('.mapboxgl-marker').forEach(m => m.remove());
 
             const url = sectionId === 'all' ? `${API_URL}/itinerary` : `${API_URL}/itinerary?section_id=${sectionId}`;
             const res = await fetch(url);
             const tasks = await res.json();
 
             let features = [];
+            let boundsFeatures = []; // Used specifically for centering the map
+
             tasks.forEach(task => {
                 if (task.geometries) task.geometries.forEach(g => {
+                    // Process Tracks (Lines)
                     if (g.kind === 'line' && g.geojson) {
                         g.geojson.features.forEach(f => {
-                            f.properties = { ...f.properties, taskId: task.task_id, title: g.title, color: g.color };
-                            features.push(f);
+                            const feat = { ...f, properties: { ...f.properties, taskId: task.task_id, title: g.title, color: g.color } };
+                            features.push(feat);
+                            boundsFeatures.push(feat);
                         });
                     }
-                    if (g.kind === 'point') {
+                    
+                    // Process Waypoints (Points)
+                    if (g.kind === 'point' && g.lng && g.lat) {
+                        boundsFeatures.push(turf.point([g.lng, g.lat]));
+                        
                         const el = document.createElement('div');
                         el.innerHTML = `<div style="background:${g.color || '#3498db'}; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3); font-size:12px;">${g.icon || '📍'}</div>`;
 
@@ -532,6 +545,7 @@
                 });
             });
 
+            // 2. Render the lines on the map
             if (features.length > 0) {
                 map.addSource('daily-route', { type: 'geojson', data: { type: 'FeatureCollection', features: features } });
                 map.addLayer({ id: 'daily-route', type: 'line', source: 'daily-route', paint: { 'line-color': ['get', 'color'], 'line-width': 5, 'line-opacity': 0.8 } });
@@ -539,6 +553,17 @@
                 map.on('click', 'daily-route', (e) => {
                     const feature = e.features[0];
                     showElevationProfile({ type: 'FeatureCollection', features: [feature] }, feature.properties.title || "Route", { distance: turf.length(feature).toFixed(2), taskId: feature.properties.taskId });
+                });
+            }
+
+            // 3. AUTO-CENTER: Zoom to fit all items for this specific day
+            if (sectionId !== 'all' && boundsFeatures.length > 0) {
+                const collection = turf.featureCollection(boundsFeatures);
+                const bbox = turf.bbox(collection);
+                map.fitBounds(bbox, { 
+                    padding: { top: 100, bottom: 50, left: 50, right: 50 }, 
+                    duration: 1500,
+                    maxZoom: 15 
                 });
             }
         }
