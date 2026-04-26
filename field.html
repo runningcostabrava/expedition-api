@@ -160,7 +160,8 @@
 
     <button class="fab-pin" onclick="enableDropPinMode()">📍</button>
     <button class="fab-fleet" onclick="openFieldFleet()">📡</button>
-    <button id="fab-record" class="fab-fleet" style="top: 210px; background: #e74c3c;" onclick="toggleRecording()">⏺️</button>
+    <button id="fab-record" class="fab-fleet" style="top: 210px; background: #e74c3c;"
+        onclick="toggleRecording()">⏺️</button>
 
     <div id="elevation-panel" class="bottom-panel" style="height: 250px;">
         <span class="close-panel" onclick="document.getElementById('elevation-panel').style.display='none'">×</span>
@@ -183,7 +184,8 @@
             <input type="hidden" id="pin-lat"><input type="hidden" id="pin-lng">
             <input type="text" id="pin-title" placeholder="Location Name">
 
-            <label style="display:block; margin-bottom:5px; font-size:0.9em; font-weight:bold; color:#475569;">🔗 Link to
+            <label style="display:block; margin-bottom:5px; font-size:0.9em; font-weight:bold; color:#475569;">🔗 Link
+                to
                 Task (Optional)</label>
             <select id="pin-task-id"
                 style="width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 8px;">
@@ -327,7 +329,7 @@
             // 1. If we don't know who this is, ask them to pick their profile
             if (!myDeviceId) {
                 try {
-                    const res = await fetch(`${API_URL}/api/fleet/devices`);
+                    const res = await fetch(`${API_URL}/api/fleet/devices?_t=${Date.now()}`);
                     const devices = await res.json();
 
                     let promptText = "Who are you? Enter your ID number:\n";
@@ -370,7 +372,7 @@
                                 })
                             });
                         } catch (e) {
-                            // Fail silently if offline, the Service Worker will catch the GETs, 
+                            // Fail silently if offline, the Service Worker will catch the GETs,
                             // but we just ignore failed POSTs until signal returns.
                         }
                     },
@@ -535,7 +537,7 @@
 
         async function fetchTeamLocations() {
             try {
-                const res = await fetch(`${API_URL}/api/fleet/telemetry?minutes=60`);
+                const res = await fetch(`${API_URL}/api/fleet/telemetry?minutes=1440&_t=${Date.now()}`);
                 const data = await res.json();
 
                 const paths = {};
@@ -613,7 +615,7 @@
             document.getElementById('field-fleet-list').innerHTML = '<div style="padding: 20px; text-align: center; color: #64748b;">Loading radar...</div>';
 
             try {
-                const res = await fetch(`${API_URL}/api/fleet/devices`);
+                const res = await fetch(`${API_URL}/api/fleet/devices?_t=${Date.now()}`);
                 const devices = await res.json();
 
                 let html = '';
@@ -629,11 +631,11 @@
                     <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
                         <div style="flex: 1; cursor: pointer;" onclick="zoomToGuide(${d.id})">
                             <div style="font-size: 1.1em; color: #0f172a;">${d.icon || '🏃‍♂️'} <strong>${d.display_name}</strong></div>
-                            
+
                             <div style="font-size: 0.85em; color: #64748b; margin-top: 4px; font-weight: 600;">
                                 ${statusIcon} Last seen: ${timeString}
                             </div>
-                            
+
                             <div style="font-size: 0.8em; color: #3498db; font-weight: bold; margin-top: 4px;">📍 Tap to Zoom to Location</div>
                         </div>
                         <button onclick="event.stopPropagation(); toggleFieldDevice(${d.id}, ${!d.is_visible})" style="padding:8px 16px; border-radius:8px; border:none; background:${d.is_visible ? '#10b981' : '#94a3b8'}; color:white; font-weight:bold; cursor:pointer;">
@@ -648,6 +650,10 @@
                 document.getElementById('field-fleet-list').innerHTML = '<div style="color: #ef4444;">Failed to load devices.</div>';
             }
         }
+
+
+
+
 
         async function toggleFieldDevice(id, isVisible) {
             await authFetch(`${API_URL}/api/fleet/devices/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_visible: isVisible }) });
