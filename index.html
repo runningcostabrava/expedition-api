@@ -1124,6 +1124,15 @@
                     else if (task.category_line_type === 'dotted') dashArray = [0.1, 2];
 
                     if (geom.kind === 'point' && geom.lat && geom.lng) {
+                        const lng = parseFloat(geom.lng);
+                        const lat = parseFloat(geom.lat);
+
+                        // SAFETY: Only add marker if coordinates are actual numbers
+                        if (isNaN(lng) || isNaN(lat)) {
+                            console.warn(`Skipping invalid point: ${geom.title}`);
+                            return;
+                        }
+
                         const el = document.createElement('div');
                         el.className = 'custom-map-pin'; // Links to our dynamic CSS scaling
                         el.innerHTML = `
@@ -1136,7 +1145,7 @@
 
                         // focusAfterOpen: false prevents the ARIA warning
                         const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' });
-                        marker.setLngLat([geom.lng, geom.lat])
+                        marker.setLngLat([lng, lat])
                             .addTo(map);
 
                         marker.getElement().addEventListener('click', (e) => {
