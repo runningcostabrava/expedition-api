@@ -183,10 +183,15 @@
         </select>
     </div>
 
-    <button class="fab-pin" onclick="enableDropPinMode()">📍</button>
-    <button class="fab-fleet" onclick="openFieldFleet()">📡</button>
-    <button id="fab-record" class="fab-fleet" style="top: 210px; background: #e74c3c;"
-        onclick="toggleRecording()">⏺️</button>
+    <div
+        style="position: absolute; top: 75px; right: 15px; display: flex; flex-direction: column; gap: 15px; z-index: 100;">
+        <button class="fab-pin" style="position: static; width: 44px; height: 44px; margin: 0;"
+            onclick="enableDropPinMode()">📍</button>
+        <button class="fab-fleet" style="position: static; width: 44px; height: 44px; margin: 0;"
+            onclick="openFieldFleet()">📡</button>
+        <button id="fab-record" class="fab-fleet" style="position: static; width: 44px; height: 44px; margin: 0; background: #e74c3c;"
+            onclick="toggleRecording()">⏺️</button>
+    </div>
 
     <div id="elevation-panel" class="bottom-panel" style="height: 250px;">
         <span class="close-panel" onclick="document.getElementById('elevation-panel').style.display='none'">×</span>
