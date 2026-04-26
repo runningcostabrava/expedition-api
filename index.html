@@ -99,16 +99,16 @@
     </div>
 
     <div id="mobile-fab-container">
-        <button onclick="processAiCommand()" class="action-btn-modern" title="AI Assistant"><i class="ph ph-robot"></i></button>
+        <button onclick="processAiCommand()" class="action-btn-modern" data-tooltip="AI Assistant"><i class="ph ph-robot"></i></button>
         <button onclick="createWaypointAtCurrentLocation()" class="action-btn-modern"
-            style="background: #ef4444 !important; color: white !important;" title="Mark Current Location"><i class="ph ph-camera"></i></button>
+            style="background: #ef4444 !important; color: white !important;" data-tooltip="Mark Current Location"><i class="ph ph-camera"></i></button>
         <button onclick="startSmartRoute()" class="action-btn-modern" style="font-size: 1.1em;"
-            title="Smart Route"><i class="ph ph-car-profile"></i></button>
+            data-tooltip="Smart Route"><i class="ph ph-car-profile"></i></button>
         <input type="file" id="gpx-file" accept=".gpx" style="display: none;">
         <button onclick="document.getElementById('gpx-file').click()" class="action-btn-modern"
-            title="Upload GPX"><i class="ph ph-upload-simple"></i></button>
-        <button onclick="toggleFleetPanel()" class="action-btn-modern" title="Fleet Tracking"><i class="ph ph-radar"></i></button>
-        <button onclick="cycleSidebar()" class="action-btn-modern"><i class="ph ph-clipboard-text"></i></button>
+            data-tooltip="Upload GPX"><i class="ph ph-upload-simple"></i></button>
+        <button onclick="toggleFleetPanel()" class="action-btn-modern" data-tooltip="Fleet Tracking"><i class="ph ph-radar"></i></button>
+        <button onclick="cycleSidebar()" class="action-btn-modern" data-tooltip="Toggle Sidebar"><i class="ph ph-clipboard-text"></i></button>
         <button onclick="openTaskEditor(null)" class="add-task-btn" style="width: auto; padding: 8px 15px; margin: 0;"><i class="ph ph-plus"></i>
             Task</button>
     </div>
