@@ -759,6 +759,22 @@ app.get('/api/fleet/telemetry', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// 6. RAW TELEMETRY LOGS (For the Data Inspector)
+app.get('/api/fleet/logs', async (req, res) => {
+    try {
+        // Fetches the last 200 GPS pings, matching them to guide names
+        const query = `
+            SELECT l.id, l.guide_id, l.lat, l.lng, l.timestamp, d.display_name 
+            FROM location_logs l
+            LEFT JOIN live_devices d ON LOWER(l.guide_id) = LOWER(d.device_identifier) OR LOWER(l.guide_id) = LOWER(d.display_name) OR l.guide_id = d.id::text
+            ORDER BY l.timestamp DESC
+            LIMIT 200
+        `;
+        const result = await pool.query(query);
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // --- TRACCAR PROXY ENDPOINTS ---
 app.get('/api/traccar/positions', async (req, res) => {
   try {
