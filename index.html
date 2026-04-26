@@ -498,7 +498,7 @@
                 // --- DYNAMICALLY LOAD GOOGLE PLACES SCRIPT ---
                 const script = document.createElement('script');
                 // ADDED &loading=async and &callback=initGoogleSearch
-                script.src = `https://maps.googleapis.com/maps/api/js?key=${config.GOOGLE_PLACES_API_KEY}&libraries=places&loading=async&callback=initGoogleSearch`;
+                script.src = `https://maps.googleapis.com/maps/api/js?key=${config.GOOGLE_PLACES_API_KEY}&v=weekly&loading=async&callback=initGoogleSearch`;
                 script.async = true;
                 script.defer = true;
                 document.head.appendChild(script);
@@ -824,50 +824,52 @@
             });
 
             window.initGoogleSearch = async () => {
-                const { Place } = await google.maps.importLibrary("places");
+                try {
+                    // Explicitly load the Places library
+                    const placesLib = await google.maps.importLibrary("places");
+                    const { Place } = placesLib; 
+                    
+                    // Save to window so search listeners can find it
+                    window.GooglePlaceClass = Place;
 
-                const searchInput = document.createElement('input');
-                searchInput.id = 'google-discovery-input';
-                searchInput.placeholder = '🔍 Find "restaurants", "hotels"...';
-                // NEW: Styled to perfectly match the Deep Sea Command Bar
-                searchInput.style.cssText = 'width: 220px; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); outline: none; background: rgba(255,255,255,0.1); color: white; font-family: sans-serif;';
+                    const searchInput = document.createElement('input');
+                    searchInput.id = 'google-discovery-input';
+                    searchInput.placeholder = '🔍 Find "restaurants", "hotels"...';
+                    searchInput.style.cssText = 'width: 220px; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); outline: none; background: rgba(255,255,255,0.1); color: white; font-family: sans-serif;';
 
-                const container = document.getElementById('google-search-container');
-                if (container) container.appendChild(searchInput);
+                    const container = document.getElementById('google-search-container');
+                    if (container) container.appendChild(searchInput);
 
-                // Listen for the "Enter" key
-                searchInput.addEventListener('keydown', async (e) => {
-                    if (e.key === 'Enter') {
-                        const query = searchInput.value.trim();
-                        if (!query) return;
+                    searchInput.addEventListener('keydown', async (e) => {
+                        if (e.key === 'Enter') {
+                            const query = searchInput.value.trim();
+                            if (!query) return;
 
-                        // Constrain search to the center of the user's screen
-                        const center = map.getCenter();
-                        const request = {
-                            textQuery: query,
-                            // SAFER APPROACH: Use a radial bias instead of Mapbox bounds to prevent Google geometry crashes
-                            locationBias: {
-                                center: { lat: center.lat, lng: center.lng },
-                                radius: 15000 // 15km search radius
-                            },
-                            fields: ['id', 'displayName', 'location', 'photos', 'rating', 'userRatingCount', 'formattedAddress', 'websiteURI', 'googleMapsURI', 'nationalPhoneNumber'],
-                            maxResultCount: 10
-                        };
+                            const center = map.getCenter();
+                            const request = {
+                                textQuery: query,
+                                locationBias: { center: { lat: center.lat, lng: center.lng }, radius: 15000 },
+                                fields: ['id', 'displayName', 'location', 'photos', 'rating', 'userRatingCount', 'formattedAddress', 'websiteURI', 'googleMapsURI', 'nationalPhoneNumber'],
+                                maxResultCount: 10
+                            };
 
-                        try {
-                            const { places } = await Place.searchByText(request);
-                            if (places && places.length > 0) {
-                                window.lastSearchResults = places; // Save for the "Back" button
-                                renderDiscoverySidebar(places);
-                            } else {
-                                alert("No results found in this area. Try zooming out or moving the map.");
+                            try {
+                                // Use the class from the window or the loaded library
+                                const { places } = await window.GooglePlaceClass.searchByText(request);
+                                if (places && places.length > 0) {
+                                    window.lastSearchResults = places;
+                                    renderDiscoverySidebar(places);
+                                } else {
+                                    alert("No results found in this area.");
+                                }
+                            } catch (err) {
+                                console.error("Search Execution Error:", err);
                             }
-                        } catch (err) {
-                            console.error("Google Places Search Error:", err);
-                            alert("Error searching Google Places. Check console for details.");
                         }
-                    }
-                });
+                    });
+                } catch (err) {
+                    console.error("Google Library Load Error:", err);
+                }
             };
 
             function renderDiscoverySidebar(places) {
@@ -984,14 +986,17 @@
                     listContainer.appendChild(row);
                 });
 
-                function renderRichPlaceProfile(place, coords, isFromSearchList = false) {
+                async function renderRichPlaceProfile(place, coords, isFromSearchList = false) {
                     const container = document.getElementById('asana-container');
                     const photoUrl = place.photos && place.photos.length > 0 ? place.photos[0].getURI({ maxWidth: 600 }) : 'https://via.placeholder.com/600x300?text=No+Photo';
                     const title = place.displayName || 'Unknown Place';
-                    // NEW API FIX: isOpen() is called directly on the 'place' object
+                    // NEW API FIX: isOpen() is an asynchronous call and requires an await
                     let isOpen = '';
                     try {
-                        if (place.regularOpeningHours) isOpen = place.isOpen() ? '<span style="color:#27ae60; font-weight:bold;">🟢 Open Now</span>' : '<span style="color:#e74c3c; font-weight:bold;">🔴 Closed</span>';
+                        if (place.regularOpeningHours) {
+                            const isOpenNow = await place.isOpen();
+                            isOpen = isOpenNow ? '<span style="color:#27ae60; font-weight:bold;">🟢 Open Now</span>' : '<span style="color:#e74c3c; font-weight:bold;">🔴 Closed</span>';
+                        }
                     } catch (e) { /* Ignore if Google fails to parse the current time */ }
 
                     const googleData = {
@@ -2065,28 +2070,24 @@
                 }
             }
 
-            window.changeMapStyle = function (style) {
+            window.changeMapStyle = function(style) {
+                // 1. Tell the GPU to stop rendering 3D before we switch styles
+                map.setTerrain(null); 
+                
                 map.setStyle(style);
+                
                 map.once('style.load', () => {
-                    // Only activate 3D Terrain on the Satellite view
+                    // Only re-enable 3D if the user explicitly chose the "Satellite 3D" option
                     if (style.includes('satellite')) {
                         if (!map.getSource('mapbox-dem')) {
                             map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
                         }
                         map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
-                        map.setLight({ anchor: 'map' });
-                        if (!map.getLayer('sky')) {
-                            map.addLayer({ 'id': 'sky', 'type': 'sky', 'paint': { 'sky-type': 'atmosphere', 'sky-atmosphere-sun-intensity': 15 } });
-                        }
-                    } else {
-                        // Revert to flat 2D for all other styles
-                        map.setTerrain(null);
-                        if (map.getLayer('sky')) map.removeLayer('sky');
                     }
-
-                    // Re-render map data
-                    if (typeof renderMapGeometries === 'function') renderMapGeometries();
+                    
+                    // Always refresh your tracks/pins
                     if (typeof loadDayTracks === 'function') loadDayTracks(document.getElementById('day-selector').value || 'all');
+                    if (typeof renderMapGeometries === 'function') renderMapGeometries();
                 });
             };
 
