@@ -1255,7 +1255,12 @@
                                 parsedComments = geom.comments || '';
                             }
 
-                            const html = `
+                            const offset = 0.01;
+                        const sw = (geom.lat - offset) + '%2C' + (geom.lng - offset);
+                        const ne = (geom.lat + offset) + '%2C' + (geom.lng + offset);
+                        const wikilocUrl = `https://www.wikiloc.com/wikiloc/map.do?sw=${sw}&ne=${ne}&page=1`;
+
+                        const html = `
                         ${geom.photo_url ? `<img src="${geom.photo_url}" onclick="openLightbox('${geom.photo_url}')" style="width:100%; height:180px; object-fit:cover; border-radius:8px; margin-bottom:15px; box-shadow:0 4px 6px rgba(0,0,0,0.1); cursor:zoom-in;">` : ''}
                         <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
                             <p style="margin: 0 0 5px 0; font-size: 0.85em; color: #94a3b8; font-weight: bold;">Section: ${task.section_id ? (AppStore.get('sections').find(s => s.id === task.section_id)?.title || 'Unknown') : 'Unscheduled'}</p>
@@ -1278,7 +1283,7 @@
                     <button style="width: 100%; background: #f59e0b; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);" onclick="openStreetView(${geom.lat}, ${geom.lng})">
                         🚶‍♂️ Drop Street View Here
                     </button>
-                    <button style="width: 100%; background: #84cc16; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(132, 204, 22, 0.2); margin-top: 10px;" onclick="window.open('https://www.wikiloc.com/wikiloc/find.do?near=' + ${geom.lat} + ',' + ${geom.lng} + '&q=' + encodeURIComponent('${(task.task_name || 'trails').replace(/'/g, "\\'")}'), '_blank')">
+                    <button style="width: 100%; background: #84cc16; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(132, 204, 22, 0.2); margin-top: 10px;" onclick="window.open('${wikilocUrl}', '_blank')">
                         ⛰️ View on Wikiloc
                     </button>
                 `;
@@ -1569,6 +1574,11 @@
             } catch (e) { parsedComments = geom.comments || ''; }
 
             if (kind === 'point') {
+                const offset = 0.01;
+                const sw = (geom.lat - offset) + '%2C' + (geom.lng - offset);
+                const ne = (geom.lat + offset) + '%2C' + (geom.lng + offset);
+                const wikilocUrl = `https://www.wikiloc.com/wikiloc/map.do?sw=${sw}&ne=${ne}&page=1`;
+
                 const html = `
                     ${geom.photo_url ? `<img src="${geom.photo_url}" style="width:100%; height:180px; object-fit:cover; border-radius:8px; margin-bottom:15px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">` : ''}
                     <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
@@ -1592,7 +1602,7 @@
                     <button style="width: 100%; background: #f59e0b; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);" onclick="openStreetView(${geom.lat}, ${geom.lng})">
                         🚶‍♂️ Drop Street View Here
                     </button>
-                    <button style="width: 100%; background: #84cc16; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(132, 204, 22, 0.2); margin-top: 10px;" onclick="window.open('https://www.wikiloc.com/wikiloc/find.do?near=' + ${geom.lat} + ',' + ${geom.lng} + '&q=trails', '_blank')">
+                    <button style="width: 100%; background: #84cc16; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(132, 204, 22, 0.2); margin-top: 10px;" onclick="window.open('${wikilocUrl}', '_blank')">
                         ⛰️ View on Wikiloc
                     </button>
                 `;
