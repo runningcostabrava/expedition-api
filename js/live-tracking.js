@@ -55,11 +55,11 @@ window.fetchFleetDirectory = async function () {
                         ${d.icon || '🏃‍♂️'} ${d.display_name}
                     </div>
                     <button onclick="event.stopPropagation(); toggleDeviceVisibility(${d.id}, ${!d.is_visible})" style="background: none; border: none; cursor: pointer; font-size: 1.2em;" title="Toggle Map Visibility">
-                        ${d.is_visible ? '👁️' : '🙈'}
+                        ${d.is_visible ? '<i class="ph ph-eye"></i>' : '<i class="ph ph-eye-slash"></i>'}
                     </button>
                 </div>
 
-                <div style="font-size: 0.85em; color: #3498db; font-weight: bold;">📍 Tap to Zoom to Location</div>
+                <div style="font-size: 0.85em; color: #3498db; font-weight: bold;"><i class="ph ph-map-pin"></i> Tap to Zoom to Location</div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 5px;" onclick="event.stopPropagation()">
                     <div>
@@ -123,7 +123,7 @@ async function fetchAndDrawTelemetry() {
                 paths[point.guide_id] = {
                     coords: [],
                     color: point.color,
-                    icon: point.icon || '📍',
+                    icon: point.icon || 'ph-map-pin',
                     icon_size: point.icon_size || 28,
                     name: point.display_name
                 };

@@ -52,7 +52,7 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                 });
 
                 if (minDist < 5) {
-                    const iconEmoji = (g.icon || '📍').split(' ')[0];
+                    const iconEmoji = (g.icon || 'ph-map-pin').split(' ')[0];
                     const canvas = document.createElement('canvas');
                     canvas.width = 24; canvas.height = 24;
                     const ctx = canvas.getContext('2d');
@@ -64,7 +64,7 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                     waypointData[nearestIdx] = elevations[nearestIdx];
                     waypointMeta[nearestIdx] = {
                         title: g.title,
-                        icon: g.icon || '📍',
+                        icon: g.icon || 'ph-map-pin',
                         lng: g.lng,
                         lat: g.lat,
                         x: distances[nearestIdx]
@@ -117,7 +117,7 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                         label: (context) => {
                             if (context.dataset.label === 'Waypoints') {
                                 const meta = waypointMeta[context.dataIndex];
-                                if (meta) return `📍 ${meta.title}`;
+                                if (meta) return `<i class="ph ph-map-pin"></i> ${meta.title}`;
                                 return null;
                             }
                             return `Elev: ${context.parsed.y}m`;
@@ -149,7 +149,7 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                         const wp = waypointMeta[element.index];
                         if (wp) {
                             map.flyTo({ center: [wp.lng, wp.lat], zoom: 17 });
-                            statsHeader.innerHTML = `<span style="color:#e67e22;">📍 <strong>${wp.icon} ${wp.title}</strong></span> <span style="margin-left:15px; color:#666;">at ${wp.x}km</span> <button onclick="refreshData()" style="width:auto; padding:2px 8px; margin-left:10px; font-size:10px; background:#95a5a6;">Reset View</button>`;
+                            statsHeader.innerHTML = `<span style="color:#e67e22;"><i class="ph ${wp.icon}"></i> <strong>${wp.title}</strong></span> <span style="margin-left:15px; color:#666;">at ${wp.x}km</span> <button onclick="refreshData()" style="width:auto; padding:2px 8px; margin-left:10px; font-size:10px; background:#95a5a6;">Reset View</button>`;
                         }
                     } else {
                         // CLICKED LINE (CREATE NEW)
@@ -167,7 +167,7 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                         // CRITICAL FIX: Ensure exact variable match to index.html's let declaration
                         activeParentTrackId = trackId;
 
-                        showGeometryContextPopup([activeCoord[0], activeCoord[1]], { type: 'Point', coordinates: [activeCoord[0], activeCoord[1]] }, `KM ${dist}`, `📏 ${dist}km | 🔺 +${gain}m`, null, '📍');
+                        showGeometryContextPopup([activeCoord[0], activeCoord[1]], { type: 'Point', coordinates: [activeCoord[0], activeCoord[1]] }, `KM ${dist}`, `<i class="ph ph-ruler"></i> ${dist}km | <i class="ph ph-trend-up"></i> +${gain}m`, null, 'ph-map-pin');
                     }
                 }
             },

@@ -467,7 +467,7 @@ const OfflineManager = (() => {
         osmBtn.id = 'om-osm-btn';
         osmBtn.className = 'om-btn';
         osmBtn.title = 'Switch to OpenStreetMap (offline)';
-        osmBtn.innerHTML = '🗺️';
+        osmBtn.innerHTML = '<i class="ph ph-map-trifold"></i>';
         osmBtn.onclick = toggleOSM;
 
         // Download area button

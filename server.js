@@ -754,7 +754,7 @@ app.post('/categories', adminAuth, async (req, res) => {
   const { name, color, icon, line_type, marker_size } = req.body;
   try {
     const result = await pool.query('INSERT INTO categories (name, color, icon, line_type, marker_size) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [name, color || '#3498db', icon || '📍', line_type || 'solid', marker_size || 28]);
+      [name, color || '#3498db', icon || 'ph-map-pin', line_type || 'solid', marker_size || 28]);
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -785,7 +785,7 @@ app.get('/task_types', async (req, res) => {
 app.post('/task_types', adminAuth, async (req, res) => {
   const { name, color, icon } = req.body;
   try {
-    const result = await pool.query('INSERT INTO task_types (name, color, icon) VALUES ($1, $2, $3) RETURNING *', [name, color || '#95a5a6', icon || '🏷️']);
+    const result = await pool.query('INSERT INTO task_types (name, color, icon) VALUES ($1, $2, $3) RETURNING *', [name, color || '#95a5a6', icon || 'ph-tag']);
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

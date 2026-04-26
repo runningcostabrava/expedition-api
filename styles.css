@@ -1402,7 +1402,8 @@ body.zen-mode #fleet-panel {
     }
 
     #mobile-fab-container .add-task-btn::after {
-        content: "➕"; /* Replaces text with an icon */
+        content: "\e3c6"; /* Phosphor icon plus symbol */
+        font-family: "Phosphor";
         font-size: 18px;
         display: block;
     }

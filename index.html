@@ -33,6 +33,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
 
 <body>
@@ -72,9 +73,9 @@
     <div id="command-bar">
         <div style="font-weight: 900; color: white !important; margin-right: 5px; flex-shrink: 0;">EXPEDITION v2</div>
 
-        <button id="mobile-search-btn" class="mobile-only-btn"
+            <button id="mobile-search-btn" class="mobile-only-btn"
             onclick="document.getElementById('search-group').classList.toggle('show-mobile')"
-            style="background: transparent; border: none; color: white; font-size: 1.2em; cursor: pointer; padding: 0; display: none;">🔍</button>
+            style="background: transparent; border: none; color: white; font-size: 1.2em; cursor: pointer; padding: 0; display: none;"><i class="ph ph-magnifying-glass"></i></button>
 
         <div id="search-group" class="search-group">
             <div style="position: relative; flex: 1; max-width: 300px; width: 100%;">
@@ -90,26 +91,26 @@
         <div id="style-switcher" style="margin-left: auto;">
             <select onchange="changeMapStyle(this.value)"
                 style="padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); font-weight: bold; cursor: pointer; outline: none; background: rgba(255,255,255,0.1); color: white;">
-                <option value="mapbox://styles/mapbox/outdoors-v12">⛰️ Outdoors</option>
-                <option value="mapbox://styles/mapbox/satellite-streets-v12">🌍 Satellite 3D</option>
-                <option value="mapbox://styles/mapbox/dark-v11">🌙 Dark Mode</option>
-                <option value="mapbox://styles/mapbox/streets-v12">🛣️ Standard</option>
+                <option value="mapbox://styles/mapbox/outdoors-v12">Outdoors</option>
+                <option value="mapbox://styles/mapbox/satellite-streets-v12">Satellite 3D</option>
+                <option value="mapbox://styles/mapbox/dark-v11">Dark Mode</option>
+                <option value="mapbox://styles/mapbox/streets-v12">Standard</option>
             </select>
         </div>
     </div>
 
     <div id="mobile-fab-container">
-        <button onclick="processAiCommand()" class="action-btn-modern" title="AI Assistant">🤖</button>
+        <button onclick="processAiCommand()" class="action-btn-modern" title="AI Assistant"><i class="ph ph-robot"></i></button>
         <button onclick="createWaypointAtCurrentLocation()" class="action-btn-modern"
-            style="background: #ef4444 !important; color: white !important;" title="Mark Current Location">📸</button>
+            style="background: #ef4444 !important; color: white !important;" title="Mark Current Location"><i class="ph ph-camera"></i></button>
         <button onclick="startSmartRoute()" class="action-btn-modern" style="font-size: 1.1em;"
-            title="Smart Route">🚗</button>
+            title="Smart Route"><i class="ph ph-car-profile"></i></button>
         <input type="file" id="gpx-file" accept=".gpx" style="display: none;">
         <button onclick="document.getElementById('gpx-file').click()" class="action-btn-modern"
-            title="Upload GPX">📤</button>
-        <button onclick="toggleFleetPanel()" class="action-btn-modern" title="Fleet Tracking">📡</button>
-        <button onclick="cycleSidebar()" class="action-btn-modern">📋</button>
-        <button onclick="openTaskEditor(null)" class="add-task-btn" style="width: auto; padding: 8px 15px; margin: 0;">+
+            title="Upload GPX"><i class="ph ph-upload-simple"></i></button>
+        <button onclick="toggleFleetPanel()" class="action-btn-modern" title="Fleet Tracking"><i class="ph ph-radar"></i></button>
+        <button onclick="cycleSidebar()" class="action-btn-modern"><i class="ph ph-clipboard-text"></i></button>
+        <button onclick="openTaskEditor(null)" class="add-task-btn" style="width: auto; padding: 8px 15px; margin: 0;"><i class="ph ph-plus"></i>
             Task</button>
     </div>
 
@@ -119,10 +120,10 @@
             ⬇️ Tap to Hide List ⬇️</div>
         <div id="panel-header" style="padding: 15px; border-bottom: 1px solid rgba(0,0,0,0.1);">
             <button class="mobile-only-btn" onclick="document.getElementById('left-panel').classList.add('hidden')"
-                style="width:100%; margin-bottom:12px; background:#e2e8f0; color:#0f172a; border:none; padding:12px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">🗺️
+                style="width:100%; margin-bottom:12px; background:#e2e8f0; color:#0f172a; border:none; padding:12px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.05);"><i class="ph ph-map-trifold"></i>
                 Hide List & View Map</button>
             <button onclick="showAllSectionsOnMap()"
-                style="width:100%; margin-bottom:12px; background:#34495e; color:white; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">🌍
+                style="width:100%; margin-bottom:12px; background:#34495e; color:white; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"><i class="ph ph-globe"></i>
                 Show All (Long-press map to add points)</button>
             <div class="search-container" style="display: flex; gap: 10px; margin-bottom: 10px;">
                 <input type="text" id="search-filter" placeholder="🔍 Search tasks..." oninput="renderProjectView()"
@@ -130,7 +131,7 @@
                 <button
                     onclick="const f = document.getElementById('advanced-filters'); f.style.display = f.style.display === 'none' ? 'grid' : 'none';"
                     style="background: #f1f5f9; border: 1px solid #cbd5e0; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; color: #475569; display: flex; align-items: center; gap: 4px;">
-                    ⚙️ Filters
+                    <i class="ph ph-gear"></i> Filters
                 </button>
             </div>
 
@@ -167,11 +168,11 @@
             <div style="display: flex; gap: 8px; margin-top: 10px;">
                 <select id="map-section-filter" onchange="currentSectionFilter = this.value; renderMapGeometries();"
                     style="flex: 1; padding: 6px; border-radius: 6px; border: 1px solid #ddd; font-size: 0.85em; font-weight: bold; color: #1e293b; background: #f8fafc; cursor: pointer;">
-                    <option value="all">🌍 Show All on Map</option>
+                    <option value="all">Show All on Map</option>
                 </select>
                 <button
                     onclick="document.getElementById('map-section-filter').value = 'all'; currentSectionFilter = 'all'; renderMapGeometries();"
-                    style="padding: 6px 12px; border-radius: 6px; border: 1px solid #ddd; background: white; cursor: pointer; font-size: 0.8em; font-weight: bold; color: #64748b;">🔄</button>
+                    style="padding: 6px 12px; border-radius: 6px; border: 1px solid #ddd; background: white; cursor: pointer; font-size: 0.8em; font-weight: bold; color: #64748b;"><i class="ph ph-arrows-clockwise"></i></button>
             </div>
         </div>
         <div id="asana-container"></div>
@@ -188,7 +189,7 @@
                 style="width:auto; padding: 6px 12px; background: transparent; color: #64748b; border: 1px solid #cbd5e0; font-weight: bold;">←
                 Back to Plan</button>
             <button id="detail-edit-btn" class="action-btn-modern"
-                style="color: #3498db; font-weight: bold; padding: 6px 12px;">⚙️ Edit Task</button>
+                style="color: #3498db; font-weight: bold; padding: 6px 12px;"><i class="ph ph-gear"></i> Edit Task</button>
         </div>
         <div id="task-detail-content" style="padding: 20px; overflow-y: auto; flex: 1;">
         </div>
@@ -201,7 +202,7 @@
         <div id="right-panel-header">
             <span id="right-panel-title">Details</span>
             <button onclick="closeRightPanel()"
-                style="width: auto; background: none; border: none; font-size: 1.2em; cursor: pointer; color: #94a3b8; padding: 0;">✖</button>
+                style="width: auto; background: none; border: none; font-size: 1.2em; cursor: pointer; color: #94a3b8; padding: 0;"><i class="ph ph-x"></i></button>
         </div>
         <div id="right-panel-content">
         </div>
@@ -212,9 +213,9 @@
             style="display:none; text-align:center; padding:12px; background:#1e293b; font-weight:bold; color:#94a3b8; border-bottom: 1px solid rgba(0,0,0,0.2); cursor:pointer; z-index: 10;">
             ⬇️ Tap to Hide Fleet ⬇️</div>
         <div id="right-panel-header" style="background: #1e293b; color: white;">
-            <span id="right-panel-title">📡 Fleet Command Center</span>
+            <span id="right-panel-title"><i class="ph ph-radar"></i> Fleet Command Center</span>
             <button onclick="toggleFleetPanel()"
-                style="width: auto; background: none; border: none; font-size: 1.2em; cursor: pointer; color: #94a3b8; padding: 0;">✖</button>
+                style="width: auto; background: none; border: none; font-size: 1.2em; cursor: pointer; color: #94a3b8; padding: 0;"><i class="ph ph-x"></i></button>
         </div>
         <div id="right-panel-content" style="background: #f8fafc;">
 
@@ -255,9 +256,9 @@
 
         <div id="map"></div>
 
-        <div id="elevation-panel">
-            <span id="close-elevation"
-                onclick="document.getElementById('elevation-panel').style.display='none'">❌</span>
+            <div id="elevation-panel">
+                <span id="close-elevation"
+                    onclick="document.getElementById('elevation-panel').style.display='none'"><i class="ph ph-x"></i></span>
             <div id="elevation-stats-header"></div>
             <canvas id="elevation-chart"></canvas>
         </div>
@@ -285,7 +286,7 @@
                         Category
                         <span onclick="openModal('category-modal')"
                             style="cursor:pointer; font-size: 12px; color: #3498db; text-decoration: underline;">Manage
-                            ⚙️</span>
+                            <i class="ph ph-gear"></i></span>
                     </label>
                     <select id="task-category-id">
                         <option value="">No Category</option>
@@ -297,7 +298,7 @@
                         Task Type
                         <span onclick="openModal('type-modal')"
                             style="cursor:pointer; font-size: 12px; color: #3498db; text-decoration: underline;">Manage
-                            ⚙️</span>
+                            <i class="ph ph-gear"></i></span>
                     </label>
                     <select id="task-type-id">
                         <option value="">No Type</option>
@@ -330,7 +331,7 @@
                     <label><input type="checkbox" id="is-completed"> Mark Task as Completed</label>
                 </div>
                 <div class="form-group">
-                    <label><input type="checkbox" id="is-milestone"> 📍 Mark as Milestone (Fite)</label>
+                    <label><input type="checkbox" id="is-milestone"> <i class="ph-fill ph-map-pin"></i> Mark as Milestone (Fite)</label>
                 </div>
 
                 <div class="form-group">
@@ -362,7 +363,7 @@
     <div id="category-modal" class="modal">
         <div class="modal-content" style="max-width: 400px;">
             <span class="close" onclick="closeModal('category-modal')">&times;</span>
-            <h3>⚙️ Manage Categories</h3>
+            <h3><i class="ph ph-gear"></i> Manage Categories</h3>
             <div id="category-list"
                 style="margin-bottom: 20px; max-height: 200px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 8px;">
             </div>
@@ -374,18 +375,18 @@
                     <input type="color" id="new-cat-color" value="#3498db" title="Pin Color"
                         style="width: 50px; height: 38px; border: none; padding: 0; cursor:pointer;">
                     <select id="new-cat-icon" style="flex: 1;">
-                        <option value="📍">📍 Pin</option>
-                        <option value="🥾">🥾 Hike / Walk</option>
-                        <option value="🏃‍♂️">🏃‍♂️ Run</option>
-                        <option value="🚌">🚌 Bus</option>
-                        <option value="🚐">🚐 Van / Minibus</option>
-                        <option value="🚗">🚗 Car / Taxi</option>
-                        <option value="⛵">⛵ Boat / Ferry</option>
-                        <option value="🍽️">🍽️ Food / Restaurant</option>
-                        <option value="🏨">🏨 Hotel / Sleep</option>
-                        <option value="📸">📸 Photo / Viewpoint</option>
-                        <option value="🚩">🚩 Start / Finish</option>
-                        <option value="⚠️">⚠️ Alert / Danger</option>
+                        <option value="ph-map-pin">Pin</option>
+                        <option value="ph-boot">Hike / Walk</option>
+                        <option value="ph-sneaker">Run</option>
+                        <option value="ph-bus">Bus</option>
+                        <option value="ph-van">Van / Minibus</option>
+                        <option value="ph-car">Car / Taxi</option>
+                        <option value="ph-boat">Boat / Ferry</option>
+                        <option value="ph-fork-knife">Food / Restaurant</option>
+                        <option value="ph-bed">Hotel / Sleep</option>
+                        <option value="ph-camera">Photo / Viewpoint</option>
+                        <option value="ph-flag">Start / Finish</option>
+                        <option value="ph-warning">Alert / Danger</option>
                     </select>
                 </div>
                 <label>Line Style (for Tracks)</label>
@@ -404,7 +405,7 @@
     <div id="type-modal" class="modal">
         <div class="modal-content" style="max-width: 400px;">
             <span class="close" onclick="closeModal('type-modal')">&times;</span>
-            <h3>⚙️ Manage Task Types</h3>
+            <h3><i class="ph ph-gear"></i> Manage Task Types</h3>
             <div id="type-list"
                 style="margin-bottom: 20px; max-height: 200px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 8px;">
             </div>
@@ -415,7 +416,7 @@
                 <div style="display: flex; gap: 10px;">
                     <input type="color" id="new-type-color" value="#95a5a6"
                         style="width: 50px; height: 38px; border: none; padding: 0; cursor:pointer;">
-                    <input type="text" id="new-type-icon" placeholder="Emoji 🚗" style="flex: 1;">
+                    <input type="text" id="new-type-icon" placeholder="Icon Class (e.g. ph-tag)" style="flex: 1;">
                 </div>
                 <button onclick="saveTaskType()"
                     style="background: #27ae60; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer;">Create
@@ -1176,14 +1177,14 @@
                         el.className = 'custom-map-pin'; // Links to our dynamic CSS scaling
 
                         // If the icon is a camera, give it a specific "Photo Spot" ring
-                        const isPhotoSpot = renderIcon === '📸';
+                        const isPhotoSpot = renderIcon === 'ph-camera';
                         el.innerHTML = `
                             <div style="background-color: ${isPhotoSpot ? '#ef4444' : markerColor}; 
                                         border-radius: 50%; width: 28px; height: 28px; 
                                         display: flex; justify-content: center; align-items: center; 
                                         border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); 
                                         font-size: 14px; transform: ${isPhotoSpot ? 'scale(1.2)' : 'scale(1)'};">
-                                ${renderIcon}
+                                <i class="ph ${renderIcon} ph-fill"></i>
                             </div>
                             <div style="width: 0; height: 0; border-left: 6px solid transparent; 
                                         border-right: 6px solid transparent; 
@@ -2453,11 +2454,11 @@
                     <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; display:flex; flex-direction:column; gap:10px;">
                         <label style="display:flex; align-items:center; gap:8px; margin:0; cursor:pointer; color:#1e293b; font-weight:bold;">
                             <input type="checkbox" id="edit-task-fite" ${isMilestone} style="width:18px; height:18px; cursor:pointer;">
-                            📍 Mark as Milestone (Fite)
+                            <i class="ph-fill ph-map-pin"></i> Mark as Milestone (Fite)
                         </label>
                         <label style="display:flex; align-items:center; gap:8px; margin:0; cursor:pointer; color:#1e293b; font-weight:bold;">
                             <input type="checkbox" id="edit-task-completed" ${isCompleted} style="width:18px; height:18px; cursor:pointer;">
-                            ✅ Mark as Completed
+                            <i class="ph ph-check-circle"></i> Mark as Completed
                         </label>
                     </div>
                     <button onclick="saveTaskFromRightPanel(${taskId})" style="width:100%; padding:14px; background:#27ae60; color:white; border:none; border-radius:8px; font-weight:bold; font-size:1.05em; margin-top:5px; cursor:pointer; box-shadow:0 4px 10px rgba(39, 174, 96, 0.3);">${taskId ? '💾 UPDATE TASK' : '✨ CREATE TASK'}</button>
@@ -2913,7 +2914,7 @@
                 <div style="display: flex; align-items: center; gap: 10px; border-bottom: 1px dashed #ccc; padding-bottom: 4px;">
                     <input type="text" placeholder="+ Add task..." style="flex: 1; border:none; outline:none; background:transparent; font-size:0.85em;" onkeydown="if(event.key==='Enter') createInlineTask(this, ${section.id || null}, '${sectionTitle.replace(/'/g, "\\'")}')">
                     <label style="font-size: 0.8em; color: #7f8c8d; cursor:pointer; margin:0; display:flex; align-items:center; gap:4px;">
-                        <input type="checkbox" class="inline-fite-checkbox"> 📍 Fite
+                        <input type="checkbox" class="inline-fite-checkbox"> <i class="ph-fill ph-map-pin"></i> Fite
                     </label>
                 </div>
             `;
@@ -3240,12 +3241,34 @@
             const safePhone = (geom.phone || '').replace(/"/g, '"');
             const safeLink = (geom.link || '').replace(/"/g, '"');
             const safePhoto = (geom.photo_url || '').replace(/"/g, '"');
-            const safeIcon = geom.icon || '📍';
+            const safeIcon = geom.icon || 'ph-map-pin';
             const iconOptions = [
-                '📍 Pin', '🥾 Hike', '🏃‍♂️ Run', '🚲 Bike', '⛺ Camp', '🏨 Hotel', '🍽️ Food', '☕ Cafe', '💧 Water', '🚻 Toilet', '📸 Photo', '⛰️ Peak', '🌲 Nature', '🌳 Forest', '🌻 Garden', '🏖️ Beach', '🚌 Bus', '🚐 Van', '🚗 Car', '🚂 Train', '✈️ Flight', '⛵ Boat', '🏥 Medical', '🛠️ Assistance', '👥 Group', '⚠️ Alert', 'ℹ️ Info', '🟢 Start', '🛑 Stop', '🏁 Finish', '🚩 Flag', '🔀 Intersection', '👣 Trail', '🛤️ Path', '🛣️ Road', '🚘 Highway', '🚸 Crossing', '🛒 Shop', '⛽ Fuel', '🅿️ Parking', '🏰 Culture', '🌉 Bridge', '🎒 Gear'
+                { val: 'ph-map-pin', label: 'Pin' },
+                { val: 'ph-boot', label: 'Hike' },
+                { val: 'ph-sneaker', label: 'Run' },
+                { val: 'ph-bicycle', label: 'Bike' },
+                { val: 'ph-tent', label: 'Camp' },
+                { val: 'ph-bed', label: 'Hotel' },
+                { val: 'ph-fork-knife', label: 'Food' },
+                { val: 'ph-coffee', label: 'Cafe' },
+                { val: 'ph-drop', label: 'Water' },
+                { val: 'ph-toilet', label: 'Toilet' },
+                { val: 'ph-camera', label: 'Photo' },
+                { val: 'ph-mountains', label: 'Peak' },
+                { val: 'ph-tree', label: 'Nature' },
+                { val: 'ph-bus', label: 'Bus' },
+                { val: 'ph-van', label: 'Van' },
+                { val: 'ph-car', label: 'Car' },
+                { val: 'ph-airplane', label: 'Flight' },
+                { val: 'ph-boat', label: 'Boat' },
+                { val: 'ph-first-aid', label: 'Medical' },
+                { val: 'ph-warning', label: 'Alert' },
+                { val: 'ph-info', label: 'Info' },
+                { val: 'ph-flag-checkered', label: 'Finish' },
+                { val: 'ph-shopping-cart', label: 'Shop' },
+                { val: 'ph-gas-pump', label: 'Fuel' }
             ].map(opt => {
-                const emoji = opt.split(' ')[0];
-                return `<option value="${emoji}" ${safeIcon === emoji ? 'selected' : ''}>${opt}</option>`;
+                return `<option value="${opt.val}" ${safeIcon === opt.val ? 'selected' : ''}>${opt.label}</option>`;
             }).join('');
 
             const html = `
@@ -3578,23 +3601,23 @@
     </style>
     <div id="app-switcher" style="position: fixed; bottom: 35px; left: 15px; z-index: 100000;">
         <button onclick="document.getElementById('switcher-menu').classList.toggle('show')"
-            style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;">📱</button>
+            style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;"><i class="ph ph-squares-four"></i></button>
         <div id="switcher-menu"
             style="display: none; position: absolute; bottom: 65px; left: 0; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 220px; flex-direction: column; gap: 8px; border: 1px solid #e2e8f0;">
             <div
                 style="font-size: 0.75em; font-weight: bold; color: #64748b; text-transform: uppercase; padding-left: 5px; margin-bottom: 2px;">
                 Switch App</div>
             <a href="index.html"
-                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">🗺️
+                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;"><i class="ph ph-map-trifold"></i>
                 Command Center</a>
             <a href="field.html"
-                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">🧭
+                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;"><i class="ph ph-compass"></i>
                 Field Map</a>
             <a href="pm.html"
-                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">📋
+                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;"><i class="ph ph-clipboard-text"></i>
                 Mobile PM</a>
             <a href="telemetry.html"
-                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;">📊
+                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;"><i class="ph ph-chart-bar"></i>
                 Telemetry</a>
         </div>
     </div>

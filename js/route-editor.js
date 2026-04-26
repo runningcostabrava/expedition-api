@@ -289,7 +289,7 @@ const KomootEngine = {
                 <div style="text-align:center; padding:5px;">
                     <strong style="display:block; margin-bottom:8px;">Stop ${i + 1}</strong>
                     <button onclick="KomootEngine.toggleSegmentMode(${i})" style="margin-bottom:5px; background:#3498db; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; width:100%;">Toggle Mode</button>
-                    <button onclick="KomootEngine.deleteStop(${i})" style="margin-bottom:5px; background:#e74c3c; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; width:100%;">🗑️ Delete Stop</button>
+                    <button onclick="KomootEngine.deleteStop(${i})" style="margin-bottom:5px; background:#e74c3c; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; width:100%;"><i class="ph ph-trash"></i> Delete Stop</button>
                 </div>
             `);
 

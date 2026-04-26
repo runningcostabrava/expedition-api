@@ -183,7 +183,7 @@
             <input type="color" id="track-color"
                 style="width:100%; height:42px; border:none; padding:0; cursor:pointer; border-radius: 6px; margin-bottom:20px;">
 
-            <button class="action-btn btn-save" onclick="executeSave()">💾 Execute Save</button>
+            <button class="action-btn btn-save" onclick="executeSave()"><i class="ph ph-floppy-disk"></i> Execute Save</button>
             <button class="action-btn btn-cancel" onclick="goBack()">Cancel & Return</button>
         </div>
     </div>
@@ -279,9 +279,9 @@
                         const div = document.createElement('div');
                         div.className = `segment ${seg.type === 'imported' ? 'smart' : seg.type}`;
                         
-                        let btnText = 'MANUAL 📏';
-                        if (seg.type === 'smart') btnText = 'SMART 🚗';
-                        if (seg.type === 'imported') btnText = 'EXACT GPX 📍';
+                        let btnText = 'MANUAL <i class="ph ph-ruler"></i>';
+                        if (seg.type === 'smart') btnText = 'SMART <i class="ph ph-car-profile"></i>';
+                        if (seg.type === 'imported') btnText = 'EXACT GPX <i class="ph ph-map-pin"></i>';
 
                         div.innerHTML = `
                     <strong>Seg ${seg.startIdx + 1}-${seg.endIdx + 1}</strong>
@@ -303,7 +303,7 @@
 
         async function executeSave() {
             const saveBtn = document.querySelector('.btn-save');
-            saveBtn.innerText = '💾 Saving...';
+            saveBtn.innerHTML = '<i class="ph ph-floppy-disk"></i> Saving...';
             saveBtn.disabled = true;
 
             try {
@@ -409,7 +409,7 @@
             } catch (error) {
                 console.error("Save Error:", error);
                 alert("Error saving track: " + error.message);
-                saveBtn.innerText = '💾 Execute Save';
+                saveBtn.innerHTML = '<i class="ph ph-floppy-disk"></i> Execute Save';
                 saveBtn.disabled = false;
             }
         }
