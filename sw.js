@@ -65,7 +65,7 @@ self.addEventListener('message', async event => {
                 const existing = await cache.match(url);
                 if (existing) { skipped++; cached++; return; }
 
-                const response = await fetch(url, { mode: 'cors' });
+                const response = await fetch(url);
                 if (response.ok) {
                     await cache.put(url, response);
                     cached++;
