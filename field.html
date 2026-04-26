@@ -10,7 +10,9 @@
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/js/api.js"></script>
     <script src="/js/offline-manager.js"></script>
+    <script src="/js/live-tracking.js"></script>
     <style>
         body {
             margin: 0;
@@ -290,6 +292,9 @@
             map.on('load', async () => {
                 geolocate.trigger();
 
+                // Start live telemetry polling for fleet
+                startFleetTelemetry();
+
                 const secRes = await fetch(`${API_URL}/sections`);
                 const sections = await secRes.json();
                 const selector = document.getElementById('day-selector');
@@ -527,149 +532,19 @@
             }
         }
 
-        // --- UPGRADED: Mobile Fleet Manager (Trails, Zoom & Last Update Time) ---
-        let teamMarkers = {};
-        let latestTeamCoords = {}; // Stores coordinates so we can zoom to them
-        let latestTeamUpdates = {}; // Stores the exact timestamp of the last ping
-
-        // Helper function to calculate "Time Ago"
-        function timeAgo(dateString) {
-            if (!dateString) return "No data";
-            const diffMs = new Date() - new Date(dateString);
-            const diffMins = Math.floor(diffMs / 1000 / 60);
-
-            if (diffMins < 1) return "Just now";
-            if (diffMins < 60) return `${diffMins}m ago`;
-
-            const hours = Math.floor(diffMins / 60);
-            const mins = diffMins % 60;
-            return `${hours}h ${mins}m ago`;
-        }
-
-        async function fetchTeamLocations() {
-            try {
-                const res = await fetch(`${API_URL}/api/fleet/telemetry?minutes=1440&_t=${Date.now()}`);
-                const data = await res.json();
-
-                const paths = {};
-                data.forEach(point => {
-                    if (!paths[point.guide_id]) {
-                        paths[point.guide_id] = { coords: [], color: point.color, icon: point.icon || '🏃‍♂️' };
-                    }
-                    paths[point.guide_id].coords.push([point.lng, point.lat]);
-
-                    // Capture the absolute latest timestamp for this guide
-                    // (Uses created_at or timestamp depending on your DB column name)
-                    latestTeamUpdates[point.guide_id] = point.created_at || point.timestamp;
-                });
-
-                const lineFeatures = [];
-                const activeIds = Object.keys(paths);
-                latestTeamCoords = {};
-
-                activeIds.forEach(id => {
-                    const track = paths[id];
-                    const latestCoord = track.coords[track.coords.length - 1];
-                    latestTeamCoords[id] = latestCoord;
-
-                    // 1. Draw the Trail
-                    if (track.coords.length > 1) {
-                        lineFeatures.push({
-                            type: 'Feature',
-                            properties: { color: track.color },
-                            geometry: { type: 'LineString', coordinates: track.coords }
-                        });
-                    }
-
-                    // 2. Draw the Live Avatar
-                    if (!teamMarkers[id]) {
-                        const el = document.createElement('div');
-                        el.innerHTML = `<div style="font-size: 24px; background: white; border-radius: 50%; padding: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 2px solid ${track.color};">${track.icon}</div>`;
-                        teamMarkers[id] = new mapboxgl.Marker({ element: el }).setLngLat(latestCoord).addTo(map);
-                    } else {
-                        teamMarkers[id].setLngLat(latestCoord);
-                    }
-                });
-
-                // Remove hidden markers
-                Object.keys(teamMarkers).forEach(id => {
-                    if (!activeIds.includes(id)) { teamMarkers[id].remove(); delete teamMarkers[id]; }
-                });
-
-                // Update Mapbox Line Source
-                const geojson = { type: 'FeatureCollection', features: lineFeatures };
-                if (map.getSource('fleet-tails')) {
-                    map.getSource('fleet-tails').setData(geojson);
-                } else {
-                    map.addSource('fleet-tails', { type: 'geojson', data: geojson });
-                    map.addLayer({
-                        id: 'fleet-tails-layer', type: 'line', source: 'fleet-tails',
-                        layout: { 'line-join': 'round', 'line-cap': 'round' },
-                        paint: { 'line-color': ['get', 'color'], 'line-width': 4, 'line-opacity': 0.7 }
-                    });
-                }
-            } catch (e) { console.error("Telemetry error", e); }
-        }
-
-        window.zoomToGuide = function (guideId) {
-            const coords = latestTeamCoords[guideId];
-            if (coords) {
-                map.flyTo({ center: coords, zoom: 16, duration: 1500 });
-                document.getElementById('fleet-panel-mobile').style.display = 'none';
-            } else {
-                alert("Location not found yet. Wait for next GPS ping.");
-            }
-        };
-
         async function openFieldFleet() {
             document.getElementById('fleet-panel-mobile').style.display = 'block';
-            document.getElementById('field-fleet-list').innerHTML = '<div style="padding: 20px; text-align: center; color: #64748b;">Loading radar...</div>';
-
-            try {
-                const res = await fetch(`${API_URL}/api/fleet/devices?_t=${Date.now()}`);
-                const devices = await res.json();
-
-                let html = '';
-                devices.forEach(d => {
-                    const lastPingTime = latestTeamUpdates[d.id];
-                    const timeString = timeAgo(lastPingTime);
-
-                    // Determine if the tracker is currently online (pinged in the last 15 minutes)
-                    const isOnline = lastPingTime && (new Date() - new Date(lastPingTime)) < (15 * 60 * 1000);
-                    const statusIcon = isOnline ? '🟢' : '🔴';
-
-                    html += `
-                    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
-                        <div style="flex: 1; cursor: pointer;" onclick="zoomToGuide(${d.id})">
-                            <div style="font-size: 1.1em; color: #0f172a;">${d.icon || '🏃‍♂️'} <strong>${d.display_name}</strong></div>
-
-                            <div style="font-size: 0.85em; color: #64748b; margin-top: 4px; font-weight: 600;">
-                                ${statusIcon} Last seen: ${timeString}
-                            </div>
-
-                            <div style="font-size: 0.8em; color: #3498db; font-weight: bold; margin-top: 4px;">📍 Tap to Zoom to Location</div>
-                        </div>
-                        <button onclick="event.stopPropagation(); toggleFieldDevice(${d.id}, ${!d.is_visible})" style="padding:8px 16px; border-radius:8px; border:none; background:${d.is_visible ? '#10b981' : '#94a3b8'}; color:white; font-weight:bold; cursor:pointer;">
-                            ${d.is_visible ? '👁️' : '🙈'}
-                        </button>
-                    </div>`;
-                });
-
-                if (html === '') html = '<div style="color: #64748b;">No devices configured.</div>';
-                document.getElementById('field-fleet-list').innerHTML = html;
-            } catch (e) {
-                document.getElementById('field-fleet-list').innerHTML = '<div style="color: #ef4444;">Failed to load devices.</div>';
-            }
+            fetchFleetDirectory();
         }
 
-
-
-
-
-        async function toggleFieldDevice(id, isVisible) {
-            await authFetch(`${API_URL}/api/fleet/devices/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_visible: isVisible }) });
-            fetchTeamLocations(); // Instantly apply to map
-            openFieldFleet();     // Refresh the list UI
+        async function toggleDeviceVisibility(id, isVisible) {
+            await authFetch(`${API_URL}/api/fleet/devices/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_visible: isVisible })
+            });
+            forceFleetUpdate(); // Instantly apply to map
+            fetchFleetDirectory();     // Refresh the list UI
         }
 
         // Elevation Profile Engine (Now includes "Back to Task" button)
