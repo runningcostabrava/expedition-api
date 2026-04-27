@@ -1,5 +1,5 @@
 let activeCategoryIdForEdit = null;
-const API_URL = 'https://mapbox-api-uz9a.onrender.com';
+const API_URL = window.location.origin;
 let AUTH_TOKEN = sessionStorage.getItem('expedition_token');
 
 let aiConversationMemory = [];

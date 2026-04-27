@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const { OpenAI } = require('openai');
-const Tesseract = require('tesseract.js');
 const { search } = require('duck-duck-scrape');
 
 const deepseek = new OpenAI({
@@ -433,6 +432,7 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
 
     // --- TESSERACT OCR ENGINE ---
     if (imageUrl) {
+      const Tesseract = require('tesseract.js'); // Only load it if we actually have an image!
       try {
         console.log("[AI] Scanning image with Tesseract OCR...");
         // Use eng+spa+ita (English, Spanish, Italian) since the expedition is in Europe
@@ -525,8 +525,8 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
 
     let finalResponseText = "";
     
-    // Allow the AI to "think" for up to 6 steps (e.g., Search Web -> Update Task -> Reply)
-    for (let step = 0; step < 6; step++) {
+    // Allow the AI to "think" for up to 10 steps (e.g., Search Web -> Update Task -> Reply)
+    for (let step = 0; step < 10; step++) {
         const response = await deepseek.chat.completions.create({
             model: "deepseek-chat",
             messages: messages,
@@ -565,15 +565,15 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
                     toolResult = `SUCCESS: Task ${args.id} updated.`;
                 }
                 else if (name === "search_internet") {
-                    console.log(`[AI] Searching web for: ${args.query}`);
+                    console.log(`[AI] Deep Researching: ${args.query}`);
                     const searchResults = await search(args.query, { safeSearch: "off" });
-                    const snippets = searchResults.results.slice(0, 3).map(r => r.description).join('\n\n');
                     
-                    if (!snippets) {
-                        toolResult = "No search results found. Please use your general knowledge or ask for clarification.";
-                    } else {
-                        toolResult = `WEB SEARCH RESULTS:\n${snippets}\n\nIMPORTANT: Use this info to provide your final answer NOW. Do not call any more tools.`;
-                    }
+                    // We take more results (5) to make it smarter, but keep descriptions concise
+                    const snippets = searchResults.results.slice(0, 5).map(r => r.description).join('\n\n');
+                    
+                    toolResult = snippets ? 
+                        `WEB RESULTS FOUND:\n${snippets}\n\nTask: Analyze these results. If you have enough info for a full weather report, answer now. If not, you may search once more for missing details.` : 
+                        "No results found on the web.";
                 }
                 else if (name === "update_core_memory") {
                     await pool.query('UPDATE ai_memory SET memory_text = $1 WHERE id = 1', [args.new_memory_text]);
