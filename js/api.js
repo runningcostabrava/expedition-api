@@ -1,5 +1,5 @@
 let activeCategoryIdForEdit = null;
-const API_URL = window.location.origin;
+const API_URL = 'https://expedition-api.onrender.com';
 let AUTH_TOKEN = sessionStorage.getItem('expedition_token');
 
 let aiConversationMemory = [];

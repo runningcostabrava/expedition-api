@@ -30,6 +30,13 @@ app.use(bodyParser.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true })); // <--- 🚨 ADD THIS CRITICAL LINE 🚨
 app.use(express.static(path.join(__dirname)));
 
+app.get('/api/config', (req, res) => {
+  res.json({
+    MAPBOX_TOKEN: process.env.MAPBOX_ACCESS_TOKEN || process.env.MAPBOX_TOKEN,
+    GOOGLE_PLACES_API_KEY: process.env.GOOGLE_PLACES_API_KEY
+  });
+});
+
 const JWT_SECRET = process.env.JWT_SECRET || 'emergency_fallback_secret'; // 2. Set secret
 
 // REPLACED: adminAuth now verifies tokens, not a static key
@@ -1215,15 +1222,6 @@ app.post('/link_anchor', adminAuth, async (req, res) => {
     await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [task_id, anchor_id]);
     res.json({ message: 'Linked successfully' });
   } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-// UPDATED: Remove ADMIN_KEY from the public config broadcast
-app.get('/api/config', (req, res) => {
-  res.json({
-    MAPBOX_TOKEN: process.env.MAPBOX_TOKEN,
-    GOOGLE_PLACES_API_KEY: process.env.GOOGLE_PLACES_API_KEY
-    // ADMIN_KEY IS GONE from here!
-  });
 });
 
 app.get('/icons/:name', (req, res) => {
