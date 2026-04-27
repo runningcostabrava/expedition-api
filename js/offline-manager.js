@@ -338,11 +338,23 @@ const OfflineManager = (() => {
     }
 
     async function updateQueueBadge() {
-        const badge = document.getElementById('om-queue-badge');
-        if (!badge) return;
         const count = await getQueueCount();
-        badge.textContent = count;
-        badge.style.display = count > 0 ? 'flex' : 'none';
+        const innerBadge = document.getElementById('om-queue-badge');
+        const mainBadge = document.getElementById('om-main-badge');
+        const mainToggle = document.getElementById('om-main-toggle');
+
+        if (innerBadge) {
+            innerBadge.textContent = count;
+            innerBadge.style.display = count > 0 ? 'flex' : 'none';
+        }
+        if (mainBadge) {
+            mainBadge.textContent = count;
+            mainBadge.style.display = count > 0 ? 'flex' : 'none';
+        }
+        if (mainToggle) {
+            if (count > 0) mainToggle.classList.add('has-pending');
+            else mainToggle.classList.remove('has-pending');
+        }
     }
 
     function buildUI() {
@@ -350,15 +362,31 @@ const OfflineManager = (() => {
         style.textContent = `
             #om-container {
                 position: fixed;
-                bottom: 150px; 
+                bottom: 100px; 
                 left: 15px;    
-                right: auto;
                 display: flex;
                 flex-direction: column;
-                align-items: flex-start;
-                gap: 8px;
+                align-items: center;
                 z-index: 500;
                 font-family: sans-serif;
+            }
+
+            #om-actions-wrap {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                margin-bottom: 10px;
+                opacity: 0;
+                transform: translateY(20px) scale(0.9);
+                transform-origin: bottom center;
+                pointer-events: none;
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+
+            #om-actions-wrap.open {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+                pointer-events: auto;
             }
 
             .om-btn {
@@ -366,7 +394,7 @@ const OfflineManager = (() => {
                 height: 44px;
                 border-radius: 50%;
                 border: 1px solid rgba(255,255,255,0.15);
-                background: rgba(15,23,42,0.85);
+                background: rgba(15,23,42,0.9);
                 backdrop-filter: blur(8px);
                 color: white;
                 font-size: 19px;
@@ -375,13 +403,27 @@ const OfflineManager = (() => {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                transition: background 0.2s, transform 0.1s;
+                transition: background 0.2s, transform 0.1s, border-color 0.2s;
                 position: relative;
             }
-            .om-btn:hover { transform: scale(1.08); }
+
             .om-btn:active { transform: scale(0.95); }
 
-            #om-queue-badge {
+            #om-main-toggle {
+                width: 50px;
+                height: 50px;
+                font-size: 24px;
+                background: #0f172a;
+                border: 2px solid rgba(255,255,255,0.2);
+                z-index: 2;
+            }
+
+            #om-main-toggle.has-pending {
+                border-color: #e74c3c;
+                box-shadow: 0 0 15px rgba(231, 76, 60, 0.5);
+            }
+
+            .om-badge {
                 position: absolute;
                 top: -4px;
                 right: -4px;
@@ -401,6 +443,9 @@ const OfflineManager = (() => {
             #om-progress-wrap {
                 display: none;
                 opacity: 0;
+                position: absolute;
+                left: 60px;
+                bottom: 0;
                 flex-direction: column;
                 gap: 4px;
                 background: rgba(15,23,42,0.9);
@@ -411,58 +456,30 @@ const OfflineManager = (() => {
                 min-width: 180px;
                 transition: opacity 0.3s;
             }
-
-            #om-progress-label {
-                font-size: 11px;
-                font-weight: 600;
-                color: #e2e8f0;
-                white-space: nowrap;
-            }
-
-            #om-progress-track {
-                width: 100%;
-                height: 4px;
-                background: rgba(255,255,255,0.1);
-                border-radius: 2px;
-                overflow: hidden;
-            }
-
-            #om-progress-bar {
-                height: 100%;
-                width: 0%;
-                background: linear-gradient(90deg, #3498db, #27ae60);
-                border-radius: 2px;
-                transition: width 0.3s ease;
-            }
-
+            #om-progress-label { font-size: 11px; font-weight: 600; color: #e2e8f0; white-space: nowrap; }
+            #om-progress-track { width: 100%; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
+            #om-progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #3498db, #27ae60); border-radius: 2px; transition: width 0.3s ease; }
+            
             #om-offline-banner {
-                display: none;
-                position: fixed;
-                top: 0; left: 0; right: 0;
-                background: linear-gradient(90deg, #e67e22, #d35400);
-                color: white;
-                text-align: center;
-                padding: 7px 16px;
-                font-size: 13px;
-                font-weight: 700;
-                letter-spacing: 0.02em;
-                z-index: 9999;
-                box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+                display: none; position: fixed; top: 0; left: 0; right: 0;
+                background: linear-gradient(90deg, #e67e22, #d35400); color: white;
+                text-align: center; padding: 7px 16px; font-size: 13px; font-weight: 700;
+                z-index: 9999; box-shadow: 0 2px 12px rgba(0,0,0,0.3);
             }
         `;
         document.head.appendChild(style);
 
-        // Offline banner
         const banner = document.createElement('div');
         banner.id = 'om-offline-banner';
         banner.innerHTML = '📵 &nbsp;Offline mode &mdash; edits will auto-sync when connected';
         document.body.appendChild(banner);
 
-        // Main container
         const container = document.createElement('div');
         container.id = 'om-container';
 
-        // OSM toggle button
+        const actionsWrap = document.createElement('div');
+        actionsWrap.id = 'om-actions-wrap';
+
         const osmBtn = document.createElement('button');
         osmBtn.id = 'om-osm-btn';
         osmBtn.className = 'om-btn';
@@ -470,7 +487,6 @@ const OfflineManager = (() => {
         osmBtn.innerHTML = '<i class="ph ph-map-trifold"></i>';
         osmBtn.onclick = toggleOSM;
 
-        // Download area button
         const dlBtn = document.createElement('button');
         dlBtn.id = 'om-dl-btn';
         dlBtn.className = 'om-btn';
@@ -478,7 +494,6 @@ const OfflineManager = (() => {
         dlBtn.innerHTML = '⬇️';
         dlBtn.onclick = downloadVisibleTiles;
 
-        // Sync button (shows pending count)
         const syncBtn = document.createElement('button');
         syncBtn.id = 'om-sync-btn';
         syncBtn.className = 'om-btn';
@@ -486,11 +501,15 @@ const OfflineManager = (() => {
         syncBtn.innerHTML = '🔄';
         syncBtn.onclick = syncQueue;
 
-        const badge = document.createElement('span');
-        badge.id = 'om-queue-badge';
-        syncBtn.appendChild(badge);
+        const innerBadge = document.createElement('span');
+        innerBadge.id = 'om-queue-badge';
+        innerBadge.className = 'om-badge';
+        syncBtn.appendChild(innerBadge);
 
-        // Progress panel
+        actionsWrap.appendChild(osmBtn);
+        actionsWrap.appendChild(dlBtn);
+        actionsWrap.appendChild(syncBtn);
+
         const progressWrap = document.createElement('div');
         progressWrap.id = 'om-progress-wrap';
         progressWrap.innerHTML = `
@@ -498,10 +517,20 @@ const OfflineManager = (() => {
             <div id="om-progress-track"><div id="om-progress-bar"></div></div>
         `;
 
+        const mainToggle = document.createElement('button');
+        mainToggle.id = 'om-main-toggle';
+        mainToggle.className = 'om-btn';
+        mainToggle.innerHTML = '<i class="ph ph-wifi-slash"></i>';
+        mainToggle.onclick = () => actionsWrap.classList.toggle('open');
+
+        const mainBadge = document.createElement('span');
+        mainBadge.id = 'om-main-badge';
+        mainBadge.className = 'om-badge';
+        mainToggle.appendChild(mainBadge);
+
+        container.appendChild(actionsWrap);
+        container.appendChild(mainToggle);
         container.appendChild(progressWrap);
-        container.appendChild(osmBtn);
-        container.appendChild(dlBtn);
-        container.appendChild(syncBtn);
         document.body.appendChild(container);
     }
 

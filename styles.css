@@ -1527,10 +1527,30 @@ body.zen-mode #fleet-panel {
         padding-bottom: 100px !important;
     }
 
-    /* Push Mapbox zoom/compass controls down so they don't overlap the search bars */
+    /* 1. High-Contrast Solid FABs */
+    #mobile-fab-container .action-btn-modern {
+        background: #1e293b !important; /* Solid dark slate */
+        color: white !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+        backdrop-filter: none !important;
+    }
+
+    #mobile-fab-container .action-btn-modern:active {
+        background: #334155 !important;
+        transform: scale(0.95) !important;
+    }
+
+    /* Keep the red pin button strictly red */
+    #mobile-fab-container .action-btn-modern[title="Mark Current Location"] {
+        background: #ef4444 !important;
+        border-color: #dc2626 !important;
+        color: white !important;
+    }
+
+    /* 2. Fix Mapbox Zoom Controls Overlapping */
     .mapboxgl-ctrl-top-right {
-        top: 240px !important; /* Pushes Mapbox controls safely below the 3 custom FABs */
-        right: 10px !important;
+        top: 70px !important; /* Pushes Mapbox controls to top right, just below the command bar */
         right: 10px !important;
     }
 
