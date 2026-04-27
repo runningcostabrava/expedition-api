@@ -428,6 +428,67 @@ const aiTools = [
         required: ["query", "location_context"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "highlight_task_in_ui",
+      description: "Use this tool to visually open, highlight, and focus on a specific task in the user's sidebar UI.",
+      parameters: {
+        type: "object",
+        properties: {
+          task_id: { type: "integer", description: "The database ID of the task to highlight" }
+        },
+        required: ["task_id"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_directory",
+      description: "Search for contacts by name or role.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string" }
+        },
+        required: ["query"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_contact",
+      description: "Save new person/organization to the database.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          contact_type: { type: "string", enum: ["Staff", "Collaborator", "PlacesContact", "Emergency"] },
+          phone: { type: "string" },
+          email: { type: "string" },
+          notes: { type: "string" }
+        },
+        required: ["name", "contact_type"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "link_contact_to_waypoint",
+      description: "Attach a contact to a map location.",
+      parameters: {
+        type: "object",
+        properties: {
+          waypoint_id: { type: "integer" },
+          contact_id: { type: "integer" }
+        },
+        required: ["waypoint_id", "contact_id"]
+      }
+    }
   }
 ];
 
@@ -522,7 +583,9 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
           8. VOCAB: 'Fite' means milestone (set is_milestone true).
           9. SEARCH DECISIVENESS: After using 'search_internet' once, if you have received reasonable information, you MUST stop calling tools and provide your final answer immediately. Do not keep searching for 'perfect' details.
           10. MEMORY: If the user asks you to remember a rule or preference, use the 'update_core_memory' tool to rewrite your permanent memory.
-          11. STRICT TOOL EXECUTION: NEVER claim to have created, updated, or deleted a task unless you have EXPLICITLY called the appropriate tool (e.g., create_task) in this exact turn. Do not hallucinate actions or pretend to do things.` 
+          11. STRICT TOOL EXECUTION: NEVER claim to have created, updated, or deleted a task unless you have EXPLICITLY called the appropriate tool (e.g., create_task) in this exact turn. Do not hallucinate actions or pretend to do things.
+          12. CONTACTS: Tasks can only be assigned to official 'Staff'. If asked to assign a task, use 'search_directory' to find the ID first, then pass it as 'responsible_contact_id'. Save new phone numbers using 'create_contact'.
+          13. UI CONTROL: You CAN control the user's interface. If the user asks to 'show', 'find', 'open', or 'highlight' a task, use the 'highlight_task_in_ui' tool.` 
         }
     ];
 
@@ -532,6 +595,7 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
     messages.push({ role: "user", content: finalPrompt });
 
     let finalResponseText = "";
+    let pendingUiAction = null;
     
     // Allow the AI to "think" for up to 10 steps (e.g., Search Web -> Update Task -> Reply)
     for (let step = 0; step < 10; step++) {
@@ -626,6 +690,10 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
                         toolResult = "Error searching for places: " + err.message;
                     }
                 }
+                else if (name === "highlight_task_in_ui") {
+                    pendingUiAction = { type: 'focus_task', taskId: args.task_id };
+                    toolResult = `SUCCESS: UI told to highlight task ${args.task_id}.`;
+                }
             } catch (err) {
                 console.error(`[AI Tool Error] ${name}:`, err);
                 toolResult = `ERROR executing ${name}: ${err.message}`;
@@ -641,7 +709,7 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
     }
 
     if (!finalResponseText) finalResponseText = "The assistant reached its thinking limit or returned an empty response. Check server logs.";
-    res.json({ success: true, message: finalResponseText });
+    res.json({ success: true, message: finalResponseText, uiAction: pendingUiAction });
   } catch (err) {
     console.error("AI Error:", err);
     res.status(500).json({ error: "AI processing failed: " + err.message });

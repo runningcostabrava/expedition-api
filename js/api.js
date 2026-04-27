@@ -467,6 +467,13 @@ window.openAiChat = function() {
 
             typingIndicator.remove();
             appendMessage('ai', data.message);
+
+            if (data.uiAction && data.uiAction.type === 'focus_task') {
+                if (typeof window.focusTaskInSidebar === 'function') {
+                    setTimeout(() => window.focusTaskInSidebar(data.uiAction.taskId), 500);
+                }
+            }
+
             window.clearAiAttachment();
 
             // Quietly refresh the UI so the user can watch the map/sidebar update instantly behind the chat!
@@ -488,3 +495,16 @@ window.openAiChat = function() {
 
 // Map the old global function to the new persistent chat UI
 window.processAiCommand = window.openAiChat;
+
+window.downloadVCard = function(name, phone, email, notes) {
+    const vcard = `BEGIN:VCARD\nVERSION:3.0\nFN:${name || ''}\nTEL:${phone || ''}\nEMAIL:${email || ''}\nNOTE:${notes || ''}\nEND:VCARD`;
+    const blob = new Blob([vcard], { type: 'text/vcard' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(name || 'contact').replace(/\s+/g, '_')}.vcf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+};

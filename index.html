@@ -2917,7 +2917,7 @@
             }
         }
 
-        function renderSectionUI(section, tasks, gridCols) {
+        function renderSectionUI(section, tasks, gridCols, forceOpen = false) {
             const container = document.getElementById('asana-container');
             const sectionDiv = document.createElement('div');
             sectionDiv.className = 'asana-section';
@@ -2931,7 +2931,7 @@
             sectionDiv.innerHTML = `
                 <div class="asana-header" style="display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #eee; padding-bottom: 6px; margin-bottom: 8px; cursor: pointer;"
                      onclick="if(document.getElementById('section-${section.id || 'null'}').classList.contains('is-editing')) return; flyToSection(${section.id || 'null'}); ${section.id ? `openSectionEditor(${section.id});` : ''}">
-                    <span class="section-toggle-icon collapsed" style="flex-shrink: 0; font-size: 0.8em; color: #94a3b8; transition: transform 0.2s;">▼</span>
+                    <span class="section-toggle-icon ${forceOpen ? '' : 'collapsed'}" style="flex-shrink: 0; font-size: 0.8em; color: #94a3b8; transition: transform 0.2s;">▼</span>
                     ${section.id ? `<input type="date" value="${dateVal}" class="modern-inline-input" disabled style="width: 115px; padding:0; border:none; background:transparent; font-size:0.9em; color:#64748b; font-weight:bold; flex-shrink: 0;" onchange="updateSectionMetadata(${section.id}, 'section_date', this.value)" onclick="if(this.closest('.is-editing')) event.stopPropagation();">` : ''}
                     <span class="inline-edit section-title-text" style="font-weight: bold; flex-shrink: 0; font-size: 0.95em; color: #1e293b;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }" onblur="updateSectionMetadata(${section.id}, 'title', this.innerText)" onclick="if(this.closest('.is-editing')) event.stopPropagation();">${sectionTitle}</span>
 
@@ -2941,7 +2941,7 @@
                         ${section.id ? `<button class="action-btn-modern del" title="Delete Section" onclick="event.stopPropagation(); deleteSection(${section.id}, '${sectionTitle.replace(/'/g, "\\'")}')"><i class="ph ph-trash"></i></button>` : ''}
                     </div>
                 </div>
-                <div class="section-content collapsed"></div>
+                <div class="section-content ${forceOpen ? '' : 'collapsed'}"></div>
             `;
 
             const taskListContainer = document.createElement('div');
