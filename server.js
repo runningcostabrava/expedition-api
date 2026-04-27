@@ -28,7 +28,6 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true })); // <--- 🚨 ADD THIS CRITICAL LINE 🚨
-app.use(express.static(path.join(__dirname)));
 
 app.get('/api/config', (req, res) => {
   res.json({
@@ -36,6 +35,8 @@ app.get('/api/config', (req, res) => {
     GOOGLE_PLACES_API_KEY: process.env.GOOGLE_PLACES_API_KEY
   });
 });
+
+app.use(express.static(path.join(__dirname)));
 
 const JWT_SECRET = process.env.JWT_SECRET || 'emergency_fallback_secret'; // 2. Set secret
 

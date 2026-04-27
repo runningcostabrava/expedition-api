@@ -551,6 +551,7 @@
 
         async function initializeApp() {
             try {
+                console.log("🚀 Initializing Expedition App...");
                 const configRes = await fetch(`${API_URL}/api/config`);
                 if (!configRes.ok) throw new Error(`Server returned ${configRes.status}: Check Render deployment`);
 
@@ -3394,9 +3395,6 @@
             } catch (err) { alert("Error: " + err.message); }
         }
 
-
-        initializeApp();
-
         // --- NEW: Catch URL parameters from the PM App ---
         window.addEventListener('load', () => {
             setTimeout(() => { // Give the map 1 second to fetch data first
@@ -3636,6 +3634,13 @@
             document.getElementById('left-panel').classList.add('hidden');
             document.getElementById('right-panel').classList.add('hidden');
         }
+
+        // --- CRITICAL: Initialize App only after all scripts are ready ---
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof initializeApp === 'function') {
+                initializeApp();
+            }
+        });
     </script>
     <style>
         #switcher-menu.show {
