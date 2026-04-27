@@ -145,7 +145,8 @@ app.get('/setup-db', adminAuth, async (req, res) => {
         id SERIAL PRIMARY KEY,
         memory_text TEXT
       );`,
-      "INSERT INTO ai_memory (id, memory_text) VALUES (1, '') ON CONFLICT DO NOTHING;"
+      "INSERT INTO ai_memory (id, memory_text) VALUES (1, '') ON CONFLICT DO NOTHING;",
+      "CREATE TABLE IF NOT EXISTS contacts (id SERIAL PRIMARY KEY, name TEXT NOT NULL, contact_type TEXT, phone TEXT, email TEXT, notes TEXT)"
     ];
 
     // Execute safely one by one
@@ -951,6 +952,43 @@ app.delete('/tracks/:id', adminAuth, async (req, res) => {
   try {
     await pool.query('DELETE FROM tracks WHERE id = $1', [req.params.id]);
     res.json({ message: "Track deleted" });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- CONTACTS DIRECTORY ---
+app.get('/api/contacts', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM contacts ORDER BY name ASC');
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/contacts', adminAuth, async (req, res) => {
+  const { name, contact_type, phone, email, notes } = req.body;
+  try {
+    const result = await pool.query(
+      'INSERT INTO contacts (name, contact_type, phone, email, notes) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [name, contact_type || 'Staff', phone, email, notes]
+    );
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/contacts/:id', adminAuth, async (req, res) => {
+  const { name, contact_type, phone, email, notes } = req.body;
+  try {
+    const result = await pool.query(
+      'UPDATE contacts SET name=$1, contact_type=$2, phone=$3, email=$4, notes=$5 WHERE id=$6 RETURNING *',
+      [name, contact_type, phone, email, notes, req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/contacts/:id', adminAuth, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM contacts WHERE id=$1', [req.params.id]);
+    res.json({ message: 'Contact deleted' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
