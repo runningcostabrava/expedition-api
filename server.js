@@ -146,7 +146,8 @@ app.get('/setup-db', adminAuth, async (req, res) => {
         memory_text TEXT
       );`,
       "INSERT INTO ai_memory (id, memory_text) VALUES (1, '') ON CONFLICT DO NOTHING;",
-      "CREATE TABLE IF NOT EXISTS contacts (id SERIAL PRIMARY KEY, name TEXT NOT NULL, contact_type TEXT, phone TEXT, email TEXT, notes TEXT)"
+      "CREATE TABLE IF NOT EXISTS contacts (id SERIAL PRIMARY KEY, name TEXT NOT NULL, contact_type TEXT, phone TEXT, email TEXT, notes TEXT)",
+      "CREATE TABLE IF NOT EXISTS waypoint_contacts (waypoint_id INTEGER REFERENCES waypoints(id) ON DELETE CASCADE, contact_id INTEGER REFERENCES contacts(id) ON DELETE CASCADE, PRIMARY KEY (waypoint_id, contact_id))"
     ];
 
     // Execute safely one by one
@@ -690,6 +691,56 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
                     } catch (err) {
                         toolResult = "Error searching for places: " + err.message;
                     }
+                }
+                else if (name === "create_contact") {
+                    const res = await pool.query(
+                        'INSERT INTO contacts (name, contact_type, phone, email, notes) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+                        [args.name, args.contact_type || 'Staff', args.phone, args.email, args.notes]
+                    );
+                    toolResult = `SUCCESS: Contact created with ID ${res.rows[0].id}.`;
+                }
+                else if (name === "search_directory") {
+                    // Search for contacts by name or role
+                    const searchQuery = `%${args.query}%`;
+                    const res = await pool.query(
+                        'SELECT id, name, contact_type, phone FROM contacts WHERE name ILIKE $1 OR contact_type ILIKE $1 LIMIT 5',
+                        [searchQuery]
+                    );
+                    toolResult = res.rows.length > 0 
+                        ? `FOUND CONTACTS:\n${JSON.stringify(res.rows)}\nUse these IDs if you need to link them.` 
+                        : `No contacts found matching "${args.query}".`;
+                }
+                else if (name === "link_contact_to_waypoint") {
+                    await pool.query(
+                        'INSERT INTO waypoint_contacts (waypoint_id, contact_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+                        [args.waypoint_id, args.contact_id]
+                    );
+                    toolResult = `SUCCESS: Contact ${args.contact_id} permanently linked to Waypoint ${args.waypoint_id}.`;
+                }
+                else if (name === "create_contact") {
+                    const res = await pool.query(
+                        'INSERT INTO contacts (name, contact_type, phone, email, notes) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+                        [args.name, args.contact_type || 'Staff', args.phone, args.email, args.notes]
+                    );
+                    toolResult = `SUCCESS: Contact created with ID ${res.rows[0].id}.`;
+                }
+                else if (name === "search_directory") {
+                    // Search for contacts by name or role
+                    const searchQuery = `%${args.query}%`;
+                    const res = await pool.query(
+                        'SELECT id, name, contact_type, phone FROM contacts WHERE name ILIKE $1 OR contact_type ILIKE $1 LIMIT 5',
+                        [searchQuery]
+                    );
+                    toolResult = res.rows.length > 0 
+                        ? `FOUND CONTACTS:\n${JSON.stringify(res.rows)}\nUse these IDs if you need to link them.` 
+                        : `No contacts found matching "${args.query}".`;
+                }
+                else if (name === "link_contact_to_waypoint") {
+                    await pool.query(
+                        'INSERT INTO waypoint_contacts (waypoint_id, contact_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+                        [args.waypoint_id, args.contact_id]
+                    );
+                    toolResult = `SUCCESS: Contact ${args.contact_id} permanently linked to Waypoint ${args.waypoint_id}.`;
                 }
                 else if (name === "highlight_task_in_ui") {
                     pendingUiAction = { type: 'focus_task', taskId: args.task_id };
