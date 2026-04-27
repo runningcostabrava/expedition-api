@@ -1,5 +1,5 @@
 let activeCategoryIdForEdit = null;
-const API_URL = 'https://expedition-api.onrender.com';
+const API_URL = 'https://mapbox-api-uz9a.onrender.com';
 let AUTH_TOKEN = sessionStorage.getItem('expedition_token');
 
 let aiConversationMemory = [];
@@ -66,62 +66,62 @@ async function authFetch(url, options = {}) {
     return response;
 }
 
-        async function refreshData() {
-            // 1. Capture the currently open section before refreshing
-            const openContent = document.querySelector('.section-content:not(.collapsed)');
-            const openSectionId = openContent ? openContent.closest('.asana-section').dataset.sectionId : null;
-            const previousActiveId = AppStore.get('activeTaskId');
-            const editingRowId = document.querySelector('.is-editing')?.id;
+async function refreshData() {
+    // 1. Capture the currently open section before refreshing
+    const openContent = document.querySelector('.section-content:not(.collapsed)');
+    const openSectionId = openContent ? openContent.closest('.asana-section').dataset.sectionId : null;
+    const previousActiveId = AppStore.get('activeTaskId');
+    const editingRowId = document.querySelector('.is-editing')?.id;
 
-            try {
-                const [itRes, secRes, catRes, typeRes] = await Promise.all([
-                    fetch(`${API_URL}/itinerary`),
-                    fetch(`${API_URL}/sections`),
-                    fetch(`${API_URL}/categories`),
-                    fetch(`${API_URL}/task_types`)
-                ]);
+    try {
+        const [itRes, secRes, catRes, typeRes] = await Promise.all([
+            fetch(`${API_URL}/itinerary`),
+            fetch(`${API_URL}/sections`),
+            fetch(`${API_URL}/categories`),
+            fetch(`${API_URL}/task_types`)
+        ]);
 
-                const data = await itRes.json();
-                console.log("📡 Itinerary Refreshed. Items found:", data.length);
-                AppStore.set('itinerary', data); // This triggers the map re-render
-                AppStore.set('sections', await secRes.json());
-                allCategories = await catRes.json();
-                allTaskTypes = await typeRes.json();
+        const data = await itRes.json();
+        console.log("📡 Itinerary Refreshed. Items found:", data.length);
+        AppStore.set('itinerary', data); // This triggers the map re-render
+        AppStore.set('sections', await secRes.json());
+        allCategories = await catRes.json();
+        allTaskTypes = await typeRes.json();
 
-                // 2. Re-render the UI
-                renderSectionPills();
-                updateCategoryDropdowns();
-                updateSectionDropdowns();
-                updateTaskTypeDropdowns();
+        // 2. Re-render the UI
+        renderSectionPills();
+        updateCategoryDropdowns();
+        updateSectionDropdowns();
+        updateTaskTypeDropdowns();
 
-                updateResponsibleDropdown();
+        updateResponsibleDropdown();
 
-                renderCategoryList();
-                renderTaskTypeList();
-                updateResponsibleDropdown();
-                renderProjectView();
-                renderMapGeometries();
+        renderCategoryList();
+        renderTaskTypeList();
+        updateResponsibleDropdown();
+        renderProjectView();
+        renderMapGeometries();
 
-                // RESTORE INLINE EDIT STATE
-                if (window.activeInlineEditId) {
-                    const row = document.getElementById(window.activeInlineEditId);
-                    if (row) {
-                        row.classList.add('is-editing');
-                        row.querySelectorAll('.modern-inline-input').forEach(inp => (inp.disabled = false));
-                        row.querySelectorAll('.inline-edit').forEach(sp => (sp.contentEditable = true));
-                    }
-                }
+        // RESTORE INLINE EDIT STATE
+        if (window.activeInlineEditId) {
+            const row = document.getElementById(window.activeInlineEditId);
+            if (row) {
+                row.classList.add('is-editing');
+                row.querySelectorAll('.modern-inline-input').forEach(inp => (inp.disabled = false));
+                row.querySelectorAll('.inline-edit').forEach(sp => (sp.contentEditable = true));
+            }
+        }
 
-                // Refresh Task Detail Panel if it is currently open
-                const detailPanel = document.getElementById('task-detail-panel');
-                if (detailPanel && detailPanel.classList.contains('open') && previousActiveId) {
-                    const updatedTask = data.find(t => t.task_id === previousActiveId);
-                    if (updatedTask) {
-                        if (typeof openTaskDetailPanel === 'function') openTaskDetailPanel(updatedTask);
-                    } else {
-                        if (typeof closeTaskDetailPanel === 'function') closeTaskDetailPanel();
-                    }
-                }
+        // Refresh Task Detail Panel if it is currently open
+        const detailPanel = document.getElementById('task-detail-panel');
+        if (detailPanel && detailPanel.classList.contains('open') && previousActiveId) {
+            const updatedTask = data.find(t => t.task_id === previousActiveId);
+            if (updatedTask) {
+                if (typeof openTaskDetailPanel === 'function') openTaskDetailPanel(updatedTask);
+            } else {
+                if (typeof closeTaskDetailPanel === 'function') closeTaskDetailPanel();
+            }
+        }
 
         // 3. FORCE the previously open section to expand again
         if (openSectionId) {
@@ -171,27 +171,27 @@ function smoothMapResize() {
     setTimeout(() => clearInterval(interval), 350); // Stop after CSS transition ends
 }
 
-window.closeAiChat = function() {
+window.closeAiChat = function () {
     const modal = document.getElementById('ai-multimodal-assistant');
     if (modal) {
         modal.classList.add('ai-chat-hidden');
         document.body.classList.remove('ai-chat-open'); // Restore map width
         smoothMapResize();
-        
+
         setTimeout(() => { modal.style.display = 'none'; }, 300);
     }
 };
 
-window.openAiChat = function() {
+window.openAiChat = function () {
     const modalId = 'ai-multimodal-assistant';
-    
+
     // 1. STATE PRESERVATION: If chat exists, slide it back in
     const existingModal = document.getElementById(modalId);
     if (existingModal) {
         existingModal.style.display = 'flex';
         document.body.classList.add('ai-chat-open'); // Shrink map width
         smoothMapResize();
-        
+
         setTimeout(() => {
             existingModal.classList.remove('ai-chat-hidden');
             document.getElementById('ai-prompt-text').focus();
@@ -226,11 +226,11 @@ window.openAiChat = function() {
                 pointer-events: auto; /* Chat is always clickable */
                 font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             }
-            
+
             /* DESKTOP: True Docked Panel */
             @media (min-width: 769px) {
                 #ai-multimodal-assistant {
-                    top: 85px; 
+                    top: 85px;
                     right: 15px;
                     bottom: 15px; /* Matches left-panel height */
                     width: 400px;
@@ -257,7 +257,7 @@ window.openAiChat = function() {
                     right: 430px !important; /* Pushes floating buttons/panels left */
                 }
             }
-            
+
             /* MOBILE: Centered Modal */
             @media (max-width: 768px) {
                 #ai-multimodal-assistant {
@@ -288,7 +288,7 @@ window.openAiChat = function() {
     // 3. BUILD THE UI
     const modal = document.createElement('div');
     modal.id = modalId;
-    
+
     modal.innerHTML = `
         <div class="ai-chat-box">
             <div style="background: #0f172a; color: white; padding: 15px 20px; font-weight: bold; font-size: 1.1em; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
@@ -325,7 +325,7 @@ window.openAiChat = function() {
             </div>
         </div>
     `;
-    
+
     document.body.appendChild(modal);
     document.body.classList.add('ai-chat-open'); // Trigger layout shift
     smoothMapResize(); // Ensure map scales cleanly
@@ -334,7 +334,7 @@ window.openAiChat = function() {
     const history = document.getElementById('ai-chat-history');
 
     // Auto-send on Enter (Shift+Enter for new line)
-    textarea.addEventListener('keydown', function(e) {
+    textarea.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             document.getElementById('ai-submit-btn').click();
@@ -343,13 +343,13 @@ window.openAiChat = function() {
 
     // Attachment Handlers
     let attachedFile = null;
-    window.clearAiAttachment = function() {
+    window.clearAiAttachment = function () {
         attachedFile = null;
         document.getElementById('ai-image-upload').value = '';
         document.getElementById('ai-attachment-preview').style.display = 'none';
     };
 
-    document.getElementById('ai-image-upload').addEventListener('change', function(e) {
+    document.getElementById('ai-image-upload').addEventListener('change', function (e) {
         if (e.target.files.length > 0) {
             attachedFile = e.target.files[0];
             document.getElementById('ai-image-name').innerText = attachedFile.name;
@@ -376,11 +376,11 @@ window.openAiChat = function() {
         }
 
         let contentHtml = '';
-        
+
         if (imageUrl) {
             contentHtml += `<img src="${imageUrl}" style="max-width:100%; border-radius:8px; border:1px solid rgba(0,0,0,0.1); cursor:pointer;" onclick="if(window.openLightbox) window.openLightbox('${imageUrl}')">`;
         }
-        
+
         if (role === 'ai') {
             contentHtml += typeof marked !== 'undefined' ? marked.parse(text) : text.replace(/\n/g, '<br>');
         } else {
@@ -388,11 +388,11 @@ window.openAiChat = function() {
         }
 
         msgDiv.innerHTML = contentHtml;
-        
+
         // Fix markdown margins
         const paras = msgDiv.querySelectorAll('p');
         paras.forEach(p => p.style.margin = '0 0 8px 0');
-        if (paras.length > 0) paras[paras.length-1].style.margin = '0';
+        if (paras.length > 0) paras[paras.length - 1].style.margin = '0';
 
         history.appendChild(msgDiv);
         setTimeout(() => { history.scrollTo({ top: history.scrollHeight, behavior: 'smooth' }); }, 50);
@@ -400,7 +400,7 @@ window.openAiChat = function() {
     }
 
     // Submit Handler
-    document.getElementById('ai-submit-btn').addEventListener('click', async function() {
+    document.getElementById('ai-submit-btn').addEventListener('click', async function () {
         const promptText = textarea.value.trim();
         if (!promptText && !attachedFile) return;
 
@@ -426,7 +426,7 @@ window.openAiChat = function() {
             if (attachedFile) {
                 const formData = new FormData();
                 formData.append('file', attachedFile);
-                
+
                 if (attachedFile.type.startsWith('image/')) {
                     // Upload Image to Cloudinary
                     const uploadRes = await authFetch(`${API_URL}/api/upload`, { method: 'POST', body: formData });
@@ -439,7 +439,7 @@ window.openAiChat = function() {
                     const parseRes = await authFetch(`${API_URL}/api/parse-media`, { method: 'POST', body: formData });
                     if (!parseRes.ok) throw new Error("Failed to read file contents");
                     const parseData = await parseRes.json();
-                    
+
                     // Inject the extracted text invisibly into the prompt
                     documentContext = `\n\n[CONTENTS OF ATTACHED FILE "${attachedFile.name}"]:\n${parseData.text}\n\n`;
                 }
@@ -450,14 +450,14 @@ window.openAiChat = function() {
             const res = await authFetch(`${API_URL}/api/ai/command`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    prompt: finalPrompt, 
+                body: JSON.stringify({
+                    prompt: finalPrompt,
                     imageUrl: uploadedImageUrl,
                     history: aiConversationMemory // Inject memory here!
                 })
             });
-            
-            if (!res || res.status === 401) throw new Error("Unauthorized"); 
+
+            if (!res || res.status === 401) throw new Error("Unauthorized");
             const data = await res.json();
             if (data.error) throw new Error(data.error);
 
@@ -478,8 +478,8 @@ window.openAiChat = function() {
 
             // Quietly refresh the UI so the user can watch the map/sidebar update instantly behind the chat!
             if (typeof refreshData === 'function') refreshData();
-            if (typeof loadData === 'function') loadData(); 
-            
+            if (typeof loadData === 'function') loadData();
+
         } catch (err) {
             typingIndicator.remove();
             appendMessage('ai', `<strong style="color:#ef4444;">Error:</strong> ${err.message}`);
@@ -496,7 +496,7 @@ window.openAiChat = function() {
 // Map the old global function to the new persistent chat UI
 window.processAiCommand = window.openAiChat;
 
-window.downloadVCard = function(name, phone, email, notes) {
+window.downloadVCard = function (name, phone, email, notes) {
     const vcard = `BEGIN:VCARD\nVERSION:3.0\nFN:${name || ''}\nTEL:${phone || ''}\nEMAIL:${email || ''}\nNOTE:${notes || ''}\nEND:VCARD`;
     const blob = new Blob([vcard], { type: 'text/vcard' });
     const url = URL.createObjectURL(blob);
