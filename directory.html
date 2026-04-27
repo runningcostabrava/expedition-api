@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <title>Directory - Expedition</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="/js/api.js"></script>
+    <style>
+        body {
+            background: #f1f5f9;
+            font-family: 'DM Sans', sans-serif;
+            margin: 0;
+            padding: 0;
+            padding-bottom: 90px;
+        }
+
+        header {
+            background: #0f172a;
+            color: white;
+            padding: max(env(safe-area-inset-top, 20px), 20px) 20px 20px 20px;
+            font-weight: bold;
+            font-size: 1.2em;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .container {
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .controls input,
+        .controls select {
+            flex: 1;
+            min-width: 150px;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #cbd5e0;
+            outline: none;
+            font-family: inherit;
+            font-size: 1em;
+        }
+
+        .contact-card {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .contact-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .contact-name {
+            font-weight: 700;
+            font-size: 1.1em;
+            color: #1e293b;
+            margin: 0;
+        }
+
+        .contact-type {
+            font-size: 0.8em;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: #e2e8f0;
+            color: #475569;
+        }
+
+        .contact-detail {
+            font-size: 0.9em;
+            color: #475569;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .contact-detail a {
+            color: #3498db;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .contact-notes {
+            font-size: 0.85em;
+            color: #64748b;
+            background: #f8fafc;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #f1f5f9;
+            margin-top: 5px;
+        }
+
+        .contact-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 5px;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 10px;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 8px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+            transition: 0.2s;
+            font-size: 0.9em;
+        }
+
+        .btn-edit {
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        .btn-vcard {
+            background: #3498db;
+            color: white;
+        }
+
+        .fab {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            background: #27ae60;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            border: none;
+            cursor: pointer;
+            z-index: 1000;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+        }
+
+        .modal.open {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            width: 100%;
+            max-width: 500px;
+            border-radius: 16px;
+            padding: 20px;
+            box-sizing: border-box;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal input,
+        .modal select,
+        .modal textarea {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-family: inherit;
+            font-size: 1em;
+        }
+
+        .modal label {
+            display: block;
+            font-size: 0.85em;
+            font-weight: bold;
+            color: #475569;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header><i class="ph ph-address-book"></i> Directory</header>
+
+    <div class="container">
+        <div class="controls">
+            <input type="text" id="search-input" placeholder="🔍 Search names or notes..." oninput="renderContacts()">
+            <select id="type-filter" onchange="renderContacts()">
+                <option value="">All Types</option>
+                <option value="Staff">Staff / Guide</option>
+                <option value="Collaborator">Collaborator</option>
+                <option value="PlacesContact">Places Contact</option>
+                <option value="Emergency">Emergency</option>
+            </select>
+        </div>
+        <div id="contacts-list">
+            <div style="text-align: center; padding: 40px; color: #64748b;">⏳ Loading Contacts...</div>
+        </div>
+    </div>
+
+    <button class="fab" onclick="openContactModal()">+</button>
+
+    <div id="contact-modal" class="modal">
+        <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 id="modal-title" style="margin: 0;">Contact</h3>
+                <span onclick="closeContactModal()" style="font-size: 24px; cursor: pointer;"><i
+                        class="ph ph-x"></i></span>
+            </div>
+
+            <input type="hidden" id="edit-id">
+
+            <label>Full Name *</label>
+            <input type="text" id="edit-name" placeholder="Name">
+
+            <label>Contact Type</label>
+            <select id="edit-type">
+                <option value="Staff">Staff / Guide</option>
+                <option value="Collaborator">Collaborator</option>
+                <option value="PlacesContact">Places Contact (Hotel, Restaurant)</option>
+                <option value="Emergency">Emergency</option>
+            </select>
+
+            <label>Phone Number</label>
+            <input type="tel" id="edit-phone" placeholder="+1 234 567 8900">
+
+            <label>Email</label>
+            <input type="email" id="edit-email" placeholder="contact@example.com">
+
+            <label>Notes</label>
+            <textarea id="edit-notes" rows="3" placeholder="Role, location, or internal details..."></textarea>
+
+            <button onclick="saveContact()"
+                style="width: 100%; background: #27ae60; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer; margin-top: 10px;"><i
+                    class="ph ph-floppy-disk"></i> Save Contact</button>
+            <button id="delete-btn" onclick="deleteContact()"
+                style="width: 100%; background: #ef4444; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer; margin-top: 10px; display: none;"><i
+                    class="ph ph-trash"></i> Delete Contact</button>
+        </div>
+    </div>
+
+    <div id="app-switcher" style="position: fixed; bottom: 25px; left: 15px; z-index: 100000;">
+        <button onclick="document.getElementById('switcher-menu').classList.toggle('show')"
+            style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center;"><i
+                class="ph ph-squares-four"></i></button>
+        <div id="switcher-menu"
+            style="display: none; position: absolute; bottom: 65px; left: 0; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 220px; flex-direction: column; gap: 8px; border: 1px solid #e2e8f0;">
+            <div style="font-size: 0.75em; font-weight: bold; color: #64748b; padding-left: 5px;">SWITCH APP</div>
+            <a href="index.html"
+                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block;"><i
+                    class="ph ph-map-trifold"></i> Command Center</a>
+            <a href="field.html"
+                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block;"><i
+                    class="ph ph-compass"></i> Field Map</a>
+            <a href="pm.html"
+                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block;"><i
+                    class="ph ph-clipboard-text"></i> Mobile PM</a>
+            <a href="directory.html"
+                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #e2e8f0; border: 1px solid #cbd5e0; display: block;"><i
+                    class="ph ph-address-book"></i> Directory</a>
+            <a href="telemetry.html"
+                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block;"><i
+                    class="ph ph-chart-bar"></i> Telemetry</a>
+        </div>
+    </div>
+    <style>
+        #switcher-menu.show {
+            display: flex !important;
+        }
+
+        #switcher-menu a:hover {
+            background: #e2e8f0 !important;
+        }
+    </style>
+
+    <script>
+        let allContacts = [];
+
+        async function loadContacts() {
+            try {
+                const res = await authFetch(`${API_URL}/api/contacts`);
+                if (res) {
+                    allContacts = await res.json();
+                    renderContacts();
+                }
+            } catch (e) {
+                document.getElementById('contacts-list').innerHTML = `<div style="text-align:center; padding:20px; color:red;">Error loading contacts.</div>`;
+            }
+        }
+
+        function renderContacts() {
+            const container = document.getElementById('contacts-list');
+            const search = document.getElementById('search-input').value.toLowerCase();
+            const filterType = document.getElementById('type-filter').value;
+
+            const filtered = allContacts.filter(c => {
+                const matchSearch = (c.name || '').toLowerCase().includes(search) || (c.notes || '').toLowerCase().includes(search);
+                const matchType = !filterType || c.contact_type === filterType;
+                return matchSearch && matchType;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div style="text-align:center; padding:40px; color:#64748b;">No contacts found.</div>`;
+                return;
+            }
+
+            const getTypeColor = (type) => {
+                const colors = { 'Staff': '#38bdf8', 'Collaborator': '#a855f7', 'PlacesContact': '#f59e0b', 'Emergency': '#ef4444' };
+                return colors[type] || '#94a3b8';
+            };
+
+            container.innerHTML = filtered.map(c => `
+                <div class="contact-card">
+                    <div class="contact-header">
+                        <h3 class="contact-name">${c.name}</h3>
+                        <span class="contact-type" style="background: ${getTypeColor(c.contact_type)}20; color: ${getTypeColor(c.contact_type)};">${c.contact_type || 'Unknown'}</span>
+                    </div>
+
+                    ${c.phone ? `<div class="contact-detail"><i class="ph ph-phone"></i> <a href="tel:${c.phone.replace(/[^0-9+]/g, '')}">${c.phone}</a></div>` : ''}
+                    ${c.email ? `<div class="contact-detail"><i class="ph ph-envelope-simple"></i> <a href="mailto:${c.email}">${c.email}</a></div>` : ''}
+                    ${c.notes ? `<div class="contact-notes">${c.notes}</div>` : ''}
+
+                    <div class="contact-actions">
+                        <button class="action-btn btn-edit" onclick="openContactModal(${c.id})"><i class="ph ph-pencil-simple"></i> Edit</button>
+                        <button class="action-btn btn-vcard" onclick="if(window.downloadVCard) window.downloadVCard('${c.name.replace(/'/g, "\\'")}', '${c.phone || ''}', '${c.email || ''}', '${(c.notes || '').replace(/'/g, "\\'")}')"><i class="ph ph-address-book"></i> Save to Phone</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openContactModal(id = null) {
+            document.getElementById('contact-modal').classList.add('open');
+            const titleEl = document.getElementById('modal-title');
+            const deleteBtn = document.getElementById('delete-btn');
+
+            if (id) {
+                const contact = allContacts.find(c => c.id === id);
+                titleEl.innerText = "Edit Contact";
+                deleteBtn.style.display = "block";
+                document.getElementById('edit-id').value = contact.id;
+                document.getElementById('edit-name').value = contact.name || '';
+                document.getElementById('edit-type').value = contact.contact_type || 'Staff';
+                document.getElementById('edit-phone').value = contact.phone || '';
+                document.getElementById('edit-email').value = contact.email || '';
+                document.getElementById('edit-notes').value = contact.notes || '';
+            } else {
+                titleEl.innerText = "New Contact";
+                deleteBtn.style.display = "none";
+                document.getElementById('edit-id').value = '';
+                document.getElementById('edit-name').value = '';
+                document.getElementById('edit-type').value = 'Staff';
+                document.getElementById('edit-phone').value = '';
+                document.getElementById('edit-email').value = '';
+                document.getElementById('edit-notes').value = '';
+            }
+        }
+
+        function closeContactModal() {
+            document.getElementById('contact-modal').classList.remove('open');
+        }
+
+        async function saveContact() {
+            const id = document.getElementById('edit-id').value;
+            const payload = {
+                name: document.getElementById('edit-name').value.trim(),
+                contact_type: document.getElementById('edit-type').value,
+                phone: document.getElementById('edit-phone').value.trim(),
+                email: document.getElementById('edit-email').value.trim(),
+                notes: document.getElementById('edit-notes').value.trim()
+            };
+
+            if (!payload.name) return alert("Name is required!");
+
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `${API_URL}/api/contacts/${id}` : `${API_URL}/api/contacts`;
+
+            try {
+                await authFetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                closeContactModal();
+                loadContacts();
+            } catch (e) {
+                alert("Failed to save contact.");
+            }
+        }
+
+        async function deleteContact() {
+            if (!confirm("Are you sure you want to delete this contact?")) return;
+            const id = document.getElementById('edit-id').value;
+            try {
+                await authFetch(`${API_URL}/api/contacts/${id}`, { method: 'DELETE' });
+                closeContactModal();
+                loadContacts();
+            } catch (e) {
+                alert("Failed to delete contact.");
+            }
+        }
+
+        // Initialize App
+        document.addEventListener('DOMContentLoaded', loadContacts);
+    </script>
+</body>
+
+</html>
