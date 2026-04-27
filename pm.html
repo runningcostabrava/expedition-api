@@ -334,13 +334,13 @@
                     .catch(err => console.error('Offline Engine Failed', err));
             });
         }
-const API_URL = 'https://expedition-api.onrender.com';
+const API_URL = 'https://mapbox-api-uz9a.onrender.com';
 
         window.openLightbox = function (url) {
             document.getElementById('lightbox-image').src = url;
             document.getElementById('lightbox-modal').style.display = 'flex';
         };
-        let AUTH_TOKEN = sessionStorage.getItem('expedition_token');
+        let AUTH_TOKEN = localStorage.getItem('expedition_token');
         let fullItinerary = [];
         let allSections = [];
 
@@ -351,7 +351,7 @@ const API_URL = 'https://expedition-api.onrender.com';
                 try {
                     const res = await fetch(`${API_URL}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pass }) });
                     const data = await res.json();
-                    if (data.token) { AUTH_TOKEN = data.token; sessionStorage.setItem('expedition_token', AUTH_TOKEN); }
+                    if (data.token) { AUTH_TOKEN = data.token; localStorage.setItem('expedition_token', AUTH_TOKEN); }
                     else return null;
                 } catch (e) {
                     alert("⚠️ Cannot log in while offline.");

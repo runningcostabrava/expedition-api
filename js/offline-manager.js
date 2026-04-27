@@ -114,7 +114,7 @@ const OfflineManager = (() => {
 
         for (const item of items) {
             try {
-                const response = await fetch(item.url, {
+                const response = await window.authFetch(item.url, {
                     method: item.method,
                     headers: item.headers,
                     body: item.body
@@ -212,7 +212,7 @@ const OfflineManager = (() => {
         });
 
         // Insert below ALL other layers so your routes/pins stay on top
-        const firstLayerId = map.getStyle()?.layers?.[0]?.id;
+        const firstLayerId = map.getStyle()?.layers?.find(l => l.type !== 'background')?.id;
         map.addLayer({
             id: 'osm-basemap',
             type: 'raster',

@@ -1,6 +1,6 @@
 let activeCategoryIdForEdit = null;
 const API_URL = 'https://mapbox-api-uz9a.onrender.com';
-let AUTH_TOKEN = sessionStorage.getItem('expedition_token');
+let AUTH_TOKEN = localStorage.getItem('expedition_token');
 
 let aiConversationMemory = [];
 
@@ -40,7 +40,7 @@ async function authFetch(url, options = {}) {
         const data = await res.json();
         if (data.token) {
             AUTH_TOKEN = data.token;
-            sessionStorage.setItem('expedition_token', AUTH_TOKEN);
+            localStorage.setItem('expedition_token', AUTH_TOKEN);
         } else {
             alert("Unauthorized: Incorrect Password");
             return new Response(null, { status: 401 });
@@ -58,7 +58,7 @@ async function authFetch(url, options = {}) {
     if (response.status === 403) {
         console.warn("Token expired. Requesting re-authentication...");
         AUTH_TOKEN = null;
-        sessionStorage.removeItem('expedition_token');
+        localStorage.removeItem('expedition_token');
         // Recursively call authFetch to prompt password and retry the exact same request
         return authFetch(url, options);
     }
