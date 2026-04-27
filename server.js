@@ -525,8 +525,8 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
 
     let finalResponseText = "";
     
-    // Allow the AI to "think" for up to 3 steps (e.g., Search Web -> Update Task -> Reply)
-    for (let step = 0; step < 3; step++) {
+    // Allow the AI to "think" for up to 6 steps (e.g., Search Web -> Update Task -> Reply)
+    for (let step = 0; step < 6; step++) {
         const response = await deepseek.chat.completions.create({
             model: "deepseek-chat",
             messages: messages,
@@ -535,11 +535,12 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
         });
 
         const message = response.choices[0].message;
+        console.log(`[AI Step ${step}]`, message.tool_calls ? "Calling Tool: " + message.tool_calls[0].function.name : "Giving Text Answer");
         messages.push(message); // Append AI's response to the internal memory
 
         // If the AI didn't call any tools, it's done thinking! Break the loop.
         if (!message.tool_calls || message.tool_calls.length === 0) {
-            finalResponseText = message.content;
+            finalResponseText = message.content || "I searched for that but couldn't formulate an answer. Please try again.";
             break;
         }
 
@@ -627,6 +628,7 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
         }
     }
 
+    if (!finalResponseText) finalResponseText = "The assistant reached its thinking limit or returned an empty response. Check server logs.";
     res.json({ success: true, message: finalResponseText });
   } catch (err) {
     console.error("AI Error:", err);
