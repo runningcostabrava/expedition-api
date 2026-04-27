@@ -512,7 +512,7 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
           6. SEARCH: If asked to find information you don't know, use the 'search_internet' tool first, read the results, and then fulfill the user's request.
           7. TIME: When creating or moving a task for a specific day, combine the section_date with the requested time to form the correct ISO timestamp (YYYY-MM-DDTHH:mm:ss.000Z), and include the section_id.
           8. VOCAB: 'Fite' means milestone (set is_milestone true).
-          9. CHATTY SEARCH: When using search_internet, you MUST wait until you have all results and then provide a full, human-friendly summary in your final response. Never let the system provide a blank or generic completion message.
+          9. SEARCH DECISIVENESS: After using 'search_internet' once, if you have received reasonable information, you MUST stop calling tools and provide your final answer immediately. Do not keep searching for 'perfect' details.
           10. MEMORY: If the user asks you to remember a rule or preference, use the 'update_core_memory' tool to rewrite your permanent memory.
           11. STRICT TOOL EXECUTION: NEVER claim to have created, updated, or deleted a task unless you have EXPLICITLY called the appropriate tool (e.g., create_task) in this exact turn. Do not hallucinate actions or pretend to do things.` 
         }
@@ -567,9 +567,13 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
                 else if (name === "search_internet") {
                     console.log(`[AI] Searching web for: ${args.query}`);
                     const searchResults = await search(args.query, { safeSearch: "off" });
-                    // Grab the top 3 results and feed the text snippets back to DeepSeek
                     const snippets = searchResults.results.slice(0, 3).map(r => r.description).join('\n\n');
-                    toolResult = `WEB SEARCH RESULTS FOR "${args.query}":\n${snippets}\n\nAnalyze this information to fulfill the user's request.`;
+                    
+                    if (!snippets) {
+                        toolResult = "No search results found. Please use your general knowledge or ask for clarification.";
+                    } else {
+                        toolResult = `WEB SEARCH RESULTS:\n${snippets}\n\nIMPORTANT: Use this info to provide your final answer NOW. Do not call any more tools.`;
+                    }
                 }
                 else if (name === "update_core_memory") {
                     await pool.query('UPDATE ai_memory SET memory_text = $1 WHERE id = 1', [args.new_memory_text]);
