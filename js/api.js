@@ -536,15 +536,22 @@ window.openAiChat = function () {
                 lastAiChunkTime = Date.now();
                 thinkingToastActive = false;
 
-                // 3. Optimize 16kHz Output (Buffered Playback)
+                // 3. High-Performance Raw PCM Playback (Int16 to Float32)
                 try {
-                    const arrayBuffer = event.data;
-                    audioContext.decodeAudioData(arrayBuffer, (buffer) => {
-                        const playSource = audioContext.createBufferSource();
-                        playSource.buffer = buffer;
-                        playSource.connect(audioContext.destination);
-                        playSource.start(0);
-                    }, (err) => console.error("Audio Decode Error:", err));
+                    const pcmBuffer = new Int16Array(event.data);
+                    const floatBuffer = new Float32Array(pcmBuffer.length);
+                    
+                    for (let i = 0; i < pcmBuffer.length; i++) {
+                        floatBuffer[i] = pcmBuffer[i] / (pcmBuffer[i] < 0 ? 0x8000 : 0x7FFF);
+                    }
+
+                    const audioBuffer = audioContext.createBuffer(1, floatBuffer.length, 16000);
+                    audioBuffer.getChannelData(0).set(floatBuffer);
+
+                    const playSource = audioContext.createBufferSource();
+                    playSource.buffer = audioBuffer;
+                    playSource.connect(audioContext.destination);
+                    playSource.start(0);
                 } catch (e) { console.error("Playback error:", e); }
             };
 

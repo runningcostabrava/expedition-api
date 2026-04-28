@@ -1998,58 +1998,58 @@ wss.on('connection', async (ws) => {
     console.log('[Live AI] Client connected for real-time conversation');
 
     try {
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        // Use the Multimodal Live model (BETA endpoint logic)
-        // Note: For gemini-2.0-flash-exp, the API uses a specific bidirectional stream
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+        const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${process.env.GEMINI_API_KEY}`;
+        const googleWs = new (require('ws'))(url);
 
-        const stream = await model.startChat({
-            generationConfig: {
-                responseModalities: ["audio"], // Ensure we get high-quality audio back
-                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } } } // Natural human-like voice
-            }
-        });
-
-        // Set up the system instructions for the live session
-        // We'll pull the context similarly to runAiAgent but tailored for low-latency voice
         const sectionsRes = await pool.query('SELECT id, title, section_date FROM sections ORDER BY section_date ASC');
         const tasksRes = await pool.query("SELECT id, task_name, starts_at, responsible FROM tasks WHERE is_completed = false LIMIT 50");
-        
-        const systemInstruction = `You are a real-time voice logistics assistant for the Expedition dashboard.
-        Identify the user's language immediately and respond using that same language (Spanish, English, or Italian).
-        Speak naturally and concisely. 
-        Current Context: Sections: ${JSON.stringify(sectionsRes.rows)}. Active Tasks: ${JSON.stringify(tasksRes.rows)}.
-        If you need to perform an action, tell the user you are doing it. You have full CRUD permissions.`;
 
-        // Finalize Gemini Multimodal Live Session
-        const liveSession = await model.startChat({
-            history: [{ role: "user", parts: [{ text: systemInstruction }] }]
+        const setupMessage = {
+            setup: {
+                model: "models/gemini-2.0-flash-exp",
+                generation_config: {
+                    response_modalities: ["AUDIO"],
+                    speech_config: { voice_config: { prebuilt_voice_config: { voice_name: "Puck" } } }
+                },
+                system_instruction: {
+                    parts: [{
+                        text: `You are a human-like voice assistant for the Expedition dashboard. 
+                        Identify the user's language (Spanish, English, Italian) and respond in that same language immediately. 
+                        Speak naturally and concisely.
+                        Current Context: Sections: ${JSON.stringify(sectionsRes.rows)}. Active Tasks: ${JSON.stringify(tasksRes.rows)}.`
+                    }]
+                }
+            }
+        };
+
+        googleWs.on('open', () => {
+            googleWs.send(JSON.stringify(setupMessage));
         });
 
-        // Pipe client audio chunks to Google
-        ws.on('message', async (data) => {
-            // Data is received as Int16 PCM, 16kHz
-            if (Buffer.isBuffer(data) || data instanceof ArrayBuffer) {
-                try {
-                    // Finalized streaming method for Multimodal Live SDK
-                    await liveSession.sendMessage([{
-                        inlineData: {
-                            mimeType: "audio/pcm;rate=16000",
+        googleWs.on('message', (data) => {
+            const response = JSON.parse(data);
+            if (response.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data) {
+                const audioBase64 = response.serverContent.modelTurn.parts[0].inlineData.data;
+                if (ws.readyState === 1) ws.send(Buffer.from(audioBase64, 'base64'));
+            }
+        });
+
+        ws.on('message', (data) => {
+            if (googleWs.readyState === 1) {
+                const bidiMessage = {
+                    realtime_input: {
+                        media_chunks: [{
+                            mime_type: "audio/pcm;rate=16000",
                             data: Buffer.isBuffer(data) ? data.toString("base64") : Buffer.from(data).toString("base64")
-                        }
-                    }]);
-                } catch (e) { console.error("Error sending audio to Gemini:", e); }
+                        }]
+                    }
+                };
+                googleWs.send(JSON.stringify(bidiMessage));
             }
         });
 
-        // Pipe Google's audio response back to the client
-        // Note: In the SDK, message chunks come back through the stream
-        // This logic ensures binary audio is relayed immediately
-        liveSession.on('message', (msg) => {
-            if (msg.audio && ws.readyState === ws.OPEN) {
-                ws.send(Buffer.from(msg.audio, 'base64'));
-            }
-        });
+        googleWs.on('close', () => ws.close());
+        ws.on('close', () => googleWs.close());
 
         ws.on('close', () => {
             console.log('[Live AI] Client disconnected');
