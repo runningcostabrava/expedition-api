@@ -3456,6 +3456,30 @@
             } catch (err) { alert("Error: " + err.message); }
         }
 
+        // --- AI UI HANDLERS (The "Hands" of the AI) ---
+        window.triggerDiscoverySearch = function(query) {
+            const input = document.getElementById('google-discovery-input');
+            if (input) {
+                input.value = query;
+                // Simulate Enter key to trigger the Google search
+                input.dispatchEvent(new KeyboardEvent('keydown', { 'key': 'Enter', 'bubbles': true }));
+                if (typeof showToast !== 'undefined') showToast(`AI searching for: ${query}`, 'info');
+            }
+        };
+
+        window.previewAiRoute = function(geojson) {
+            if (!draw || !geojson) return;
+            // Clear current drawings and show the AI's suggested route
+            draw.deleteAll();
+            draw.add(geojson);
+            
+            // Fit the map to the new route
+            const bbox = turf.bbox(geojson);
+            map.fitBounds(bbox, { padding: 80, duration: 1500 });
+            
+            if (typeof showToast !== 'undefined') showToast("AI Route Previewing on Map", "success");
+        };
+
         // --- NEW: Catch URL parameters from the PM App ---
         window.addEventListener('load', () => {
             setTimeout(() => { // Give the map 1 second to fetch data first

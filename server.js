@@ -4,6 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const { OpenAI } = require('openai');
 const { search } = require('duck-duck-scrape');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const deepseek = new OpenAI({
   baseURL: 'https://api.deepseek.com',
@@ -661,10 +662,211 @@ const aiTools = [
         required: ["title", "lat", "lng"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_waypoint",
+      description: "Modify an existing waypoint's details.",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "integer" },
+          updates: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              lat: { type: "number" },
+              lng: { type: "number" },
+              description: { type: "string" },
+              icon: { type: "string" },
+              color: { type: "string" }
+            }
+          }
+        },
+        required: ["id", "updates"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_track",
+      description: "Modify an existing track's details.",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "integer" },
+          updates: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              color: { type: "string" },
+              distance: { type: "number" },
+              gain: { type: "number" },
+              loss: { type: "number" }
+            }
+          }
+        },
+        required: ["id", "updates"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "reassign_geometry",
+      description: "Move a waypoint or track to a different task.",
+      parameters: {
+        type: "object",
+        properties: {
+          kind: { type: "string", enum: ["waypoint", "track"] },
+          id: { type: "integer", description: "The ID of the waypoint or track" },
+          new_task_id: { type: "integer" }
+        },
+        required: ["kind", "id", "new_task_id"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_contact",
+      description: "Modify an existing contact's details.",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "integer" },
+          updates: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              phone: { type: "string" },
+              email: { type: "string" },
+              notes: { type: "string" }
+            }
+          }
+        },
+        required: ["id", "updates"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_contact",
+      description: "Remove a contact from the database.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "integer" } },
+        required: ["id"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_task",
+      description: "Remove a task from the itinerary.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "integer" } },
+        required: ["id"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_waypoint",
+      description: "Remove a waypoint from the map.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "integer" } },
+        required: ["id"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_track",
+      description: "Remove a track from the map.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "integer" } },
+        required: ["id"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_section",
+      description: "Remove a section (and potentially its tasks) from the itinerary.",
+      parameters: {
+        type: "object",
+        properties: { id: { type: "integer" } },
+        required: ["id"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_fleet_status",
+      description: "Get the real-time location and status of all fleet devices.",
+      parameters: { type: "object", properties: {} }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "calculate_eta",
+      description: "Estimate arrival time based on current device position and track length.",
+      parameters: {
+        type: "object",
+        properties: {
+          track_id: { type: "integer" },
+          device_id: { type: "integer" }
+        },
+        required: ["track_id", "device_id"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "trigger_ui_discovery",
+      description: "Force the dashboard to open the discovery/search sidebar for a specific place or category.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search term like 'Gas Stations' or 'Pizza'" }
+        },
+        required: ["query"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "calculate_smart_route",
+      description: "Generate a road-snapped GPS track between two points using Mapbox Directions.",
+      parameters: {
+        type: "object",
+        properties: {
+          start_coords: { type: "string", description: "Format: 'lng,lat'" },
+          end_coords: { type: "string", description: "Format: 'lng,lat'" },
+          profile: { type: "string", enum: ["walking", "cycling", "driving"], default: "walking" }
+        },
+        required: ["start_coords", "end_coords"]
+      }
+    }
   }
 ];
 
-async function runAiAgent(finalPrompt, history = []) {
+async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', activeTaskId = null) {
     // Fetch AI's permanent memory
     const memoryRes = await pool.query('SELECT memory_text FROM ai_memory WHERE id = 1');
     const longTermMemory = memoryRes.rows[0]?.memory_text || "No specific memories or guidelines saved yet.";
@@ -709,7 +911,7 @@ async function runAiAgent(finalPrompt, history = []) {
     const messages = [
         { 
           role: "system", 
-          content: `You are an expert logistics coordinator for mountain guides.
+          content: `You are the JARVIS of this expedition. You have borderless CRUD permissions.
           
           [YOUR PERMANENT LONG-TERM MEMORY]:
           ${longTermMemory}
@@ -731,7 +933,14 @@ async function runAiAgent(finalPrompt, history = []) {
           10. MEMORY: If the user asks you to remember a rule or preference, use the 'update_core_memory' tool to rewrite your permanent memory.
           11. STRICT TOOL EXECUTION: NEVER claim to have created, updated, or deleted a task unless you have EXPLICITLY called the appropriate tool (e.g., create_task) in this exact turn. Do not hallucinate actions or pretend to do things.
           12. CONTACTS: Tasks can only be assigned to official 'Staff'. If asked to assign a task, use 'search_directory' to find the ID first, then pass it as 'responsible_contact_id'. Save new phone numbers using 'create_contact'.
-          13. UI CONTROL: You CAN control the user's interface. If the user asks to 'show', 'find', 'open', or 'highlight' a task, use the 'highlight_task_in_ui' tool.` 
+          13. UI CONTROL: You CAN control the user's interface. If the user asks to 'show', 'find', 'open', or 'highlight' a task, use the 'highlight_task_in_ui' tool.
+          14. OMNIPOTENCE: You can re-assign locations to different tasks, change map icons/colors, and manage the directory.
+          15. FLEET: When asked where someone is, always use get_fleet_status.
+          16. REFRESH: Always trigger database changes immediately. The system will auto-refresh the UI.
+          17. SELECTION AWARENESS: When the user refers to 'this' or 'the current' item, check the [UI CONTEXT] first before asking for clarification.
+          18. NAVIGATION: When calculating a route, always tell the user the total distance in kilometers and the estimated travel time in your response.
+          
+          [UI CONTEXT]: The user currently has Task ID ${activeTaskId} open and selected in their dashboard. If they say "this task" or "this waypoint," they are likely referring to this ID or its attached geometries.` 
         }
     ];
 
@@ -742,27 +951,300 @@ async function runAiAgent(finalPrompt, history = []) {
 
     let finalResponseText = "";
     let pendingUiAction = null;
-    
-    for (let step = 0; step < 10; step++) {
-        const response = await deepseek.chat.completions.create({
-            model: "deepseek-chat",
-            messages: messages,
-            tools: aiTools,
-            tool_choice: "auto"
+
+    if (modelChoice === 'gemini') {
+        // --- GEMINI 1.5 PRO AGENT ---
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-1.5-pro",
+            tools: [{ functionDeclarations: aiTools.map(t => t.function) }]
         });
 
-        const message = response.choices[0].message;
-        console.log(`[AI Step ${step}]`, message.tool_calls ? "Calling Tool: " + message.tool_calls[0].function.name : "Giving Text Answer");
-        messages.push(message);
+        const chat = model.startChat({
+            history: messages.slice(1, -1).map(m => ({
+                role: m.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: m.content }]
+            }))
+        });
 
-        if (!message.tool_calls || message.tool_calls.length === 0) {
-            finalResponseText = message.content || "I searched for that but couldn't formulate an answer. Please try again.";
-            break;
+        let result = await chat.sendMessage(finalPrompt);
+        let response = result.response;
+        
+        for (let step = 0; step < 10; step++) {
+            const calls = response.functionCalls();
+            if (!calls || calls.length === 0) {
+                finalResponseText = response.text();
+                break;
+            }
+
+            const toolResults = [];
+            for (const call of calls) {
+                const { name, args } = call;
+                console.log(`[Gemini Step ${step}] Calling Tool: ${name}`);
+                const toolResult = await executeTool(name, args);
+                if (name === "highlight_task_in_ui") pendingUiAction = { type: 'focus_task', taskId: args.task_id };
+                if (name === "trigger_ui_discovery") pendingUiAction = { type: 'ui_search', query: args.query };
+                if (name === "calculate_smart_route" && typeof toolResult === 'object') pendingUiAction = { type: 'preview_route', geojson: toolResult.geometry };
+                toolResults.push({ functionResponse: { name, response: { result: (typeof toolResult === 'string' ? toolResult : toolResult.text) } } });
+            }
+
+            result = await chat.sendMessage(toolResults);
+            response = result.response;
         }
+    } else {
+        // --- DEEPSEEK AGENT LOOP ---
+        for (let step = 0; step < 10; step++) {
+            const response = await deepseek.chat.completions.create({
+                model: "deepseek-chat",
+                messages: messages,
+                tools: aiTools,
+                tool_choice: "auto"
+            });
 
-        for (const toolCall of message.tool_calls) {
-            const name = toolCall.function.name;
-            const args = JSON.parse(toolCall.function.arguments);
+            const message = response.choices[0].message;
+            console.log(`[AI Step ${step}]`, message.tool_calls ? "Calling Tool: " + message.tool_calls[0].function.name : "Giving Text Answer");
+            messages.push(message);
+
+            if (!message.tool_calls || message.tool_calls.length === 0) {
+                finalResponseText = message.content || "I searched for that but couldn't formulate an answer. Please try again.";
+                break;
+            }
+
+            for (const toolCall of message.tool_calls) {
+                const name = toolCall.function.name;
+                const args = JSON.parse(toolCall.function.arguments);
+                const toolResult = await executeTool(name, args);
+                if (name === "highlight_task_in_ui") pendingUiAction = { type: 'focus_task', taskId: args.task_id };
+                if (name === "trigger_ui_discovery") pendingUiAction = { type: 'ui_search', query: args.query };
+                if (name === "calculate_smart_route" && typeof toolResult === 'object') pendingUiAction = { type: 'preview_route', geojson: toolResult.geometry };
+                messages.push({ role: "tool", tool_call_id: toolCall.id, content: (typeof toolResult === 'string' ? toolResult : toolResult.text) });
+            }
+        }
+    }
+
+    return { success: true, message: finalResponseText, uiAction: pendingUiAction };
+}
+
+async function executeTool(name, args) {
+    let toolResult = "";
+    try {
+        if (name === "create_task") {
+            const result = await pool.query(
+                'INSERT INTO tasks (task_name, section_id, starts_at, responsible, characteristics, is_milestone) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+                [args.task_name, args.section_id || null, args.starts_at || null, args.responsible || null, args.characteristics || null, args.is_milestone || false]
+            );
+            toolResult = `SUCCESS: Task created with ID ${result.rows[0].id}`;
+            triggerMapRefresh();
+        }
+        else if (name === "update_task") {
+            const fields = Object.keys(args.updates).map((key, i) => `${key} = $${i + 2}`).join(', ');
+            const values = Object.values(args.updates);
+            await pool.query(`UPDATE tasks SET ${fields} WHERE id = $1`, [args.id, ...values]);
+            toolResult = `SUCCESS: Task ${args.id} updated.`;
+            triggerMapRefresh();
+        }
+        else if (name === "search_internet") {
+            const searchResults = await search(args.query, { safeSearch: "off" });
+            const snippets = searchResults.results.slice(0, 5).map(r => r.description).join('\n\n');
+            toolResult = snippets ? `WEB RESULTS FOUND:\n${snippets}` : "No results found on the web.";
+        }
+        else if (name === "update_core_memory") {
+            await pool.query('UPDATE ai_memory SET memory_text = $1 WHERE id = 1', [args.new_memory_text]);
+            toolResult = `SUCCESS: Permanent memory updated.`;
+        }
+        else if (name === "create_section") {
+            const res = await pool.query(
+                'INSERT INTO sections (title, section_date, description) VALUES ($1, $2, $3) RETURNING id',
+                [args.title, args.section_date || null, args.description || null]
+            );
+            toolResult = `SUCCESS: Section created with ID ${res.rows[0].id}`;
+            triggerMapRefresh();
+        }
+        else if (name === "create_category") {
+            const res = await pool.query(
+                'INSERT INTO categories (name, color, icon, line_type) VALUES ($1, $2, $3, $4) RETURNING id',
+                [args.name, args.color || '#3498db', args.icon || 'ph-map-pin', args.line_type || 'solid']
+            );
+            toolResult = `SUCCESS: Category created with ID ${res.rows[0].id}`;
+            triggerMapRefresh();
+        }
+        else if (name === "create_task_type") {
+            const res = await pool.query(
+                'INSERT INTO task_types (name, color, icon) VALUES ($1, $2, $3) RETURNING id',
+                [args.name, args.color || '#95a5a6', args.icon || 'ph-tag']
+            );
+            toolResult = `SUCCESS: Task type created with ID ${res.rows[0].id}`;
+            triggerMapRefresh();
+        }
+        else if (name === "search_nearby_places") {
+            const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN;
+            const searchUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(args.query + ' ' + args.location_context)}.json?access_token=${mapboxToken}&limit=5`;
+            const response = await axios.get(searchUrl);
+            const results = response.data.features.map(f => ({ name: f.text, address: f.place_name, coordinates: f.center }));
+            toolResult = JSON.stringify(results);
+        }
+        else if (name === "create_contact") {
+            const res = await pool.query(
+                'INSERT INTO contacts (name, contact_type, phone, email, notes) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+                [args.name, args.contact_type || 'Staff', args.phone, args.email, args.notes]
+            );
+            toolResult = `SUCCESS: Contact created with ID ${res.rows[0].id}.`;
+        }
+        else if (name === "search_directory") {
+            const searchQuery = `%${args.query}%`;
+            const res = await pool.query(
+                'SELECT id, name, contact_type, phone FROM contacts WHERE name ILIKE $1 OR contact_type ILIKE $1 LIMIT 5',
+                [searchQuery]
+            );
+            toolResult = res.rows.length > 0 ? `FOUND CONTACTS:\n${JSON.stringify(res.rows)}` : `No contacts found.`;
+        }
+        else if (name === "link_contact_to_waypoint") {
+            await pool.query(
+                'INSERT INTO waypoint_contacts (waypoint_id, contact_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+                [args.waypoint_id, args.contact_id]
+            );
+            toolResult = `SUCCESS: Linked contact to waypoint.`;
+        }
+        else if (name === "highlight_task_in_ui") {
+            toolResult = `SUCCESS: UI told to highlight task.`;
+        }
+        else if (name === "create_waypoint") {
+            const wpRes = await pool.query(
+                'INSERT INTO waypoints (title, lat, lng, description, icon, color) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+                [args.title, args.lat, args.lng, args.description || '', args.icon || 'ph-map-pin', args.color || '#3498db']
+            );
+            const newWpId = wpRes.rows[0].id;
+            const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, waypoint_id) VALUES ($1, $2) RETURNING id', ['point', newWpId]);
+            if (args.existing_task_id) {
+                await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [args.existing_task_id, anchorRes.rows[0].id]);
+            }
+            toolResult = `SUCCESS: Waypoint created with ID ${newWpId}.`;
+            triggerMapRefresh();
+        }
+        else if (name === "update_waypoint") {
+            const fields = Object.keys(args.updates).map((key, i) => `${key} = $${i + 2}`).join(', ');
+            const values = Object.values(args.updates);
+            await pool.query(`UPDATE waypoints SET ${fields} WHERE id = $1`, [args.id, ...values]);
+            toolResult = `SUCCESS: Waypoint ${args.id} updated.`;
+            triggerMapRefresh();
+        }
+        else if (name === "update_track") {
+            const fields = Object.keys(args.updates).map((key, i) => `${key} = $${i + 2}`).join(', ');
+            const values = Object.values(args.updates);
+            await pool.query(`UPDATE tracks SET ${fields} WHERE id = $1`, [args.id, ...values]);
+            toolResult = `SUCCESS: Track ${args.id} updated.`;
+            triggerMapRefresh();
+        }
+        else if (name === "reassign_geometry") {
+            // Logic must DELETE from task_anchors where waypoint_id or track_id matches, then INSERT a new row for the new_task_id.
+            const anchorQuery = args.kind === 'waypoint' ? 
+                'SELECT id FROM spatial_anchors WHERE waypoint_id = $1' : 
+                'SELECT id FROM spatial_anchors WHERE track_id = $1';
+            const anchorRes = await pool.query(anchorQuery, [args.id]);
+            if (anchorRes.rows.length > 0) {
+                const anchorId = anchorRes.rows[0].id;
+                await pool.query('DELETE FROM task_anchors WHERE anchor_id = $1', [anchorId]);
+                await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2)', [args.new_task_id, anchorId]);
+                toolResult = `SUCCESS: Reassigned ${args.kind} ${args.id} to task ${args.new_task_id}.`;
+                triggerMapRefresh();
+            } else {
+                toolResult = `ERROR: No spatial anchor found for ${args.kind} ${args.id}.`;
+            }
+        }
+        else if (name === "update_contact") {
+            const fields = Object.keys(args.updates).map((key, i) => `${key} = $${i + 2}`).join(', ');
+            const values = Object.values(args.updates);
+            await pool.query(`UPDATE contacts SET ${fields} WHERE id = $1`, [args.id, ...values]);
+            toolResult = `SUCCESS: Contact ${args.id} updated.`;
+        }
+        else if (name === "delete_contact") {
+            await pool.query('DELETE FROM contacts WHERE id = $1', [args.id]);
+            toolResult = `SUCCESS: Contact ${args.id} deleted.`;
+        }
+        else if (name === "delete_task") {
+            await pool.query('DELETE FROM tasks WHERE id = $1', [args.id]);
+            toolResult = `SUCCESS: Task ${args.id} deleted.`;
+            triggerMapRefresh();
+        }
+        else if (name === "delete_waypoint") {
+            await pool.query('DELETE FROM waypoints WHERE id = $1', [args.id]);
+            toolResult = `SUCCESS: Waypoint ${args.id} deleted.`;
+            triggerMapRefresh();
+        }
+        else if (name === "delete_track") {
+            await pool.query('DELETE FROM tracks WHERE id = $1', [args.id]);
+            toolResult = `SUCCESS: Track ${args.id} deleted.`;
+            triggerMapRefresh();
+        }
+        else if (name === "delete_section") {
+            await pool.query('DELETE FROM tasks WHERE section_id = $1', [args.id]);
+            await pool.query('DELETE FROM sections WHERE id = $1', [args.id]);
+            toolResult = `SUCCESS: Section ${args.id} deleted.`;
+            triggerMapRefresh();
+        }
+        else if (name === "get_fleet_status") {
+            // Join live_devices with the latest pings from location_logs.
+            const query = `
+                SELECT DISTINCT ON (d.id) 
+                    d.display_name, d.icon, d.color, l.lat, l.lng, l.timestamp,
+                    EXTRACT(EPOCH FROM (NOW() - l.timestamp))/60 AS minutes_ago
+                FROM live_devices d
+                LEFT JOIN location_logs l ON LOWER(l.guide_id) = LOWER(d.device_identifier) OR LOWER(l.guide_id) = LOWER(d.display_name) OR l.guide_id = d.id::text
+                WHERE d.is_visible = true
+                ORDER BY d.id, l.timestamp DESC
+            `;
+            const res = await pool.query(query);
+            toolResult = res.rows.length > 0 ? `FLEET STATUS:\n${JSON.stringify(res.rows)}` : "No fleet devices found or no pings recorded.";
+        }
+        else if (name === "calculate_eta") {
+            // Use speed vs remaining distance (Dummy logic for now based on distance)
+            const trackRes = await pool.query('SELECT distance FROM tracks WHERE id = $1', [args.track_id]);
+            if (trackRes.rows.length > 0) {
+                const distance = trackRes.rows[0].distance || 0;
+                const avgSpeed = 4; // km/h
+                const hours = distance / avgSpeed;
+                toolResult = `ETA: Approximately ${hours.toFixed(2)} hours based on ${distance}km track at ${avgSpeed}km/h.`;
+            } else {
+                toolResult = "ERROR: Track not found.";
+            }
+        }
+        else if (name === "trigger_ui_discovery") {
+            toolResult = `SUCCESS: User discovery search triggered for "${args.query}"`;
+        }
+        else if (name === "calculate_smart_route") {
+            try {
+                const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN;
+                const profile = args.profile || 'walking';
+                const url = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${args.start_coords};${args.end_coords}?geometries=geojson&access_token=${mapboxToken}`;
+                const response = await axios.get(url);
+                const route = response.data.routes[0];
+                if (route) {
+                    const distance = (route.distance / 1000).toFixed(2);
+                    const duration = Math.round(route.duration / 60);
+                    const geometry = route.geometry;
+                    // Return an object that we can use both for the AI response and for the UI action
+                    return {
+                        text: `ROUTE FOUND: ${distance}km, ${duration} mins. Geometry: ${JSON.stringify(geometry)}`,
+                        geometry: geometry
+                    };
+                } else {
+                    toolResult = "ERROR: No route found between these points.";
+                }
+            } catch (err) {
+                toolResult = "ERROR calling Mapbox Directions: " + err.message;
+            }
+        }
+    } catch (err) {
+        console.error(`[AI Tool Error] ${name}:`, err);
+        toolResult = `ERROR executing ${name}: ${err.message}`;
+    }
+    return toolResult;
+}
+
+// Map the rest of the file
+const restOfFileStart = `
+app.post('/api/ai/command', adminAuth, async (req, res) => {
+`;
             let toolResult = "";
 
             try {
@@ -869,7 +1351,7 @@ async function runAiAgent(finalPrompt, history = []) {
 }
 
 app.post('/api/ai/command', adminAuth, async (req, res) => {
-    const { prompt, imageUrl, history = [] } = req.body;
+    const { prompt, imageUrl, history = [], model = 'deepseek', activeTaskId = null } = req.body;
     if (!prompt && !imageUrl) return res.status(400).json({ error: "Prompt or Image is required" });
 
     try {
@@ -884,7 +1366,7 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
             }
         }
 
-        const result = await runAiAgent(finalPrompt, history);
+        const result = await runAiAgent(finalPrompt, history, model, activeTaskId);
         res.json(result);
     } catch (err) {
         console.error("AI Error:", err);
@@ -894,7 +1376,7 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
 
 app.post('/api/ai/audio-command', adminAuth, upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No audio file provided' });
-    const { lat, lng } = req.body;
+    const { lat, lng, existing_task_id } = req.body;
     try {
         // 1. Transcribe using Gemini
         const base64Audio = req.file.buffer.toString('base64');
@@ -911,7 +1393,7 @@ app.post('/api/ai/audio-command', adminAuth, upload.single('file'), async (req, 
         const transcript = geminiRes.data.candidates[0].content.parts[0].text;
 
         const finalPrompt = `[GPS: ${lat}, ${lng}] I just recorded an audio note here. Transcript: ${transcript}`;
-        const result = await runAiAgent(finalPrompt);
+        const result = await runAiAgent(finalPrompt, [], 'deepseek', existing_task_id);
         res.json(result);
     } catch (err) {
         console.error("Audio AI Error:", err.response?.data || err.message);

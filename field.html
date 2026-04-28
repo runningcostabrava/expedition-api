@@ -356,13 +356,11 @@
     <div id="quick-capture-bar" style="position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: row; gap: 15px; z-index: 99999; background: rgba(15, 23, 42, 0.8); padding: 10px 20px; border-radius: 50px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
         <button onclick="quickPin()" class="qc-btn" style="background: #3498db;" title="Quick Pin">📍</button>
         <button onclick="document.getElementById('photo-input').click()" class="qc-btn" style="background: #e67e22;" title="Photo Pin">📷</button>
-        <button onclick="document.getElementById('audio-input').click()" class="qc-btn" style="background: #9b59b6;" title="Audio AI Pin">🎙️</button>
+        <button id="field-mic-btn" onclick="toggleFieldAudioRecording()" class="qc-btn" style="background: #9b59b6;" title="Audio AI Pin">🎙️</button>
         <button onclick="processAiCommand()" class="qc-btn" style="background: #ef4444;" title="AI Chat">🤖</button>
     </div>
     <input type="file" id="photo-input" accept="image/*" capture="environment" style="display: none;"
         onchange="handlePhoto(this)">
-    <input type="file" id="audio-input" accept="audio/*" capture="microphone" style="display: none;"
-        onchange="handleAudio(this)">
     <div id="toast-container"></div>
 
     <div id="app-switcher" style="position: fixed; bottom: 25px; left: 15px; z-index: 100000;">
@@ -952,37 +950,76 @@
             }
         }
 
-        async function handleAudio(input) {
-            if (!input.files || !input.files[0]) return;
-            const file = input.files[0];
-            try {
-                const urlParams = new URLSearchParams(window.location.search);
-                const activeTaskId = urlParams.get('task_id');
+        let fieldMediaRecorder;
+        let fieldAudioChunks = [];
+        let isFieldRecording = false;
 
-                showToast("🎙️ Processing Audio AI Command...");
+        async function toggleFieldAudioRecording() {
+            const btn = document.getElementById('field-mic-btn');
+            if (!isFieldRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    fieldMediaRecorder = new MediaRecorder(stream);
+                    fieldAudioChunks = [];
+
+                    fieldMediaRecorder.ondataavailable = e => { if (e.data.size > 0) fieldAudioChunks.push(e.data); };
+
+                    fieldMediaRecorder.onstop = async () => {
+                        btn.innerHTML = '<i class="ph ph-spinner-gap ph-spin"></i>';
+                        btn.style.background = '#f39c12'; // Orange loading
+
+                        const audioBlob = new Blob(fieldAudioChunks, { type: 'audio/webm' });
+                        await processFieldAudio(audioBlob);
+
+                        btn.innerHTML = '🎙️';
+                        btn.style.background = '#9b59b6'; // Return to purple
+                    };
+
+                    fieldMediaRecorder.start();
+                    isFieldRecording = true;
+                    btn.innerHTML = '<i class="ph ph-stop"></i>';
+                    btn.classList.add('recording-pulse'); // Uses the CSS animation we added earlier
+
+                } catch (err) {
+                    showToast("Microphone access denied", "error");
+                }
+            } else {
+                isFieldRecording = false;
+                fieldMediaRecorder.stop();
+                fieldMediaRecorder.stream.getTracks().forEach(track => track.stop());
+                btn.classList.remove('recording-pulse');
+            }
+        }
+
+        async function processFieldAudio(audioBlob) {
+            try {
+                showToast("🎙️ Analyzing Audio & GPS...", "info");
                 const pos = await getGPS();
                 const jitterLat = pos.coords.latitude + ((Math.random() - 0.5) * 0.00005);
                 const jitterLng = pos.coords.longitude + ((Math.random() - 0.5) * 0.00005);
 
                 dropTempPin(jitterLat, jitterLng, 'ph-microphone', '#9b59b6');
 
+                const urlParams = new URLSearchParams(window.location.search);
+                const activeTaskId = urlParams.get('task_id');
+
                 const formData = new FormData();
-                formData.append('file', file);
+                formData.append('file', audioBlob, 'field-note.webm');
                 formData.append('lat', jitterLat);
                 formData.append('lng', jitterLng);
                 if (activeTaskId) formData.append('existing_task_id', activeTaskId);
 
-                await authFetch(`${API_URL}/api/ai/audio-command`, {
+                const res = await authFetch(`${API_URL}/api/ai/audio-command`, {
                     method: 'POST',
                     body: formData
                 });
 
-                showToast("🎙️ Audio AI Task Queued/Processed!", "success");
-                if (typeof loadDayTracks === 'function') setTimeout(() => loadDayTracks(document.getElementById('day-selector').value || 'all'), 1000);
-                input.value = "";
+                if (!res.ok) throw new Error("Server failed to process audio");
+
+                showToast("🎙️ AI Processed: Waypoint Created!", "success");
+                if (typeof loadDayTracks === 'function') loadDayTracks(document.getElementById('day-selector').value || 'all', true);
             } catch (err) {
                 showToast("❌ Error: " + err.message, "error");
-                input.value = "";
             }
         }
 

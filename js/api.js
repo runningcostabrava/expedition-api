@@ -325,6 +325,33 @@ window.openAiChat = function () {
                 }
             }
 
+            /* Segmented Control Model Toggle */
+            .ai-model-toggle {
+                display: flex;
+                background: #1e293b;
+                border-radius: 20px;
+                padding: 2px;
+                font-size: 0.75em;
+                font-weight: bold;
+                border: 1px solid rgba(255,255,255,0.1);
+            }
+            .ai-model-btn {
+                padding: 4px 10px;
+                border-radius: 18px;
+                cursor: pointer;
+                transition: 0.2s;
+                color: #94a3b8;
+            }
+            .ai-model-btn.active {
+                background: #8b5cf6;
+                color: white;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            }
+            .ai-model-btn:not(.active):hover {
+                color: white;
+                background: rgba(255,255,255,0.05);
+            }
+
             /* MOBILE: Centered Modal */
             @media (max-width: 768px) {
                 #ai-multimodal-assistant {
@@ -362,11 +389,18 @@ window.openAiChat = function () {
                 <div style="display:flex; align-items:center; gap:10px;">
                     <div style="width:34px; height:34px; background:#8b5cf6; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.2em;"><i class="ph ph-robot"></i></div>
                     <div style="display:flex; flex-direction:column;">
-                        <span style="line-height:1.1;">DeepSeek Guide</span>
+                        <span style="line-height:1.1;">AI Co-Pilot</span>
                         <span style="font-size:0.7em; color:#94a3b8; font-weight:normal;">Online</span>
                     </div>
                 </div>
-                <span onclick="window.closeAiChat()" style="cursor: pointer; font-size: 1.8em; line-height: 1; padding: 0 5px;"><i class="ph ph-x"></i></span>
+                <div style="display:flex; gap:12px; align-items:center;">
+                    <div class="ai-model-toggle">
+                        <div id="model-deepseek" class="ai-model-btn active" onclick="window.setAiModel('deepseek')">🧠 DeepSeek</div>
+                        <div id="model-gemini" class="ai-model-btn" onclick="window.setAiModel('gemini')">✨ Gemini</div>
+                    </div>
+                    <span id="ai-voice-toggle" style="cursor:pointer; font-size:1.2em; opacity:0.5; transition:0.2s;" title="Read aloud (Off)">🔇</span>
+                    <span onclick="window.closeAiChat()" style="cursor: pointer; font-size: 1.8em; line-height: 1; padding: 0 5px;"><i class="ph ph-x"></i></span>
+                </div>
             </div>
 
             <div id="ai-chat-history" style="flex: 1; overflow-y: auto; padding: 20px 15px; display: flex; flex-direction: column; gap: 15px; background: #e2e8f0; background-image: radial-gradient(#cbd5e0 1px, transparent 0); background-size: 20px 20px;">
@@ -386,7 +420,10 @@ window.openAiChat = function () {
                 <div style="display: flex; gap: 8px; align-items: flex-end;">
                     <input type="file" id="ai-image-upload" accept="image/*,application/pdf,text/plain,audio/*" style="display: none;">
                     <button onclick="document.getElementById('ai-image-upload').click()" style="background: #f8fafc; color: #475569; border: 1px solid #cbd5e0; border-radius: 50%; width: 42px; height: 42px; display:flex; align-items:center; justify-content:center; cursor: pointer; flex-shrink: 0; font-size:1.2em; transition:0.2s;"><i class="ph ph-plus"></i></button>
+                    
                     <textarea id="ai-prompt-text" rows="1" placeholder="Message..." style="flex: 1; padding: 12px 15px; border: 1px solid #cbd5e0; border-radius: 20px; font-family: inherit; resize: none; overflow-y:hidden; box-sizing: border-box; font-size:0.95em; outline:none; max-height:120px;" oninput="this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 120) + 'px';"></textarea>
+                    
+                    <button id="ai-mic-btn" style="background: #3498db; color: white; border: none; border-radius: 50%; width: 42px; height: 42px; display:flex; align-items:center; justify-content:center; cursor: pointer; flex-shrink: 0; font-size:1.2em; box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3); transition:0.2s;"><i class="ph ph-microphone"></i></button>
                     <button id="ai-submit-btn" style="background: #27ae60; color: white; border: none; border-radius: 50%; width: 42px; height: 42px; display:flex; align-items:center; justify-content:center; cursor: pointer; flex-shrink: 0; font-size:1.2em; box-shadow: 0 4px 10px rgba(39, 174, 96, 0.3); transition:transform 0.1s;"><i class="ph ph-paper-plane-right"></i></button>
                 </div>
             </div>
@@ -399,6 +436,108 @@ window.openAiChat = function () {
 
     const textarea = document.getElementById('ai-prompt-text');
     const history = document.getElementById('ai-chat-history');
+
+    // --- MODEL SELECTION ---
+    let selectedAiModel = 'deepseek';
+    window.setAiModel = function(model) {
+        selectedAiModel = model;
+        document.querySelectorAll('.ai-model-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`model-${model}`).classList.add('active');
+        showToast(`AI brain switched to ${model === 'deepseek' ? 'DeepSeek' : 'Gemini 1.5 Pro'}`, 'info');
+    };
+
+    // --- VOICE OUT ENGINE (Speech Synthesis) ---
+    let voiceOutEnabled = false;
+    const voiceToggle = document.getElementById('ai-voice-toggle');
+    voiceToggle.addEventListener('click', () => {
+        voiceOutEnabled = !voiceOutEnabled;
+        if (voiceOutEnabled) {
+            voiceToggle.innerText = '🔊';
+            voiceToggle.style.opacity = '1';
+            voiceToggle.title = 'Read aloud (On)';
+        } else {
+            voiceToggle.innerText = '🔇';
+            voiceToggle.style.opacity = '0.5';
+            voiceToggle.title = 'Read aloud (Off)';
+            window.speechSynthesis.cancel(); // Stop talking instantly
+        }
+    });
+
+    function speakAiText(htmlText) {
+        if (!voiceOutEnabled) return;
+        // Strip markdown and HTML tags to prevent the AI from reading syntax aloud
+        const cleanText = htmlText.replace(/<[^>]*>?/gm, '').replace(/[*_#`]/g, '');
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.rate = 1.05; // Slightly faster for natural feel
+        window.speechSynthesis.speak(utterance);
+    }
+
+    // --- VOICE IN ENGINE (MediaRecorder) ---
+    const micBtn = document.getElementById('ai-mic-btn');
+    let mediaRecorder;
+    let audioChunks = [];
+    let isRecording = false;
+
+    // Add pulse animation CSS dynamically
+    if (!document.getElementById('mic-pulse-style')) {
+        const style = document.createElement('style');
+        style.id = 'mic-pulse-style';
+        style.innerHTML = `@keyframes micPulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } } .recording-pulse { animation: micPulse 1.5s infinite !important; background: #ef4444 !important; }`;
+        document.head.appendChild(style);
+    }
+
+    micBtn.addEventListener('click', async () => {
+        if (!isRecording) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+
+                mediaRecorder.onstop = async () => {
+                    micBtn.innerHTML = '<i class="ph ph-spinner-gap ph-spin"></i>';
+                    micBtn.style.background = '#f39c12'; // Orange loading state
+                    
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const formData = new FormData();
+                    formData.append('file', audioBlob, 'voice-note.webm');
+                    
+                    try {
+                        // Send directly to the existing Gemini transcription endpoint
+                        const res = await authFetch(`${API_URL}/api/parse-media`, { method: 'POST', body: formData });
+                        const data = await res.json();
+                        if (data.text) {
+                            textarea.value = data.text;
+                            textarea.style.height = 'auto';
+                            textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+                            textarea.focus();
+                        } else {
+                            throw new Error("No transcription returned");
+                        }
+                    } catch (err) {
+                        alert("Voice transcription failed. " + err.message);
+                    }
+                    
+                    micBtn.innerHTML = '<i class="ph ph-microphone"></i>';
+                    micBtn.style.background = '#3498db'; // Return to blue
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                micBtn.innerHTML = '<i class="ph ph-stop"></i>';
+                micBtn.classList.add('recording-pulse');
+
+            } catch (err) {
+                alert("Microphone access denied or unavailable.");
+            }
+        } else {
+            isRecording = false;
+            mediaRecorder.stop();
+            mediaRecorder.stream.getTracks().forEach(track => track.stop()); // Turn off red recording light on browser
+            micBtn.classList.remove('recording-pulse');
+        }
+    });
 
     // Auto-send on Enter (Shift+Enter for new line)
     textarea.addEventListener('keydown', function (e) {
@@ -514,13 +653,16 @@ window.openAiChat = function () {
 
             const finalPrompt = documentContext ? (promptText + documentContext) : promptText;
 
+            const activeTaskId = typeof AppStore !== 'undefined' ? AppStore.get('activeTaskId') : null;
             const res = await authFetch(`${API_URL}/api/ai/command`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     prompt: finalPrompt,
                     imageUrl: uploadedImageUrl,
-                    history: aiConversationMemory // Inject memory here!
+                    history: aiConversationMemory, // Inject memory here!
+                    model: selectedAiModel,
+                    activeTaskId: activeTaskId
                 })
             });
 
@@ -534,10 +676,22 @@ window.openAiChat = function () {
 
             typingIndicator.remove();
             appendMessage('ai', data.message);
+            speakAiText(data.message);
 
-            if (data.uiAction && data.uiAction.type === 'focus_task') {
-                if (typeof window.focusTaskInSidebar === 'function') {
-                    setTimeout(() => window.focusTaskInSidebar(data.uiAction.taskId), 500);
+            if (data.uiAction) {
+                if (data.uiAction.type === 'focus_task') {
+                    if (typeof window.focusTaskInSidebar === 'function') {
+                        setTimeout(() => window.focusTaskInSidebar(data.uiAction.taskId), 500);
+                    }
+                } else if (data.uiAction.type === 'ui_search') {
+                    if (typeof window.triggerDiscoverySearch === 'function') {
+                        window.triggerDiscoverySearch(data.uiAction.query);
+                    }
+                } else if (data.uiAction.type === 'preview_route') {
+                    // Logic to preview the GeoJSON on the map
+                    if (typeof window.previewAiRoute === 'function') {
+                        window.previewAiRoute(data.uiAction.geojson);
+                    }
                 }
             }
 
