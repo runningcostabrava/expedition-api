@@ -523,7 +523,6 @@
 
                 // Always refresh your tracks/pins
                 if (typeof loadDayTracks === 'function') loadDayTracks(document.getElementById('day-selector').value || 'all');
-                if (typeof renderMapGeometries === 'function') renderMapGeometries();
             });
         };
 
@@ -701,20 +700,25 @@
         }
 
         async function loadDayTracks(sectionId, isSilent = false) {
-            // 1. Clean up existing layers
+            // 1. Clean up existing layers and sources
             if (!isSilent) {
                 if (map.getLayer('daily-route')) map.removeLayer('daily-route');
                 if (map.getSource('daily-route')) map.removeSource('daily-route');
-                // Clean up KM markers
+                
+                // Comprehensive KM marker & source cleanup
                 const style = map.getStyle();
-                if (style && style.layers) {
-                    style.layers.forEach(layer => {
-                        if (layer.id.startsWith('layer-km-')) {
-                            map.removeLayer(layer.id);
-                            if (map.getSource(layer.source)) map.removeSource(layer.source);
-                        }
+                if (style) {
+                    if (style.layers) {
+                        style.layers.forEach(layer => {
+                            if (layer.id.startsWith('layer-km-')) map.removeLayer(layer.id);
+                        });
+                    }
+                    // Explicitly remove all KM sources to prevent "Source already exists" errors
+                    Object.keys(map.getStyle().sources).forEach(sourceId => {
+                        if (sourceId.startsWith('km-source-')) map.removeSource(sourceId);
                     });
                 }
+
                 itineraryMarkers.forEach(m => m.remove());
                 itineraryMarkers = [];
             }
