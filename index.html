@@ -3359,6 +3359,13 @@
                         <input type="text" id="edit-geom-link" value="${safeLink}" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
                     </div>
                     <div>
+                        <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Assigned Task</label>
+                        <select id="edit-waypoint-task-id" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
+                            <option value="">-- No Task (Orphan) --</option>
+                            ${(AppStore.get('itinerary') || []).map(t => `<option value="${t.task_id}" ${t.geometries && t.geometries.some(g => (kind === 'point' ? g.waypoint_id : g.track_id) === id) ? 'selected' : ''}>${t.task_name || t.task}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
                         <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Comments / Notes</label>
                         <textarea id="edit-geom-comments" rows="4" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box; font-family:inherit; resize:vertical;" oninput="renderAttachmentManager('edit-geom-comments', 'edit-geom-attachments')">${safeComments}</textarea>
                         <div id="edit-geom-attachments" style="display:flex; flex-wrap:wrap; margin-top:5px;"></div>
@@ -3375,6 +3382,7 @@
                 title: document.getElementById('edit-geom-title').value,
                 link: document.getElementById('edit-geom-link').value,
                 comments: document.getElementById('edit-geom-comments').value,
+                existing_task_id: document.getElementById('edit-waypoint-task-id').value || null
             };
 
             if (kind === 'point') {

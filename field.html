@@ -119,7 +119,8 @@
             z-index: 1000;
             border-top: 2px solid #ccc;
             padding: 15px;
-            padding-bottom: 90px; /* CRITICAL: Adds scrolling space for the App Switcher */
+            padding-bottom: 90px;
+            /* CRITICAL: Adds scrolling space for the App Switcher */
             box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.1);
             border-radius: 20px 20px 0 0;
             overflow-y: auto;
@@ -247,16 +248,18 @@
     </div>
 
     <div
-        style="position: absolute; top: 85px; right: 15px; display: flex; flex-direction: column; gap: 8px; z-index: 100;">
-        <button class="fab-fleet" style="position: static; width: 36px; height: 36px; background: #8b5cf6;" onclick="processAiCommand()"><i class="ph ph-robot"></i></button>
+        style="position: absolute; top: 150px; right: 15px; display: flex; flex-direction: column; gap: 8px; z-index: 100;">
+        <button class="fab-fleet" style="position: static; width: 36px; height: 36px; background: #8b5cf6;"
+            onclick="processAiCommand()"><i class="ph ph-robot"></i></button>
         <button class="fab-pin" style="position: static; width: 36px; height: 36px; margin: 0;"
             onclick="enableDropPinMode()"><i class="ph ph-map-pin"></i></button>
         <button class="fab-fleet" style="position: static; width: 36px; height: 36px; margin: 0;"
             onclick="openFieldFleet()"><i class="ph ph-broadcast"></i></button>
-        <button id="fab-record" class="fab-fleet" style="position: static; width: 36px; height: 36px; margin: 0; background: #e74c3c;"
+        <button id="fab-record" class="fab-fleet"
+            style="position: static; width: 36px; height: 36px; margin: 0; background: #e74c3c;"
             onclick="toggleRecording()"><i class="ph ph-record"></i></button>
-        <button onclick="map.setTerrain(null); map.setPitch(0); showToast('3D Disabled (Stability Mode)', 'info')" 
-                style="background: #34495e; color: white; border-radius: 50%; width: 36px; height: 36px; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
+        <button onclick="map.setTerrain(null); map.setPitch(0); showToast('3D Disabled (Stability Mode)', 'info')"
+            style="background: #34495e; color: white; border-radius: 50%; width: 36px; height: 36px; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
             2D
         </button>
     </div>
@@ -271,7 +274,8 @@
 
     <div id="fleet-panel-mobile" class="bottom-panel">
         <span class="close-panel" onclick="document.getElementById('fleet-panel-mobile').style.display='none'">×</span>
-        <h3 style="margin-top: 0; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;"><i class="ph ph-broadcast"></i> Team Radar
+        <h3 style="margin-top: 0; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;"><i
+                class="ph ph-broadcast"></i> Team Radar
         </h3>
         <button onclick="window.location.href='telemetry.html'"
             style="width:100%; margin-bottom: 15px; background:#3498db; color:white; border:none; padding:12px; border-radius:8px; cursor:pointer; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📊
@@ -309,7 +313,8 @@
                 style="padding: 0; border: none; margin-bottom: 20px;">
 
             <button id="save-pin-btn" onclick="saveDroppedPin()"
-                style="width: 100%; background: #27ae60; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer;"><i class="ph ph-floppy-disk"></i>
+                style="width: 100%; background: #27ae60; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer;"><i
+                    class="ph ph-floppy-disk"></i>
                 Save</button>
             <button onclick="document.getElementById('pin-modal').classList.remove('open')"
                 style="width: 100%; background: #94a3b8; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer; margin-top: 10px;">Cancel</button>
@@ -322,56 +327,80 @@
             <input type="hidden" id="track-distance">
             <input type="text" id="track-title" placeholder="Track Name (e.g. Morning Hike)">
 
-            <label style="display:block; margin-bottom:5px; font-size:0.9em; font-weight:bold; color:#475569;">🔗 Link to Task</label>
-            <select id="track-task-id" style="width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px;">
+            <label style="display:block; margin-bottom:5px; font-size:0.9em; font-weight:bold; color:#475569;">🔗 Link
+                to Task</label>
+            <select id="track-task-id"
+                style="width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px;">
                 <option value="">-- No Task (Loose Track) --</option>
             </select>
 
-            <button id="save-track-btn" style="width: 100%; background: #e74c3c; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer;"><i class="ph ph-floppy-disk"></i> Save Track</button>
-            <button onclick="document.getElementById('track-modal').classList.remove('open')" style="width: 100%; background: #94a3b8; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer; margin-top: 10px;">Cancel</button>
+            <button id="save-track-btn"
+                style="width: 100%; background: #e74c3c; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer;"><i
+                    class="ph ph-floppy-disk"></i> Save Track</button>
+            <button onclick="document.getElementById('track-modal').classList.remove('open')"
+                style="width: 100%; background: #94a3b8; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer; margin-top: 10px;">Cancel</button>
         </div>
     </div>
 
     <!-- Quick Capture Floating Bar -->
-    <div id="quick-capture-bar" style="position: fixed; bottom: 90px; left: 15px; display: flex; flex-direction: column; gap: 12px; z-index: 99999;">
+    <div id="quick-capture-bar"
+        style="position: fixed; bottom: 90px; left: 15px; display: flex; flex-direction: column; gap: 12px; z-index: 99999;">
         <button onclick="quickPin()" class="qc-btn" style="background: #3498db;" title="Quick Pin">📍</button>
-        <button onclick="document.getElementById('photo-input').click()" class="qc-btn" style="background: #e67e22;" title="Photo Pin">📷</button>
-        <button onclick="document.getElementById('audio-input').click()" class="qc-btn" style="background: #9b59b6;" title="Audio AI Pin">🎙️</button>
+        <button onclick="document.getElementById('photo-input').click()" class="qc-btn" style="background: #e67e22;"
+            title="Photo Pin">📷</button>
+        <button onclick="document.getElementById('audio-input').click()" class="qc-btn" style="background: #9b59b6;"
+            title="Audio AI Pin">🎙️</button>
     </div>
-    <input type="file" id="photo-input" accept="image/*" capture="environment" style="display: none;" onchange="handlePhoto(this)">
-    <input type="file" id="audio-input" accept="audio/*" capture="microphone" style="display: none;" onchange="handleAudio(this)">
+    <input type="file" id="photo-input" accept="image/*" capture="environment" style="display: none;"
+        onchange="handlePhoto(this)">
+    <input type="file" id="audio-input" accept="audio/*" capture="microphone" style="display: none;"
+        onchange="handleAudio(this)">
     <div id="toast-container"></div>
 
     <div id="app-switcher" style="position: fixed; bottom: 25px; left: 15px; z-index: 100000;">
         <button onclick="document.getElementById('switcher-menu').classList.toggle('show')"
-            style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;"><i class="ph ph-squares-four"></i></button>
+            style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;"><i
+                class="ph ph-squares-four"></i></button>
         <div id="switcher-menu"
             style="display: none; position: absolute; bottom: 65px; left: 0; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 220px; flex-direction: column; gap: 8px; border: 1px solid #e2e8f0;">
-            <div style="font-size: 0.75em; font-weight: bold; color: #64748b; text-transform: uppercase; padding-left: 5px; margin-bottom: 2px;">Switch App</div>
+            <div
+                style="font-size: 0.75em; font-weight: bold; color: #64748b; text-transform: uppercase; padding-left: 5px; margin-bottom: 2px;">
+                Switch App</div>
             <a href="index.html"
-                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;"><i class="ph ph-map-trifold"></i> Command Center</a>
+                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;"><i
+                    class="ph ph-map-trifold"></i> Command Center</a>
             <a href="field.html"
-                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;"><i class="ph ph-compass"></i> Field Map</a>
+                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;"><i
+                    class="ph ph-compass"></i> Field Map</a>
             <a href="pm.html"
-                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;"><i class="ph ph-clipboard-text"></i> Mobile PM</a>
+                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;"><i
+                    class="ph ph-clipboard-text"></i> Mobile PM</a>
             <a href="telemetry.html"
-                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;"><i class="ph ph-trend-up"></i> Telemetry</a>
-            <a href="directory.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;"><i class="ph ph-address-book"></i> Directory</a>
+                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;"><i
+                    class="ph ph-trend-up"></i> Telemetry</a>
+            <a href="directory.html"
+                style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block; transition: background 0.2s;"><i
+                    class="ph ph-address-book"></i> Directory</a>
         </div>
     </div>
     <style>
-        #switcher-menu.show { display: flex !important; }
-        #switcher-menu a:hover { background: #e2e8f0 !important; }
+        #switcher-menu.show {
+            display: flex !important;
+        }
+
+        #switcher-menu a:hover {
+            background: #e2e8f0 !important;
+        }
     </style>
 
     <script>
         // NOTE: API_URL, AUTH_TOKEN, and authFetch() are inherited natively from /js/api.js
         // DO NOT redeclare them here or it will crash.
 
-        window.getSafeIconHtml = function(iconVal, fallbackClass, isFill = false) {
+        window.getSafeIconHtml = function (iconVal, fallbackClass, isFill = false) {
             const val = (iconVal && iconVal !== 'marker' && iconVal.trim() !== '') ? iconVal : fallbackClass;
             if (val.startsWith('ph-')) return `<i class="ph ${val} ${isFill ? 'ph-fill' : ''}"></i>`;
-            return val; 
+            return val;
         };
 
         let map, elevationChartInstance = null;
@@ -449,12 +478,12 @@
         }
 
         // --- NEW: Map Swapping Engine ---
-        window.changeMapStyle = function(style) {
+        window.changeMapStyle = function (style) {
             // 1. Tell the GPU to stop rendering 3D before we switch styles
-            map.setTerrain(null); 
-            
+            map.setTerrain(null);
+
             map.setStyle(style);
-            
+
             map.once('style.load', () => {
                 // Only re-enable 3D if the user explicitly chose the "Satellite 3D" option
                 if (style.includes('satellite')) {
@@ -463,7 +492,7 @@
                     }
                     map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
                 }
-                
+
                 // Always refresh your tracks/pins
                 if (typeof loadDayTracks === 'function') loadDayTracks(document.getElementById('day-selector').value || 'all');
                 if (typeof renderMapGeometries === 'function') renderMapGeometries();
@@ -585,7 +614,7 @@
         async function saveRecordedTrack(geometry, distance) {
             pendingTrackGeometry = geometry;
             document.getElementById('track-distance').value = distance;
-            
+
             // Fetch tasks for the dropdown
             try {
                 const res = await fetch(`${API_URL}/itinerary`);
@@ -603,7 +632,7 @@
         // Add the click listener to the new save button
         document.getElementById('save-track-btn').onclick = async () => {
             const btn = document.getElementById('save-track-btn');
-            btn.innerText = "⏳ Uploading..."; 
+            btn.innerText = "⏳ Uploading...";
             btn.disabled = true;
 
             const title = document.getElementById('track-title').value || "Recorded Track";
@@ -633,8 +662,8 @@
             } catch (e) {
                 alert("Failed to save track.");
             }
-            
-            btn.innerHTML = "<i class='ph ph-floppy-disk'></i> Save Track"; 
+
+            btn.innerHTML = "<i class='ph ph-floppy-disk'></i> Save Track";
             btn.disabled = false;
         };
 
@@ -669,7 +698,7 @@
                             boundsFeatures.push(feat);
                         });
                     }
-                    
+
                     // Process Waypoints (Points)
                     if (g.kind === 'point' && g.lng && g.lat) {
                         boundsFeatures.push(turf.point([g.lng, g.lat]));
@@ -711,10 +740,10 @@
             if (sectionId !== 'all' && boundsFeatures.length > 0) {
                 const collection = turf.featureCollection(boundsFeatures);
                 const bbox = turf.bbox(collection);
-                map.fitBounds(bbox, { 
-                    padding: { top: 100, bottom: 50, left: 50, right: 50 }, 
+                map.fitBounds(bbox, {
+                    padding: { top: 100, bottom: 50, left: 50, right: 50 },
                     duration: 1500,
-                    maxZoom: 15 
+                    maxZoom: 15
                 });
             }
         }
@@ -811,6 +840,9 @@
 
         async function quickPin() {
             try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const activeTaskId = urlParams.get('task_id');
+
                 showToast("🛰️ Fetching GPS...");
                 const pos = await getGPS();
                 const payload = {
@@ -820,6 +852,8 @@
                     icon: 'ph-map-pin',
                     color: '#3498db'
                 };
+                if (activeTaskId) payload.existing_task_id = parseInt(activeTaskId);
+
                 await authFetch(`${API_URL}/waypoints`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -836,9 +870,12 @@
             if (!input.files || !input.files[0]) return;
             const file = input.files[0];
             try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const activeTaskId = urlParams.get('task_id');
+
                 showToast("📸 Processing Photo...");
                 const pos = await getGPS();
-                
+
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('lat', pos.coords.latitude);
@@ -846,12 +883,17 @@
                 formData.append('title', "Photo Waypoint");
                 formData.append('icon', 'ph-camera');
                 formData.append('color', '#e67e22');
-                
-                await authFetch(`${API_URL}/api/waypoints/photo`, {
+                if (activeTaskId) formData.append('existing_task_id', activeTaskId);
+
+                const res = await authFetch(`${API_URL}/api/waypoints/photo`, {
                     method: 'POST',
                     body: formData
                 });
-                
+                const data = await res.json();
+
+                if (!res.ok) throw new Error(data.error || "Upload failed");
+                if (!data.photo_url && !data.offline_queued) throw new Error("Cloudinary failed to return an image URL.");
+
                 showToast("📷 Photo Saved!", "success");
                 if (typeof loadDayTracks === 'function') loadDayTracks(document.getElementById('day-selector').value || 'all');
                 input.value = "";
@@ -865,6 +907,9 @@
             if (!input.files || !input.files[0]) return;
             const file = input.files[0];
             try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const activeTaskId = urlParams.get('task_id');
+
                 showToast("🎙️ Processing Audio AI Command...");
                 const pos = await getGPS();
                 const { latitude, longitude } = pos.coords;
@@ -873,12 +918,13 @@
                 formData.append('file', file);
                 formData.append('lat', latitude);
                 formData.append('lng', longitude);
-                
+                if (activeTaskId) formData.append('activeTaskId', activeTaskId);
+
                 await authFetch(`${API_URL}/api/ai/audio-command`, {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 showToast("🎙️ Audio AI Task Queued/Processed!", "success");
                 if (typeof loadDayTracks === 'function') setTimeout(() => loadDayTracks(document.getElementById('day-selector').value || 'all'), 1000);
                 input.value = "";
