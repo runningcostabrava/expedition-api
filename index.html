@@ -1232,6 +1232,10 @@
                         // If the icon is a camera, give it a specific "Photo Spot" ring
                         const isPhotoSpot = renderIcon === 'ph-camera';
                         const iconHtml = window.getSafeIconHtml(renderIcon, 'ph-map-pin', true);
+                        
+                        // Shorten title for the label
+                        const shortName = (geom.title || '').includes('-') ? geom.title.split('-')[1].substring(0, 5) : (geom.title || '').substring(0, 5);
+
                         el.innerHTML = `
                             <div style="background-color: ${isPhotoSpot ? '#ef4444' : markerColor}; 
                                         border-radius: 50%; width: 28px; height: 28px; 
@@ -1244,6 +1248,7 @@
                                         border-right: 6px solid transparent; 
                                         border-top: 8px solid ${isPhotoSpot ? '#ef4444' : markerColor}; 
                                         margin: -1px auto 0;"></div>
+                            <div class="pin-label">${shortName}</div>
                         `;
                         el.style.cursor = 'pointer';
 
