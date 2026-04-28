@@ -854,6 +854,14 @@ const aiTools = [
   {
     type: "function",
     function: {
+      name: "get_all_waypoints",
+      description: "Fetch all waypoints from the database. Use this if you need to check for duplicates or perform global cleanup across all sections.",
+      parameters: { type: "object", properties: {} }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "calculate_smart_route",
       description: "Generate a road-snapped GPS track between two points using Mapbox Directions.",
       parameters: {
@@ -944,6 +952,7 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
           17. SELECTION AWARENESS: When the user refers to 'this' or 'the current' item, check the [UI CONTEXT] first before asking for clarification.
           18. NAVIGATION: When calculating a route, always tell the user the total distance in kilometers and the estimated travel time in your response.
           19. PROJECT MANAGEMENT: You have full vision of the expedition database via [Expedition Days] and [Current Active Tasks]. If the user asks for a review or optimization, analyze every task, its responsible person, its location in 'map_data', and its 'starts_at' time to provide professional project management advice.
+          20. Every task provided in [Current Active Tasks] contains a 'map_data' array. This array includes the database IDs (waypoint_id or track_id) for every location on the map. You DO NOT need a separate tool to scan waypoints; you must read the IDs directly from the 'map_data' provided in this context to perform updates or deletions.
 
           [UI CONTEXT]: The user currently has Task ID ${activeTaskId} open and selected in their dashboard. If they say "this task" or "this waypoint," they are likely referring to this ID or its attached geometries.` 
         }
@@ -1023,15 +1032,16 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
         }
     } else {
         // --- DEEPSEEK AGENT LOOP ---
+        let lastDeepseekResponse = null;
         for (let step = 0; step < 10; step++) {
-            const response = await deepseek.chat.completions.create({
+            lastDeepseekResponse = await deepseek.chat.completions.create({
                 model: "deepseek-chat",
                 messages: messages,
                 tools: aiTools,
                 tool_choice: "auto"
             });
 
-            const message = response.choices[0].message;
+            const message = lastDeepseekResponse.choices[0].message;
             console.log(`[AI Step ${step}]`, message.tool_calls ? "Calling Tool: " + message.tool_calls[0].function.name : "Giving Text Answer");
             messages.push(message);
 
@@ -1051,8 +1061,8 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
             }
         }
 
-        if (response.usage) {
-            const usage = response.usage;
+        if (lastDeepseekResponse && lastDeepseekResponse.usage) {
+            const usage = lastDeepseekResponse.usage;
             totalCost = (usage.prompt_tokens * RATES.deepseek.input) + (usage.completion_tokens * RATES.deepseek.output);
         }
     }
@@ -1242,6 +1252,10 @@ async function executeTool(name, args) {
             } else {
                 toolResult = "ERROR: Track not found.";
             }
+        }
+        else if (name === "get_all_waypoints") {
+            const res = await pool.query('SELECT id, title, lat, lng, section_id FROM waypoints');
+            toolResult = res.rows.length > 0 ? `ALL WAYPOINTS:\n${JSON.stringify(res.rows)}` : "No waypoints found in database.";
         }
         else if (name === "trigger_ui_discovery") {
             toolResult = `SUCCESS: User discovery search triggered for "${args.query}"`;
