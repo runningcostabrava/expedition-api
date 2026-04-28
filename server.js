@@ -319,7 +319,7 @@ app.post('/api/waypoints/audio', adminAuth, upload.single('file'), async (req, r
 
         // 1. Transcribe using Gemini
         const base64Audio = req.file.buffer.toString('base64');
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
         const geminiRes = await axios.post(geminiUrl, {
             contents: [{
                 parts: [
@@ -376,7 +376,7 @@ app.post('/api/parse-media', adminAuth, upload.single('file'), async (req, res) 
 
         if (isAudio) {
             const base64Audio = req.file.buffer.toString('base64');
-            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
             const geminiRes = await axios.post(geminiUrl, {
                 contents: [{
                     parts: [
