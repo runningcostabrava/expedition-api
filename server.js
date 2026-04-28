@@ -9,7 +9,6 @@ const deepseek = new OpenAI({
   baseURL: 'https://api.deepseek.com',
   apiKey: process.env.DEEPSEEK_API_KEY 
 });
-const openaiAudio = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const jwt = require('jsonwebtoken'); // 1. Import JWT
 const { Pool } = require('pg');
 const bodyParser = require('body-parser');
@@ -265,35 +264,23 @@ app.post('/api/waypoints/photo', adminAuth, upload.single('file'), async (req, r
 });
 
 app.post('/api/waypoints/audio', adminAuth, upload.single('file'), async (req, res) => {
-    let tempPath = null;
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
         const { lat, lng, title, category, color, icon, parent_track_id, section_id } = req.body;
 
-        const mime = req.file.mimetype;
-        const isAudio = mime.startsWith('audio/') || 
-                        mime.startsWith('video/mp4') || 
-                        req.file.originalname.toLowerCase().endsWith('.opus') || 
-                        req.file.originalname.toLowerCase().endsWith('.ogg') || 
-                        req.file.originalname.toLowerCase().endsWith('.m4a') || 
-                        req.file.originalname.toLowerCase().endsWith('.wav');
-
-        if (!isAudio) return res.status(400).json({ error: 'Unsupported audio format' });
-
-        // 1. Transcribe
-        const extension = path.extname(req.file.originalname) || '.mp3';
-        tempPath = path.join(os.tmpdir(), `whisper-${Date.now()}${extension}`);
-        fs.writeFileSync(tempPath, req.file.buffer);
-
-        const transcription = await openaiAudio.audio.transcriptions.create({
-            file: fs.createReadStream(tempPath),
-            model: "whisper-1",
-        });
-
-        fs.unlinkSync(tempPath);
-        tempPath = null;
-
-        const transcript = transcription.text;
+        // 1. Transcribe using Gemini
+        const base64Audio = req.file.buffer.toString('base64');
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+        const geminiRes = await axios.post(geminiUrl, {
+            contents: [{
+                parts: [
+                    { text: "You are a transcriber. Transcribe this audio exactly as spoken. Return ONLY the transcribed text." },
+                    { inlineData: { mimeType: req.file.mimetype, data: base64Audio } }
+                ]
+            }]
+        }, { headers: { 'Content-Type': 'application/json' } });
+        
+        const transcript = geminiRes.data.candidates[0].content.parts[0].text;
 
         // 2. Create Waypoint
         const wp = await pool.query(
@@ -305,15 +292,13 @@ app.post('/api/waypoints/audio', adminAuth, upload.single('file'), async (req, r
 
         res.json({ success: true, waypoint_id: wpId, transcript });
     } catch (err) {
-        console.error("Audio Waypoint error:", err);
-        if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+        console.error("Audio Waypoint error:", err.response?.data || err.message);
         res.status(500).json({ error: err.message });
     }
 });
 
 app.post('/api/parse-media', adminAuth, upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    let tempPath = null;
     try {
         const mime = req.file.mimetype;
         
@@ -328,7 +313,7 @@ app.post('/api/parse-media', adminAuth, upload.single('file'), async (req, res) 
             return res.json({ text: req.file.buffer.toString('utf-8') });
         }
         
-        // 3. Handle Audio & Video (Whisper)
+        // 3. Handle Audio & Video (Gemini)
         const isAudio = mime.startsWith('audio/') || 
                         mime.startsWith('video/mp4') || 
                         req.file.originalname.toLowerCase().endsWith('.opus') || 
@@ -337,27 +322,23 @@ app.post('/api/parse-media', adminAuth, upload.single('file'), async (req, res) 
                         req.file.originalname.toLowerCase().endsWith('.wav');
 
         if (isAudio) {
-            // Whisper API requires a file on disk or a proper ReadStream with a filename
-            const extension = path.extname(req.file.originalname) || '.mp3';
-            tempPath = path.join(os.tmpdir(), `whisper-${Date.now()}${extension}`);
-            fs.writeFileSync(tempPath, req.file.buffer);
-
-            const transcription = await openaiAudio.audio.transcriptions.create({
-                file: fs.createReadStream(tempPath),
-                model: "whisper-1",
-            });
-
-            // Clean up temp file
-            fs.unlinkSync(tempPath);
-            tempPath = null;
-
-            return res.json({ text: transcription.text });
+            const base64Audio = req.file.buffer.toString('base64');
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+            const geminiRes = await axios.post(geminiUrl, {
+                contents: [{
+                    parts: [
+                        { text: "You are a transcriber. Transcribe this audio exactly as spoken. Return ONLY the transcribed text." },
+                        { inlineData: { mimeType: req.file.mimetype, data: base64Audio } }
+                    ]
+                }]
+            }, { headers: { 'Content-Type': 'application/json' } });
+            
+            return res.json({ text: geminiRes.data.candidates[0].content.parts[0].text });
         }
         
         return res.status(400).json({ error: 'Unsupported file type for text extraction.' });
     } catch (err) {
-        console.error("Media parsing error:", err);
-        if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+        console.error("Media parsing error:", err.response?.data || err.message);
         res.status(500).json({ error: err.message });
     }
 });
@@ -862,26 +843,26 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
 app.post('/api/ai/audio-command', adminAuth, upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No audio file provided' });
     const { lat, lng } = req.body;
-    let tempPath = null;
     try {
-        const extension = path.extname(req.file.originalname) || '.mp3';
-        tempPath = path.join(os.tmpdir(), `whisper-${Date.now()}${extension}`);
-        fs.writeFileSync(tempPath, req.file.buffer);
+        // 1. Transcribe using Gemini
+        const base64Audio = req.file.buffer.toString('base64');
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+        const geminiRes = await axios.post(geminiUrl, {
+            contents: [{
+                parts: [
+                    { text: "You are a transcriber. Transcribe this audio exactly as spoken. Return ONLY the transcribed text." },
+                    { inlineData: { mimeType: req.file.mimetype, data: base64Audio } }
+                ]
+            }]
+        }, { headers: { 'Content-Type': 'application/json' } });
+        
+        const transcript = geminiRes.data.candidates[0].content.parts[0].text;
 
-        const transcription = await openaiAudio.audio.transcriptions.create({
-            file: fs.createReadStream(tempPath),
-            model: "whisper-1",
-        });
-
-        fs.unlinkSync(tempPath);
-        tempPath = null;
-
-        const finalPrompt = `[GPS: ${lat}, ${lng}] I just recorded an audio note here. Transcript: ${transcription.text}`;
+        const finalPrompt = `[GPS: ${lat}, ${lng}] I just recorded an audio note here. Transcript: ${transcript}`;
         const result = await runAiAgent(finalPrompt);
         res.json(result);
     } catch (err) {
-        console.error("Audio AI Error:", err);
-        if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+        console.error("Audio AI Error:", err.response?.data || err.message);
         res.status(500).json({ error: "Audio AI processing failed: " + err.message });
     }
 });
