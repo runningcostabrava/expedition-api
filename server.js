@@ -1325,8 +1325,8 @@ app.post('/api/ai/audio-command', adminAuth, upload.single('file'), async (req, 
         const transcript = result.response.text();
 
         const finalPrompt = `[GPS: ${lat}, ${lng}] I just recorded an audio note here. Transcript: ${transcript}`;
-        const result = await runAiAgent(finalPrompt, [], 'deepseek', existing_task_id, []);
-        res.json(result);
+        const agentResult = await runAiAgent(finalPrompt, [], 'deepseek', existing_task_id, []);
+        res.json(agentResult);
     } catch (err) {
         console.error("Audio AI Error:", err.response?.data || err.message);
         res.status(500).json({ error: "Audio AI processing failed: " + err.message });
