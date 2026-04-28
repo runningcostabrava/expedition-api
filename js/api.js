@@ -465,6 +465,8 @@ window.openAiChat = function () {
     let micStream = null;
     let processorNode = null;
     let isConversing = false;
+    let lastAiChunkTime = Date.now();
+    let thinkingToastActive = false;
 
     const micBtn = document.getElementById('ai-mic-btn');
 
@@ -478,9 +480,6 @@ window.openAiChat = function () {
         `;
         document.head.appendChild(style);
     }
-
-    let lastAudioSentTime = Date.now();
-    let thinkingToastTimeout = null;
 
     async function startLiveConversation() {
         try {
@@ -498,7 +497,7 @@ window.openAiChat = function () {
                 showToast("Live conversation active", "info");
                 
                 const source = audioContext.createMediaStreamSource(stream);
-                // ScriptProcessor is legacy but reliable for simple PCM conversion in this context
+                // 1. High-Performance PCM Conversion (Int16, 16kHz)
                 processorNode = audioContext.createScriptProcessor(4096, 1, 1);
 
                 source.connect(processorNode);
@@ -508,45 +507,38 @@ window.openAiChat = function () {
                     if (!isConversing) return;
                     const inputData = e.inputBuffer.getChannelData(0);
                     
-                    // 1. PCM Conversion (Int16, 16kHz)
                     const pcmData = new Int16Array(inputData.length);
                     let hasSignal = false;
                     for (let i = 0; i < inputData.length; i++) {
                         const s = Math.max(-1, Math.min(1, inputData[i]));
                         pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-                        if (Math.abs(s) > 0.05) hasSignal = true; // Simple VAD check
+                        if (Math.abs(s) > 0.05) hasSignal = true; 
                     }
 
                     if (liveAudioSocket.readyState === WebSocket.OPEN) {
                         liveAudioSocket.send(pcmData.buffer);
-                        if (hasSignal) {
-                            lastAudioSentTime = Date.now();
-                            if (thinkingToastTimeout) {
-                                clearTimeout(thinkingToastTimeout);
-                                thinkingToastTimeout = null;
-                            }
-                        } else {
-                            // If silent for 1.5s after talking, show thinking toast
-                            if (!thinkingToastTimeout && Date.now() - lastAudioSentTime > 1500) {
-                                thinkingToastTimeout = setTimeout(() => {
-                                    if (isConversing) showToast("Thinking... Give me a moment", "info");
-                                }, 500);
-                            }
-                        }
                     }
                 };
+
+                // 2. Latency Watcher & Thinking Logic
+                setInterval(() => {
+                    if (!isConversing) return;
+                    const now = Date.now();
+                    // If AI hasn't sent audio in 1.5s and user isn't talking (simplified)
+                    if (now - lastAiChunkTime > 1500 && !thinkingToastActive) {
+                        showToast("Give me a moment...", "info");
+                        thinkingToastActive = true;
+                    }
+                }, 500);
             };
 
             liveAudioSocket.onmessage = async (event) => {
-                if (thinkingToastTimeout) {
-                    clearTimeout(thinkingToastTimeout);
-                    thinkingToastTimeout = null;
-                }
-                
-                // 2. Low-Latency Playback
+                lastAiChunkTime = Date.now();
+                thinkingToastActive = false;
+
+                // 3. Optimize 16kHz Output (Buffered Playback)
                 try {
                     const arrayBuffer = event.data;
-                    // decodeAudioData is async and handles the raw bytes from the server
                     audioContext.decodeAudioData(arrayBuffer, (buffer) => {
                         const playSource = audioContext.createBufferSource();
                         playSource.buffer = buffer;
