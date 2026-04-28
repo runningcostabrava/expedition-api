@@ -168,6 +168,66 @@
             box-sizing: border-box;
             font-family: inherit;
         }
+
+        /* Quick Capture Bar & Toasts */
+        .qc-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            font-size: 22px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            transition: transform 0.1s, filter 0.2s;
+        }
+
+        .qc-btn:active {
+            transform: scale(0.9);
+        }
+
+        .qc-btn:hover {
+            filter: brightness(1.1);
+        }
+
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: #0f172a;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            font-size: 0.9em;
+            font-weight: 600;
+            animation: slideInDown 0.3s ease-out;
+            pointer-events: auto;
+        }
+
+        @keyframes slideInDown {
+            from {
+                transform: translateY(-100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
     </style>
 </head>
 
@@ -271,6 +331,16 @@
             <button onclick="document.getElementById('track-modal').classList.remove('open')" style="width: 100%; background: #94a3b8; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer; margin-top: 10px;">Cancel</button>
         </div>
     </div>
+
+    <!-- Quick Capture Floating Bar -->
+    <div id="quick-capture-bar" style="position: fixed; bottom: 90px; left: 15px; display: flex; flex-direction: column; gap: 12px; z-index: 99999;">
+        <button onclick="quickPin()" class="qc-btn" style="background: #3498db;" title="Quick Pin">📍</button>
+        <button onclick="document.getElementById('photo-input').click()" class="qc-btn" style="background: #e67e22;" title="Photo Pin">📷</button>
+        <button onclick="document.getElementById('audio-input').click()" class="qc-btn" style="background: #9b59b6;" title="Audio AI Pin">🎙️</button>
+    </div>
+    <input type="file" id="photo-input" accept="image/*" capture="environment" style="display: none;" onchange="handlePhoto(this)">
+    <input type="file" id="audio-input" accept="audio/*" capture="microphone" style="display: none;" onchange="handleAudio(this)">
+    <div id="toast-container"></div>
 
     <div id="app-switcher" style="position: fixed; bottom: 25px; left: 15px; z-index: 100000;">
         <button onclick="document.getElementById('switcher-menu').classList.toggle('show')"
@@ -710,6 +780,112 @@
                 document.getElementById('pin-lng').value = e.lngLat.lng;
                 document.getElementById('pin-modal').classList.add('open');
             });
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            if (type === 'error') toast.style.borderLeft = '4px solid #ef4444';
+            if (type === 'success') toast.style.borderLeft = '4px solid #10b981';
+            toast.innerText = message;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.5s';
+                setTimeout(() => toast.remove(), 500);
+            }, 4000);
+        }
+
+        async function getGPS() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) return reject(new Error("GPS not supported"));
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                });
+            });
+        }
+
+        async function quickPin() {
+            try {
+                showToast("🛰️ Fetching GPS...");
+                const pos = await getGPS();
+                const payload = {
+                    title: "Quick Pin",
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude,
+                    icon: 'ph-map-pin',
+                    color: '#3498db'
+                };
+                await authFetch(`${API_URL}/waypoints`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                showToast("📍 Pin Dropped!", "success");
+                if (typeof loadDayTracks === 'function') loadDayTracks(document.getElementById('day-selector').value || 'all');
+            } catch (err) {
+                showToast("❌ GPS Denied: " + err.message, "error");
+            }
+        }
+
+        async function handlePhoto(input) {
+            if (!input.files || !input.files[0]) return;
+            const file = input.files[0];
+            try {
+                showToast("📸 Processing Photo...");
+                const pos = await getGPS();
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('lat', pos.coords.latitude);
+                formData.append('lng', pos.coords.longitude);
+                formData.append('title', "Photo Waypoint");
+                formData.append('icon', 'ph-camera');
+                formData.append('color', '#e67e22');
+                
+                await authFetch(`${API_URL}/api/waypoints/photo`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                showToast("📷 Photo Saved!", "success");
+                if (typeof loadDayTracks === 'function') loadDayTracks(document.getElementById('day-selector').value || 'all');
+                input.value = "";
+            } catch (err) {
+                showToast("❌ Error: " + err.message, "error");
+                input.value = "";
+            }
+        }
+
+        async function handleAudio(input) {
+            if (!input.files || !input.files[0]) return;
+            const file = input.files[0];
+            try {
+                showToast("🎙️ Processing Audio AI Command...");
+                const pos = await getGPS();
+                const { latitude, longitude } = pos.coords;
+
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('lat', latitude);
+                formData.append('lng', longitude);
+                
+                await authFetch(`${API_URL}/api/ai/audio-command`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                showToast("🎙️ Audio AI Task Queued/Processed!", "success");
+                if (typeof loadDayTracks === 'function') setTimeout(() => loadDayTracks(document.getElementById('day-selector').value || 'all'), 1000);
+                input.value = "";
+            } catch (err) {
+                showToast("❌ Error: " + err.message, "error");
+                input.value = "";
+            }
         }
 
         async function saveDroppedPin() {

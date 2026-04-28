@@ -52,13 +52,36 @@ const OfflineManager = (() => {
 
     async function enqueue(url, options) {
         const database = await openDB();
+        
+        let body = options.body || null;
+        let isFormData = false;
+
+        if (body instanceof FormData) {
+            isFormData = true;
+            const entries = [];
+            for (const [key, value] of body.entries()) {
+                if (value instanceof File || value instanceof Blob) {
+                    const reader = new FileReader();
+                    const base64 = await new Promise((res) => {
+                        reader.onload = () => res(reader.result);
+                        reader.readAsDataURL(value);
+                    });
+                    entries.push({ key, value: base64, isBlob: true, type: value.type, name: value.name });
+                } else {
+                    entries.push({ key, value });
+                }
+            }
+            body = entries;
+        }
+
         return new Promise((resolve, reject) => {
             const tx = database.transaction(STORE_NAME, 'readwrite');
             tx.objectStore(STORE_NAME).add({
                 url,
                 method: options.method || 'POST',
                 headers: options.headers || {},
-                body: options.body || null,
+                body: body,
+                isFormData: isFormData,
                 timestamp: new Date().toISOString(),
                 retries: 0
             });
@@ -114,10 +137,32 @@ const OfflineManager = (() => {
 
         for (const item of items) {
             try {
+                let finalBody = item.body;
+                let finalHeaders = { ...item.headers };
+
+                if (item.isFormData) {
+                    finalBody = new FormData();
+                    for (const entry of item.body) {
+                        if (entry.isBlob) {
+                            const res = await fetch(entry.value);
+                            const blob = await res.blob();
+                            finalBody.append(entry.key, blob, entry.name);
+                        } else {
+                            finalBody.append(entry.key, entry.value);
+                        }
+                    }
+                    // When using FormData, the browser must set the Content-Type with boundary.
+                    // If we manually set it to 'application/json' or similar in the original request, we should remove it.
+                    if (finalHeaders['Content-Type'] || finalHeaders['content-type']) {
+                        delete finalHeaders['Content-Type'];
+                        delete finalHeaders['content-type'];
+                    }
+                }
+
                 const response = await window.authFetch(item.url, {
                     method: item.method,
-                    headers: item.headers,
-                    body: item.body
+                    headers: finalHeaders,
+                    body: finalBody
                 });
 
                 if (response.ok || response.status === 409) {

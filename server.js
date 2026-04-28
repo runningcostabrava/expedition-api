@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const os = require('os');
 const { OpenAI } = require('openai');
 const { search } = require('duck-duck-scrape');
 
@@ -7,6 +9,7 @@ const deepseek = new OpenAI({
   baseURL: 'https://api.deepseek.com',
   apiKey: process.env.DEEPSEEK_API_KEY 
 });
+const openaiAudio = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const jwt = require('jsonwebtoken'); // 1. Import JWT
 const { Pool } = require('pg');
 const bodyParser = require('body-parser');
@@ -216,8 +219,101 @@ app.post('/api/upload', adminAuth, upload.single('file'), (req, res) => {
   }
 });
 
+app.post('/api/waypoints/photo', adminAuth, upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file provided' });
+        const { lat, lng, title, category, color, icon, parent_track_id, phone, address, google_maps_url, section_id } = req.body;
+
+        // 1. Upload to Cloudinary
+        const isImage = req.file.mimetype.startsWith('image/');
+        const resType = isImage ? 'auto' : 'raw';
+        const uploadOptions = { folder: "expedition_media", resource_type: resType };
+        
+        if (resType === 'raw') {
+            uploadOptions.format = req.file.originalname.split('.').pop();
+            uploadOptions.use_filename = true;
+        }
+
+        const cloudinaryRes = await new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(uploadOptions, (error, result) => {
+                if (error) reject(error);
+                else resolve(result);
+            });
+            const { Readable } = require('stream');
+            const readableStream = new Readable({
+                read() {
+                    this.push(req.file.buffer);
+                    this.push(null);
+                }
+            });
+            readableStream.pipe(stream);
+        });
+
+        // 2. Create Waypoint
+        const wp = await pool.query(
+            'INSERT INTO waypoints (title, lat, lng, photo_url, category, color, icon, parent_track_id, phone, address, google_maps_url, section_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id',
+            [title || 'Photo Waypoint', lat, lng, cloudinaryRes.secure_url, category, color || '#e67e22', icon || 'ph-camera', parent_track_id, phone, address, google_maps_url, section_id]
+        );
+        const wpId = wp.rows[0].id;
+        await pool.query('INSERT INTO spatial_anchors (kind, waypoint_id) VALUES ($1, $2)', ['point', wpId]);
+
+        res.json({ success: true, waypoint_id: wpId, photo_url: cloudinaryRes.secure_url });
+    } catch (error) {
+        console.error("Photo Waypoint Error:", error);
+        res.status(500).json({ error: 'Failed to create photo waypoint', details: error.message });
+    }
+});
+
+app.post('/api/waypoints/audio', adminAuth, upload.single('file'), async (req, res) => {
+    let tempPath = null;
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+        const { lat, lng, title, category, color, icon, parent_track_id, section_id } = req.body;
+
+        const mime = req.file.mimetype;
+        const isAudio = mime.startsWith('audio/') || 
+                        mime.startsWith('video/mp4') || 
+                        req.file.originalname.toLowerCase().endsWith('.opus') || 
+                        req.file.originalname.toLowerCase().endsWith('.ogg') || 
+                        req.file.originalname.toLowerCase().endsWith('.m4a') || 
+                        req.file.originalname.toLowerCase().endsWith('.wav');
+
+        if (!isAudio) return res.status(400).json({ error: 'Unsupported audio format' });
+
+        // 1. Transcribe
+        const extension = path.extname(req.file.originalname) || '.mp3';
+        tempPath = path.join(os.tmpdir(), `whisper-${Date.now()}${extension}`);
+        fs.writeFileSync(tempPath, req.file.buffer);
+
+        const transcription = await openaiAudio.audio.transcriptions.create({
+            file: fs.createReadStream(tempPath),
+            model: "whisper-1",
+        });
+
+        fs.unlinkSync(tempPath);
+        tempPath = null;
+
+        const transcript = transcription.text;
+
+        // 2. Create Waypoint
+        const wp = await pool.query(
+            'INSERT INTO waypoints (title, lat, lng, description, category, color, icon, parent_track_id, section_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id',
+            [title || 'Audio Field Note', lat, lng, "Audio Field Note: " + transcript, category, color || '#9b59b6', icon || 'ph-microphone', parent_track_id, section_id]
+        );
+        const wpId = wp.rows[0].id;
+        await pool.query('INSERT INTO spatial_anchors (kind, waypoint_id) VALUES ($1, $2)', ['point', wpId]);
+
+        res.json({ success: true, waypoint_id: wpId, transcript });
+    } catch (err) {
+        console.error("Audio Waypoint error:", err);
+        if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post('/api/parse-media', adminAuth, upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    let tempPath = null;
     try {
         const mime = req.file.mimetype;
         
@@ -232,15 +328,36 @@ app.post('/api/parse-media', adminAuth, upload.single('file'), async (req, res) 
             return res.json({ text: req.file.buffer.toString('utf-8') });
         }
         
-        // 3. Handle Audio (Disabled)
-        const isAudio = mime.startsWith('audio/') || req.file.originalname.toLowerCase().endsWith('.opus') || req.file.originalname.toLowerCase().endsWith('.ogg');
+        // 3. Handle Audio & Video (Whisper)
+        const isAudio = mime.startsWith('audio/') || 
+                        mime.startsWith('video/mp4') || 
+                        req.file.originalname.toLowerCase().endsWith('.opus') || 
+                        req.file.originalname.toLowerCase().endsWith('.ogg') || 
+                        req.file.originalname.toLowerCase().endsWith('.m4a') || 
+                        req.file.originalname.toLowerCase().endsWith('.wav');
+
         if (isAudio) {
-            return res.json({ text: "[System: An audio file was attached, but audio transcription is currently disabled.]" });
+            // Whisper API requires a file on disk or a proper ReadStream with a filename
+            const extension = path.extname(req.file.originalname) || '.mp3';
+            tempPath = path.join(os.tmpdir(), `whisper-${Date.now()}${extension}`);
+            fs.writeFileSync(tempPath, req.file.buffer);
+
+            const transcription = await openaiAudio.audio.transcriptions.create({
+                file: fs.createReadStream(tempPath),
+                model: "whisper-1",
+            });
+
+            // Clean up temp file
+            fs.unlinkSync(tempPath);
+            tempPath = null;
+
+            return res.json({ text: transcription.text });
         }
         
         return res.status(400).json({ error: 'Unsupported file type for text extraction.' });
     } catch (err) {
         console.error("Media parsing error:", err);
+        if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
         res.status(500).json({ error: err.message });
     }
 });
@@ -491,36 +608,30 @@ const aiTools = [
         required: ["waypoint_id", "contact_id"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_waypoint",
+      description: "Drop a pin/waypoint on the map at the user's current GPS location. Use this when the user's audio note describes a physical location or hazard.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          lat: { type: "number", description: "Extract this from the [GPS: lat, lng] tag in the prompt." },
+          lng: { type: "number", description: "Extract this from the [GPS: lat, lng] tag in the prompt." },
+          description: { type: "string", description: "The transcribed audio note" },
+          icon: { type: "string", description: "Phosphor icon class, e.g., ph-warning, ph-map-pin" },
+          color: { type: "string", description: "Hex color code" },
+          existing_task_id: { type: "integer", nullable: true, description: "Link to a task if requested" }
+        },
+        required: ["title", "lat", "lng"]
+      }
+    }
   }
 ];
 
-app.post('/api/ai/command', adminAuth, async (req, res) => {
-  const { prompt, imageUrl, history = [] } = req.body;
-  if (!prompt && !imageUrl) return res.status(400).json({ error: "Prompt or Image is required" });
-
-  try {
-    let finalPrompt = prompt || "Please process the extracted text from the attached image.";
-
-    // --- TESSERACT OCR ENGINE ---
-    if (imageUrl) {
-      const Tesseract = require('tesseract.js'); // Only load it if we actually have an image!
-      try {
-        console.log("[AI] Scanning image with Tesseract OCR...");
-        // Use eng+spa+ita (English, Spanish, Italian) since the expedition is in Europe
-        const { data: { text } } = await Tesseract.recognize(
-          imageUrl,
-          'eng+spa+ita', 
-          { logger: m => console.log(m) } // Optional: logs progress in the console
-        );
-        
-        finalPrompt += `\n\n[RAW TEXT EXTRACTED FROM IMAGE VIA OCR]:\n${text}`;
-        console.log("[AI] Tesseract Extraction Complete.");
-      } catch (ocrErr) {
-        console.error("[AI] Tesseract OCR Failed:", ocrErr);
-        finalPrompt += `\n\n[SYSTEM NOTE: The user attached an image, but the OCR extraction failed.]`;
-      }
-    }
-
+async function runAiAgent(finalPrompt, history = []) {
     // Fetch AI's permanent memory
     const memoryRes = await pool.query('SELECT memory_text FROM ai_memory WHERE id = 1');
     const longTermMemory = memoryRes.rows[0]?.memory_text || "No specific memories or guidelines saved yet.";
@@ -529,7 +640,7 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
     const sectionsRes = await pool.query('SELECT id, title, section_date FROM sections ORDER BY section_date ASC');
     const sectionsContext = JSON.stringify(sectionsRes.rows);
 
-    // 2. Fetch Tasks AND their attached Map Geometries (Distance, Elev, Links, Comments)
+    // 2. Fetch Tasks AND their attached Map Geometries
     const currentTasksQuery = `
       SELECT t.id, t.task_name, t.starts_at, t.responsible, t.section_id, t.characteristics,
              COALESCE(
@@ -599,7 +710,6 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
     let finalResponseText = "";
     let pendingUiAction = null;
     
-    // Allow the AI to "think" for up to 10 steps (e.g., Search Web -> Update Task -> Reply)
     for (let step = 0; step < 10; step++) {
         const response = await deepseek.chat.completions.create({
             model: "deepseek-chat",
@@ -610,15 +720,13 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
 
         const message = response.choices[0].message;
         console.log(`[AI Step ${step}]`, message.tool_calls ? "Calling Tool: " + message.tool_calls[0].function.name : "Giving Text Answer");
-        messages.push(message); // Append AI's response to the internal memory
+        messages.push(message);
 
-        // If the AI didn't call any tools, it's done thinking! Break the loop.
         if (!message.tool_calls || message.tool_calls.length === 0) {
             finalResponseText = message.content || "I searched for that but couldn't formulate an answer. Please try again.";
             break;
         }
 
-        // Otherwise, execute the tools the AI requested
         for (const toolCall of message.tool_calls) {
             const name = toolCall.function.name;
             const args = JSON.parse(toolCall.function.arguments);
@@ -639,15 +747,9 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
                     toolResult = `SUCCESS: Task ${args.id} updated.`;
                 }
                 else if (name === "search_internet") {
-                    console.log(`[AI] Deep Researching: ${args.query}`);
                     const searchResults = await search(args.query, { safeSearch: "off" });
-                    
-                    // We take more results (5) to make it smarter, but keep descriptions concise
                     const snippets = searchResults.results.slice(0, 5).map(r => r.description).join('\n\n');
-                    
-                    toolResult = snippets ? 
-                        `WEB RESULTS FOUND:\n${snippets}\n\nTask: Analyze these results. If you have enough info for a full weather report, answer now. If not, you may search once more for missing details.` : 
-                        "No results found on the web.";
+                    toolResult = snippets ? `WEB RESULTS FOUND:\n${snippets}` : "No results found on the web.";
                 }
                 else if (name === "update_core_memory") {
                     await pool.query('UPDATE ai_memory SET memory_text = $1 WHERE id = 1', [args.new_memory_text]);
@@ -679,18 +781,9 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
                         const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN;
                         const searchUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(args.query + ' ' + args.location_context)}.json?access_token=${mapboxToken}&limit=5`;
                         const response = await axios.get(searchUrl);
-                        
-                        const results = response.data.features.map(f => ({
-                            name: f.text,
-                            address: f.place_name,
-                            coordinates: f.center,
-                            category: f.properties.category
-                        }));
-                        
+                        const results = response.data.features.map(f => ({ name: f.text, address: f.place_name, coordinates: f.center }));
                         toolResult = JSON.stringify(results);
-                    } catch (err) {
-                        toolResult = "Error searching for places: " + err.message;
-                    }
+                    } catch (err) { toolResult = "Error: " + err.message; }
                 }
                 else if (name === "create_contact") {
                     const res = await pool.query(
@@ -700,72 +793,97 @@ app.post('/api/ai/command', adminAuth, async (req, res) => {
                     toolResult = `SUCCESS: Contact created with ID ${res.rows[0].id}.`;
                 }
                 else if (name === "search_directory") {
-                    // Search for contacts by name or role
                     const searchQuery = `%${args.query}%`;
                     const res = await pool.query(
                         'SELECT id, name, contact_type, phone FROM contacts WHERE name ILIKE $1 OR contact_type ILIKE $1 LIMIT 5',
                         [searchQuery]
                     );
-                    toolResult = res.rows.length > 0 
-                        ? `FOUND CONTACTS:\n${JSON.stringify(res.rows)}\nUse these IDs if you need to link them.` 
-                        : `No contacts found matching "${args.query}".`;
+                    toolResult = res.rows.length > 0 ? `FOUND CONTACTS:\n${JSON.stringify(res.rows)}` : `No contacts found.`;
                 }
                 else if (name === "link_contact_to_waypoint") {
                     await pool.query(
                         'INSERT INTO waypoint_contacts (waypoint_id, contact_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
                         [args.waypoint_id, args.contact_id]
                     );
-                    toolResult = `SUCCESS: Contact ${args.contact_id} permanently linked to Waypoint ${args.waypoint_id}.`;
-                }
-                else if (name === "create_contact") {
-                    const res = await pool.query(
-                        'INSERT INTO contacts (name, contact_type, phone, email, notes) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-                        [args.name, args.contact_type || 'Staff', args.phone, args.email, args.notes]
-                    );
-                    toolResult = `SUCCESS: Contact created with ID ${res.rows[0].id}.`;
-                }
-                else if (name === "search_directory") {
-                    // Search for contacts by name or role
-                    const searchQuery = `%${args.query}%`;
-                    const res = await pool.query(
-                        'SELECT id, name, contact_type, phone FROM contacts WHERE name ILIKE $1 OR contact_type ILIKE $1 LIMIT 5',
-                        [searchQuery]
-                    );
-                    toolResult = res.rows.length > 0 
-                        ? `FOUND CONTACTS:\n${JSON.stringify(res.rows)}\nUse these IDs if you need to link them.` 
-                        : `No contacts found matching "${args.query}".`;
-                }
-                else if (name === "link_contact_to_waypoint") {
-                    await pool.query(
-                        'INSERT INTO waypoint_contacts (waypoint_id, contact_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-                        [args.waypoint_id, args.contact_id]
-                    );
-                    toolResult = `SUCCESS: Contact ${args.contact_id} permanently linked to Waypoint ${args.waypoint_id}.`;
+                    toolResult = `SUCCESS: Linked contact to waypoint.`;
                 }
                 else if (name === "highlight_task_in_ui") {
                     pendingUiAction = { type: 'focus_task', taskId: args.task_id };
-                    toolResult = `SUCCESS: UI told to highlight task ${args.task_id}.`;
+                    toolResult = `SUCCESS: UI told to highlight task.`;
+                }
+                else if (name === "create_waypoint") {
+                    const wpRes = await pool.query(
+                        'INSERT INTO waypoints (title, lat, lng, description, icon, color) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+                        [args.title, args.lat, args.lng, args.description || '', args.icon || 'ph-map-pin', args.color || '#3498db']
+                    );
+                    const newWpId = wpRes.rows[0].id;
+                    const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, waypoint_id) VALUES ($1, $2) RETURNING id', ['point', newWpId]);
+                    if (args.existing_task_id) {
+                        await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [args.existing_task_id, anchorRes.rows[0].id]);
+                    }
+                    toolResult = `SUCCESS: Waypoint created with ID ${newWpId}.`;
                 }
             } catch (err) {
                 console.error(`[AI Tool Error] ${name}:`, err);
                 toolResult = `ERROR executing ${name}: ${err.message}`;
             }
 
-            // Report the tool's result back to the AI so it can take the next step
-            messages.push({
-                role: "tool",
-                tool_call_id: toolCall.id,
-                content: toolResult
-            });
+            messages.push({ role: "tool", tool_call_id: toolCall.id, content: toolResult });
         }
     }
 
-    if (!finalResponseText) finalResponseText = "The assistant reached its thinking limit or returned an empty response. Check server logs.";
-    res.json({ success: true, message: finalResponseText, uiAction: pendingUiAction });
-  } catch (err) {
-    console.error("AI Error:", err);
-    res.status(500).json({ error: "AI processing failed: " + err.message });
-  }
+    return { success: true, message: finalResponseText, uiAction: pendingUiAction };
+}
+
+app.post('/api/ai/command', adminAuth, async (req, res) => {
+    const { prompt, imageUrl, history = [] } = req.body;
+    if (!prompt && !imageUrl) return res.status(400).json({ error: "Prompt or Image is required" });
+
+    try {
+        let finalPrompt = prompt || "Please process the extracted text from the attached image.";
+        if (imageUrl) {
+            const Tesseract = require('tesseract.js');
+            try {
+                const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng+spa+ita');
+                finalPrompt += `\n\n[RAW TEXT EXTRACTED FROM IMAGE VIA OCR]:\n${text}`;
+            } catch (ocrErr) {
+                finalPrompt += `\n\n[SYSTEM NOTE: OCR extraction failed.]`;
+            }
+        }
+
+        const result = await runAiAgent(finalPrompt, history);
+        res.json(result);
+    } catch (err) {
+        console.error("AI Error:", err);
+        res.status(500).json({ error: "AI processing failed: " + err.message });
+    }
+});
+
+app.post('/api/ai/audio-command', adminAuth, upload.single('file'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No audio file provided' });
+    const { lat, lng } = req.body;
+    let tempPath = null;
+    try {
+        const extension = path.extname(req.file.originalname) || '.mp3';
+        tempPath = path.join(os.tmpdir(), `whisper-${Date.now()}${extension}`);
+        fs.writeFileSync(tempPath, req.file.buffer);
+
+        const transcription = await openaiAudio.audio.transcriptions.create({
+            file: fs.createReadStream(tempPath),
+            model: "whisper-1",
+        });
+
+        fs.unlinkSync(tempPath);
+        tempPath = null;
+
+        const finalPrompt = `[GPS: ${lat}, ${lng}] I just recorded an audio note here. Transcript: ${transcription.text}`;
+        const result = await runAiAgent(finalPrompt);
+        res.json(result);
+    } catch (err) {
+        console.error("Audio AI Error:", err);
+        if (tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+        res.status(500).json({ error: "Audio AI processing failed: " + err.message });
+    }
 });
 
 app.get('/tracks', async (req, res) => {
