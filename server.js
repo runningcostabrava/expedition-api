@@ -2015,7 +2015,7 @@ wss.on('connection', async (ws) => {
                     parts: [{
                         text: `You are a human-like voice assistant for the Expedition dashboard. 
                         Identify the user's language (Spanish, English, Italian) and respond in that same language immediately. 
-                        Speak naturally and concisely.
+                        Speak naturally and concisely. Keep audio responses under 15 seconds for field stability.
                         Current Context: Sections: ${JSON.stringify(sectionsRes.rows)}. Active Tasks: ${JSON.stringify(tasksRes.rows)}.`
                     }]
                 }
@@ -2036,11 +2036,13 @@ wss.on('connection', async (ws) => {
 
         ws.on('message', (data) => {
             if (googleWs.readyState === 1) {
+                // Ensure data is converted to a proper base64 string for the proxy
+                const base64Data = Buffer.isBuffer(data) ? data.toString("base64") : Buffer.from(data).toString("base64");
                 const bidiMessage = {
                     realtime_input: {
                         media_chunks: [{
                             mime_type: "audio/pcm;rate=16000",
-                            data: Buffer.isBuffer(data) ? data.toString("base64") : Buffer.from(data).toString("base64")
+                            data: base64Data
                         }]
                     }
                 };
