@@ -2053,32 +2053,42 @@ const server = app.listen(PORT, '0.0.0.0', () => console.log(`API online on port
 // --- GEMINI MULTIMODAL LIVE WEBSOCKET SERVER ---
 const wss = new WebSocketServer({ server, path: '/api/live-stream' });
 
-  wss.on('connection', async (ws) => {
-    if (!process.env.GEMINI_API_KEY) { ws.close(1011, "Missing API Key"); return; }
+wss.on('connection', async (ws) => {
+    console.log('[Live AI] Nuevo cliente intentando conectar...');
+    if (!process.env.GEMINI_API_KEY) { 
+        console.error('ERROR: GEMINI_API_KEY no configurada');
+        ws.close(1011, "Config Error"); return; 
+    }
     try {
         const WebSocket = require('ws');
-        const googleWs = new WebSocket(`wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${process.env.GEMINI_API_KEY}`);
+        const googleUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${process.env.GEMINI_API_KEY}`;
+        const googleWs = new WebSocket(googleUrl);
+
         googleWs.on('open', () => {
+            console.log('[Live AI] Puente con Google ABIERTO ✅');
             googleWs.send(JSON.stringify({
                 setup: {
                     model: "models/gemini-2.0-flash-exp",
-                    generation_config: { response_modalities: ["AUDIO"], speech_config: { voice_config: { prebuilt_voice_config: { voice_name: "Puck" } } } }
+                    generation_config: { response_modalities: ["AUDIO"] }
                 }
             }));
         });
+
         googleWs.on('message', (data) => {
             const resp = JSON.parse(data);
             if (resp.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data) {
-                if (ws.readyState === 1) ws.send(Buffer.from(resp.serverContent.modelTurn.parts[0].inlineData.data, 'base64'));
+                if (ws.readyState === WebSocket.OPEN) ws.send(Buffer.from(resp.serverContent.modelTurn.parts[0].inlineData.data, 'base64'));
             }
         });
+
+        googleWs.on('error', (e) => console.error('[Live AI] Error en Google WS:', e));
+        googleWs.on('close', () => { console.log('[Live AI] Google cerró la conexión'); ws.close(); });
+
         ws.on('message', (data) => {
-            if (googleWs.readyState === 1) {
+            if (googleWs.readyState === WebSocket.OPEN) {
                 const b64 = Buffer.isBuffer(data) ? data.toString("base64") : Buffer.from(data).toString("base64");
                 googleWs.send(JSON.stringify({ realtime_input: { media_chunks: [{ mime_type: "audio/pcm;rate=16000", data: b64 }] } }));
             }
         });
-        googleWs.on('close', () => ws.close());
-        ws.on('close', () => googleWs.close());
-    } catch (e) { ws.close(); }
-  });
+    } catch (e) { console.error('[Live AI] Error Crítico:', e); ws.close(); }
+});

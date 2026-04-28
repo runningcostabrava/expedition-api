@@ -1230,6 +1230,7 @@
                         }
 
                         const el = document.createElement('div');
+                        el.dataset.anchorId = geom.anchor_id;
                         el.className = 'custom-map-pin'; // Links to our dynamic CSS scaling
 
                         // If the icon is a camera, give it a specific "Photo Spot" ring
@@ -3140,13 +3141,15 @@
 
         function toggleGeomVisibility(kind, id, btn) {
             if (kind === 'point') {
-                const marker = activeMarkers.find(m => m.getElement().dataset.anchorId == id || m.getLngLat().lng == id); // Fallback logic
+                const marker = (typeof itineraryMarkers !== 'undefined' && itineraryMarkers.length > 0) 
+                    ? itineraryMarkers.find(m => m.getElement().dataset.anchorId == id) 
+                    : activeMarkers.find(m => m.getElement().dataset.anchorId == id);
                 if (marker) {
                     const el = marker.getElement();
                     const isHidden = el.style.opacity === '0';
                     el.style.opacity = isHidden ? '1' : '0';
                     el.style.pointerEvents = isHidden ? 'auto' : 'none';
-                    btn.innerText = isHidden ? '👁️' : '🙈';
+                    btn.innerHTML = isHidden ? '<i class="ph ph-eye"></i>' : '<i class="ph ph-eye-closed"></i>';
                 }
             } else {
                 const layerId = `layer-${id}`;
@@ -3154,7 +3157,7 @@
                     const currentVis = map.getLayoutProperty(layerId, 'visibility') || 'visible';
                     const nextVis = currentVis === 'visible' ? 'none' : 'visible';
                     map.setLayoutProperty(layerId, 'visibility', nextVis);
-                    btn.innerText = nextVis === 'visible' ? '👁️' : '🙈';
+                    btn.innerHTML = nextVis === 'visible' ? '<i class="ph ph-eye"></i>' : '<i class="ph ph-eye-closed"></i>';
                 }
             }
         }

@@ -798,6 +798,7 @@
                                 ${pinContent}
                             </div>
                         `;
+                        el.dataset.anchorId = g.anchor_id;
 
                         const popupHtml = `
                             <div style="text-align: center;">
@@ -860,6 +861,27 @@
         }
 
         let fieldElevationHoverMarker = null;
+
+        function toggleGeomVisibility(kind, id, btn) {
+            if (kind === 'point') {
+                const marker = itineraryMarkers.find(m => m.getElement().dataset.anchorId == id);
+                if (marker) {
+                    const el = marker.getElement();
+                    const isHidden = el.style.opacity === '0';
+                    el.style.opacity = isHidden ? '1' : '0';
+                    el.style.pointerEvents = isHidden ? 'auto' : 'none';
+                    btn.innerHTML = isHidden ? '<i class="ph ph-eye"></i>' : '<i class="ph ph-eye-closed"></i>';
+                }
+            } else {
+                const layerId = `layer-${id}`;
+                if (map.getLayer(layerId)) {
+                    const currentVis = map.getLayoutProperty(layerId, 'visibility') || 'visible';
+                    const nextVis = currentVis === 'visible' ? 'none' : 'visible';
+                    map.setLayoutProperty(layerId, 'visibility', nextVis);
+                    btn.innerHTML = nextVis === 'visible' ? '<i class="ph ph-eye"></i>' : '<i class="ph ph-eye-closed"></i>';
+                }
+            }
+        }
 
         function showElevationProfile(geojson, title, metadata) {
             document.getElementById('elevation-panel').style.display = 'block';
