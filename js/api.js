@@ -757,7 +757,6 @@ window.openAiChat = function () {
 
             typingIndicator.remove();
             appendMessage('ai', data.message);
-            speakAiText(data.message);
 
             if (data.uiAction) {
                 if (data.uiAction.type === 'focus_task') {
