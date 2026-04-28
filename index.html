@@ -585,6 +585,9 @@
                 });
 
                 map.on('load', () => {
+                    if (!map.getSource('mapbox-dem')) {
+                        map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
+                    }
                     refreshData();
 
 
@@ -1238,14 +1241,14 @@
 
                         // 2. Add logic to decide between showing an icon or text inside the circle
                         const isNumbered = !isNaN(shortName) && shortName !== '';
-                        const pinContent = isNumbered ? `<span style="font-weight:900; font-size:11px; color:white; pointer-events:none;">${shortName}</span>` : iconHtml;
+                        const pinContent = isNumbered ? `<span style="font-weight:900; font-size:16px; color:white; pointer-events:none; text-shadow: 0 0 4px #0f172a;">${shortName}</span>` : iconHtml;
 
                         el.innerHTML = `
                             <div style="background-color: ${isPhotoSpot ? '#ef4444' : markerColor}; 
                                         border-radius: 50%; width: 28px; height: 28px; 
                                         display: flex; justify-content: center; align-items: center; 
                                         border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); 
-                                        font-size: 14px; color: white; transform: ${isPhotoSpot ? 'scale(1.2)' : 'scale(1)'};">
+                                        font-size: 14px; color: white; transform: ${isPhotoSpot ? 'scale(1.2)' : 'scale(1.1)'};">
                                 ${pinContent}
                             </div>
                             <div style="width: 0; height: 0; border-left: 6px solid transparent; 
@@ -1350,14 +1353,14 @@
                                     layout: {
                                         'text-field': ['get', 'km'],
                                         'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
-                                        'text-size': 14,
+                                        'text-size': 16,
                                         'text-allow-overlap': true,
                                         'text-ignore-placement': true
                                     },
                                     paint: {
                                         'text-color': '#ffffff',
                                         'text-halo-color': '#0f172a',
-                                        'text-halo-width': 3
+                                        'text-halo-width': 4
                                     }
                                 });
                             }
@@ -2285,13 +2288,10 @@
             map.setStyle(style);
 
             map.once('style.load', () => {
-                // Only re-enable 3D if the user explicitly chose the "Satellite 3D" option
-                if (style.includes('satellite')) {
-                    if (!map.getSource('mapbox-dem')) {
-                        map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
-                    }
-                    map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
+                if (!map.getSource('mapbox-dem')) {
+                    map.addSource('mapbox-dem', { 'type': 'raster-dem', 'url': 'mapbox://mapbox.mapbox-terrain-dem-v1', 'tileSize': 512 });
                 }
+                map.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.2 });
 
                 // Always refresh your tracks/pins
                 if (typeof loadDayTracks === 'function') loadDayTracks(document.getElementById('day-selector').value || 'all');

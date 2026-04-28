@@ -488,8 +488,7 @@ window.openAiChat = function () {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             micStream = stream;
 
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            liveAudioSocket = new WebSocket(`${protocol}//${window.location.host}/api/live-stream`);
+            liveAudioSocket = new WebSocket(API_URL.replace('https:', 'wss:') + '/api/live-stream');
             liveAudioSocket.binaryType = 'arraybuffer';
 
             liveAudioSocket.onopen = () => {

@@ -759,14 +759,14 @@
                                     layout: {
                                         'text-field': ['get', 'km'],
                                         'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
-                                        'text-size': 14,
+                                        'text-size': 16,
                                         'text-allow-overlap': true,
                                         'text-ignore-placement': true
                                     },
                                     paint: {
                                         'text-color': '#ffffff',
                                         'text-halo-color': '#0f172a',
-                                        'text-halo-width': 3
+                                        'text-halo-width': 4
                                     }
                                     });
                                 }
@@ -791,10 +791,10 @@
                         // Lógica de nombre corto y detección de números
                         const shortName = (g.title || '').includes('-') ? (g.title.split('-')[1].trim().split(' ')[0]) : (g.title || '').trim().substring(0, 3);
                         const isNumbered = !isNaN(shortName) && shortName !== '';
-                        const pinContent = isNumbered ? `<span style="font-weight:900; font-size:11px; color:white; pointer-events:none;">${shortName}</span>` : iconHtml;
+                        const pinContent = isNumbered ? `<span style="font-weight:900; font-size:16px; color:white; pointer-events:none; text-shadow: 0 0 4px #0f172a;">${shortName}</span>` : iconHtml;
 
                         el.innerHTML = `
-                            <div style="background:${g.color || '#3498db'}; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3); font-size:12px; color:white;">
+                            <div style="background:${g.color || '#3498db'}; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3); font-size:12px; color:white; transform: scale(1.1);">
                                 ${pinContent}
                             </div>
                         `;

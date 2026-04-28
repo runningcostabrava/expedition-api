@@ -176,7 +176,8 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       );`,
       "INSERT INTO ai_memory (id, memory_text) VALUES (1, '') ON CONFLICT DO NOTHING;",
       "CREATE TABLE IF NOT EXISTS contacts (id SERIAL PRIMARY KEY, name TEXT NOT NULL, contact_type TEXT, phone TEXT, email TEXT, notes TEXT)",
-      "CREATE TABLE IF NOT EXISTS waypoint_contacts (waypoint_id INTEGER REFERENCES waypoints(id) ON DELETE CASCADE, contact_id INTEGER REFERENCES contacts(id) ON DELETE CASCADE, PRIMARY KEY (waypoint_id, contact_id))"
+      "CREATE TABLE IF NOT EXISTS waypoint_contacts (waypoint_id INTEGER REFERENCES waypoints(id) ON DELETE CASCADE, contact_id INTEGER REFERENCES contacts(id) ON DELETE CASCADE, PRIMARY KEY (waypoint_id, contact_id))",
+      "CREATE TABLE IF NOT EXISTS database_backups (id SERIAL PRIMARY KEY, backup_date TIMESTAMPTZ DEFAULT NOW(), table_name TEXT, data_json JSONB, metadata TEXT)"
     ];
 
     // Execute safely one by one
@@ -875,10 +876,43 @@ const aiTools = [
         required: ["start_coords", "end_coords"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_backups",
+      description: "View available database backups to recover deleted information.",
+      parameters: { type: "object", properties: {} }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "restore_from_backup",
+      description: "Overwrite a table with data from a backup JSONB snapshot.",
+      parameters: {
+        type: "object",
+        properties: {
+          backup_id: { type: "integer" },
+          table_name: { type: "string", enum: ["waypoints", "tasks", "sections"] }
+        },
+        required: ["backup_id", "table_name"]
+      }
+    }
   }
 ];
 
 async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', activeTaskId = null, imageUrls = []) {
+    // --- AUTO-SNAPSHOT BEFORE AI ACTIONS ---
+    try {
+        const wpSnap = await pool.query('SELECT * FROM waypoints');
+        const tkSnap = await pool.query('SELECT * FROM tasks');
+        const scSnap = await pool.query('SELECT * FROM sections');
+        const fullSnap = { waypoints: wpSnap.rows, tasks: tkSnap.rows, sections: scSnap.rows };
+        await pool.query('INSERT INTO database_backups (table_name, data_json, metadata) VALUES ($1, $2, $3)', 
+            ['full_snapshot', JSON.stringify(fullSnap), 'Backup antes de: ' + finalPrompt.substring(0, 50)]);
+    } catch (snapErr) { console.error("Auto-snapshot failed:", snapErr); }
+
     // Fetch AI's permanent memory
     const memoryRes = await pool.query('SELECT memory_text FROM ai_memory WHERE id = 1');
     const longTermMemory = memoryRes.rows[0]?.memory_text || "No specific memories or guidelines saved yet.";
@@ -954,6 +988,7 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
           18. NAVIGATION: When calculating a route, always tell the user the total distance in kilometers and the estimated travel time in your response.
           19. PROJECT MANAGEMENT: You have full vision of the expedition database via [Expedition Days] and [Current Active Tasks]. If the user asks for a review or optimization, analyze every task, its responsible person, its location in 'map_data', and its 'starts_at' time to provide professional project management advice.
           20. Every task provided in [Current Active Tasks] contains a 'map_data' array. This array includes the database IDs (waypoint_id or track_id) for every location on the map. You DO NOT need a separate tool to scan waypoints; you must read the IDs directly from the 'map_data' provided in this context to perform updates or deletions.
+          21. RECUPERACIÓN DE DATOS. Si el usuario indica que has borrado información o cometido un error masivo, utiliza 'list_backups' para encontrar el snapshot anterior a tu acción y 'restore_from_backup' para revertir los cambios en la tabla afectada inmediatamente.
 
           [UI CONTEXT]: The user currently has Task ID ${activeTaskId} open and selected in their dashboard. If they say "this task" or "this waypoint," they are likely referring to this ID or its attached geometries.` 
         }
@@ -1283,6 +1318,30 @@ async function executeTool(name, args) {
             } catch (err) {
                 toolResult = "ERROR calling Mapbox Directions: " + err.message;
             }
+        }
+        else if (name === "list_backups") {
+            const res = await pool.query('SELECT id, backup_date, metadata FROM database_backups ORDER BY backup_date DESC LIMIT 10');
+            toolResult = res.rows.length > 0 ? `BACKUPS FOUND:\n${JSON.stringify(res.rows)}` : "No backups found.";
+        }
+        else if (name === "restore_from_backup") {
+            const res = await pool.query('SELECT data_json FROM database_backups WHERE id = $1', [args.backup_id]);
+            if (res.rows.length > 0) {
+                const snapshot = res.rows[0].data_json;
+                const tableData = snapshot[args.table_name];
+                if (tableData) {
+                    await pool.query('BEGIN');
+                    await pool.query(`TRUNCATE TABLE ${args.table_name} CASCADE`);
+                    for (const row of tableData) {
+                        const fields = Object.keys(row).join(', ');
+                        const placeholders = Object.keys(row).map((_, i) => `$${i + 1}`).join(', ');
+                        const values = Object.values(row);
+                        await pool.query(`INSERT INTO ${args.table_name} (${fields}) VALUES (${placeholders})`, values);
+                    }
+                    await pool.query('COMMIT');
+                    toolResult = `SUCCESS: Table ${args.table_name} restored from backup ${args.backup_id}.`;
+                    triggerMapRefresh();
+                } else { toolResult = `ERROR: No data for table ${args.table_name} in this backup.`; }
+            } else { toolResult = "ERROR: Backup not found."; }
         }
     } catch (err) {
         console.error(`[AI Tool Error] ${name}:`, err);
