@@ -319,7 +319,7 @@ app.post('/api/waypoints/audio', adminAuth, upload.single('file'), async (req, r
 
         // 1. Transcribe using Gemini
         const base64Audio = req.file.buffer.toString('base64');
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-3-flash-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
         const geminiRes = await axios.post(geminiUrl, {
             contents: [{
                 parts: [
@@ -376,7 +376,7 @@ app.post('/api/parse-media', adminAuth, upload.single('file'), async (req, res) 
 
         if (isAudio) {
             const base64Audio = req.file.buffer.toString('base64');
-            const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-3-flash-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
             const geminiRes = await axios.post(geminiUrl, {
                 contents: [{
                     parts: [
@@ -956,7 +956,7 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
         // --- GEMINI 1.5 PRO AGENT ---
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-pro",
+            model: "gemini-3.1-pro-preview",
             tools: [{ functionDeclarations: aiTools.map(t => t.function) }]
         });
 
@@ -1271,7 +1271,7 @@ app.post('/api/ai/audio-command', adminAuth, upload.single('file'), async (req, 
     try {
         // 1. Transcribe using Gemini
         const base64Audio = req.file.buffer.toString('base64');
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-3-flash-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
         const geminiRes = await axios.post(geminiUrl, {
             contents: [{
                 parts: [
