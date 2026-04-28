@@ -756,18 +756,18 @@
                                         id: kmLayerId,
                                         type: 'symbol',
                                         source: kmSourceId,
-                                        layout: {
-                                            'text-field': ['get', 'km'],
-                                            'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
-                                            'text-size': 9,
-                                            'text-allow-overlap': true,
-                                            'text-ignore-placement': true
-                                        },
-                                        paint: {
-                                            'text-color': '#ffffff',
-                                            'text-halo-color': '#0f172a',
-                                            'text-halo-width': 2
-                                        }
+                                    layout: {
+                                        'text-field': ['get', 'km'],
+                                        'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
+                                        'text-size': 14,
+                                        'text-allow-overlap': true,
+                                        'text-ignore-placement': true
+                                    },
+                                    paint: {
+                                        'text-color': '#ffffff',
+                                        'text-halo-color': '#0f172a',
+                                        'text-halo-width': 3
+                                    }
                                     });
                                 }
                             }
@@ -882,7 +882,21 @@
                 type: 'line',
                 data: {
                     labels: distances,
-                    datasets: [{ label: title, data: elevations, fill: true, tension: 0.4, borderColor: '#3498db', backgroundColor: 'rgba(52, 152, 219, 0.2)', pointRadius: 0 }]
+                    datasets: [{ 
+                        label: title, 
+                        data: elevations, 
+                        fill: true, 
+                        tension: 0.4, 
+                        borderColor: '#3498db', 
+                        backgroundColor: 'rgba(52, 152, 219, 0.2)', 
+                        pointRadius: 0,
+                        segment: {
+                            backgroundColor: ctx => {
+                                const km = Math.floor(distances[ctx.p1DataIndex]);
+                                return km % 2 === 0 ? 'rgba(52, 152, 219, 0.3)' : 'rgba(41, 128, 185, 0.5)';
+                            }
+                        }
+                    }]
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
@@ -905,16 +919,16 @@
                     scales: {
                         x: {
                             grid: {
-                                color: (c) => {
-                                    const label = distances[c.index];
-                                    return (label % 1 === 0) ? 'rgba(56, 189, 248, 0.8)' : 'rgba(0,0,0,0.05)';
-                                },
-                                lineWidth: (c) => {
-                                    const label = distances[c.index];
-                                    return (label % 1 === 0) ? 3 : 1;
-                                }
+                                color: (c) => (parseFloat(distances[c.index]) % 1 === 0 ? 'rgba(56, 189, 248, 0.8)' : 'rgba(0,0,0,0)'),
+                                lineWidth: (c) => (parseFloat(distances[c.index]) % 1 === 0 ? 3 : 0)
                             },
-                            ticks: { callback: function(val) { return (distances[val] % 1 === 0) ? distances[val] + 'km' : ''; } }
+                            ticks: { 
+                                font: { size: 12, weight: 'bold' },
+                                callback: function(val) { 
+                                    const d = distances[val];
+                                    return (parseFloat(d) % 1 === 0) ? d + 'km' : ''; 
+                                } 
+                            }
                         }
                     }
                 }

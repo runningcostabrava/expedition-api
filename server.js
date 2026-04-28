@@ -3,7 +3,7 @@ const cors = require('cors');
 const fs = require('fs');
 const os = require('os');
 const { OpenAI } = require('openai');
-const { search } = require('duck-duck-scrape');
+const { search, SafeSearchType } = require('duck-duck-scrape');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const deepseek = new OpenAI({
@@ -1090,7 +1090,7 @@ async function executeTool(name, args) {
             triggerMapRefresh();
         }
         else if (name === "search_internet") {
-            const searchResults = await search(args.query, { safeSearch: "off" });
+            const searchResults = await search(args.query, { safeSearch: SafeSearchType.OFF });
             const snippets = searchResults.results.slice(0, 5).map(r => r.description).join('\n\n');
             toolResult = snippets ? `WEB RESULTS FOUND:\n${snippets}` : "No results found on the web.";
         }
@@ -1994,72 +1994,32 @@ const server = app.listen(PORT, '0.0.0.0', () => console.log(`API online on port
 // --- GEMINI MULTIMODAL LIVE WEBSOCKET SERVER ---
 const wss = new WebSocketServer({ server, path: '/api/live-stream' });
 
-wss.on('connection', async (ws) => {
-    console.log('[Live AI] Client connected for real-time conversation');
-
+  wss.on('connection', async (ws) => {
+    if (!process.env.GEMINI_API_KEY) { ws.close(1011, "Missing API Key"); return; }
     try {
-        const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${process.env.GEMINI_API_KEY}`;
-        const googleWs = new (require('ws'))(url);
-
-        const sectionsRes = await pool.query('SELECT id, title, section_date FROM sections ORDER BY section_date ASC');
-        const tasksRes = await pool.query("SELECT id, task_name, starts_at, responsible FROM tasks WHERE is_completed = false LIMIT 50");
-
-        const setupMessage = {
-            setup: {
-                model: "models/gemini-2.0-flash-exp",
-                generation_config: {
-                    response_modalities: ["AUDIO"],
-                    speech_config: { voice_config: { prebuilt_voice_config: { voice_name: "Puck" } } }
-                },
-                system_instruction: {
-                    parts: [{
-                        text: `You are a human-like voice assistant for the Expedition dashboard. 
-                        Identify the user's language (Spanish, English, Italian) and respond in that same language immediately. 
-                        Speak naturally and concisely. Keep audio responses under 15 seconds for field stability.
-                        Current Context: Sections: ${JSON.stringify(sectionsRes.rows)}. Active Tasks: ${JSON.stringify(tasksRes.rows)}.`
-                    }]
-                }
-            }
-        };
-
+        const WebSocket = require('ws');
+        const googleWs = new WebSocket(`wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${process.env.GEMINI_API_KEY}`);
         googleWs.on('open', () => {
-            googleWs.send(JSON.stringify(setupMessage));
+            googleWs.send(JSON.stringify({
+                setup: {
+                    model: "models/gemini-2.0-flash-exp",
+                    generation_config: { response_modalities: ["AUDIO"], speech_config: { voice_config: { prebuilt_voice_config: { voice_name: "Puck" } } } }
+                }
+            }));
         });
-
         googleWs.on('message', (data) => {
-            const response = JSON.parse(data);
-            if (response.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data) {
-                const audioBase64 = response.serverContent.modelTurn.parts[0].inlineData.data;
-                if (ws.readyState === 1) ws.send(Buffer.from(audioBase64, 'base64'));
+            const resp = JSON.parse(data);
+            if (resp.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data) {
+                if (ws.readyState === 1) ws.send(Buffer.from(resp.serverContent.modelTurn.parts[0].inlineData.data, 'base64'));
             }
         });
-
         ws.on('message', (data) => {
             if (googleWs.readyState === 1) {
-                // Ensure data is converted to a proper base64 string for the proxy
-                const base64Data = Buffer.isBuffer(data) ? data.toString("base64") : Buffer.from(data).toString("base64");
-                const bidiMessage = {
-                    realtime_input: {
-                        media_chunks: [{
-                            mime_type: "audio/pcm;rate=16000",
-                            data: base64Data
-                        }]
-                    }
-                };
-                googleWs.send(JSON.stringify(bidiMessage));
+                const b64 = Buffer.isBuffer(data) ? data.toString("base64") : Buffer.from(data).toString("base64");
+                googleWs.send(JSON.stringify({ realtime_input: { media_chunks: [{ mime_type: "audio/pcm;rate=16000", data: b64 }] } }));
             }
         });
-
         googleWs.on('close', () => ws.close());
         ws.on('close', () => googleWs.close());
-
-        ws.on('close', () => {
-            console.log('[Live AI] Client disconnected');
-            // Cleanup Gemini session if necessary
-        });
-
-    } catch (err) {
-        console.error("[Live AI Error]:", err);
-        ws.close();
-    }
-});
+    } catch (e) { ws.close(); }
+  });

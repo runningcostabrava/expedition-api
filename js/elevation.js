@@ -100,7 +100,8 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                     fill: true,
                     tension: 0.4,
                     borderColor: '#3498db',
-                    backgroundColor: 'rgba(52, 152, 219, 0.2)'
+                    backgroundColor: 'rgba(52, 152, 219, 0.2)',
+                    segment: { backgroundColor: ctx => (Math.floor(distances[ctx.p1DataIndex]) % 2 === 0 ? 'rgba(52, 152, 219, 0.3)' : 'rgba(41, 128, 185, 0.5)') }
                 }
             ]
         },
@@ -172,11 +173,8 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
             scales: {
                 y: { beginAtZero: false, ticks: { color: '#000', font: { weight: 'bold' } } },
                 x: { 
-                    ticks: { color: '#000', font: { weight: 'bold' } },
-                    grid: { 
-                        color: (c) => (c.tick && c.tick.value % 1 === 0 ? 'rgba(56, 189, 248, 0.5)' : 'rgba(0,0,0,0.05)'),
-                        lineWidth: (c) => (c.tick && c.tick.value % 1 === 0 ? 2 : 1)
-                    }
+                    grid: { color: (c) => (parseFloat(distances[c.index]) % 1 === 0 ? 'rgba(56, 189, 248, 0.8)' : 'rgba(0,0,0,0)'), lineWidth: (c) => (parseFloat(distances[c.index]) % 1 === 0 ? 3 : 0) },
+                    ticks: { font: { size: 12, weight: 'bold' }, color: '#000' }
                 }
             }
         }
