@@ -1233,22 +1233,25 @@
                         const isPhotoSpot = renderIcon === 'ph-camera';
                         const iconHtml = window.getSafeIconHtml(renderIcon, 'ph-map-pin', true);
                         
-                        // Shorten title for the label
-                        const shortName = (geom.title || '').includes('-') ? geom.title.split('-')[1].substring(0, 5) : (geom.title || '').substring(0, 5);
+                        // 1. Update the shortName extraction to be more aggressive
+                        const shortName = (geom.title || '').includes('-') ? (geom.title.split('-')[1].trim().split(' ')[0]) : (geom.title || '').substring(0, 5);
+
+                        // 2. Add logic to decide between showing an icon or text inside the circle
+                        const showNumber = (geom.title && geom.title.match(/[Ww]\d+-\d+/));
+                        const pinContent = showNumber ? `<span style="font-weight:900; font-size:11px; color:white;">${shortName}</span>` : iconHtml;
 
                         el.innerHTML = `
                             <div style="background-color: ${isPhotoSpot ? '#ef4444' : markerColor}; 
                                         border-radius: 50%; width: 28px; height: 28px; 
                                         display: flex; justify-content: center; align-items: center; 
                                         border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); 
-                                        font-size: 14px; transform: ${isPhotoSpot ? 'scale(1.2)' : 'scale(1)'};">
-                                ${iconHtml}
+                                        font-size: 14px; color: white; transform: ${isPhotoSpot ? 'scale(1.2)' : 'scale(1)'};">
+                                ${pinContent}
                             </div>
                             <div style="width: 0; height: 0; border-left: 6px solid transparent; 
                                         border-right: 6px solid transparent; 
                                         border-top: 8px solid ${isPhotoSpot ? '#ef4444' : markerColor}; 
                                         margin: -1px auto 0;"></div>
-                            <div class="pin-label">${shortName}</div>
                         `;
                         el.style.cursor = 'pointer';
 
