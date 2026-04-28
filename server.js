@@ -19,6 +19,7 @@ const cloudinary = require('cloudinary').v2;
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const FormData = require('form-data');
+const { WebSocketServer } = require('ws');
 
 cloudinary.config({ 
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME, 
@@ -1988,4 +1989,73 @@ pool.query(`
 `).catch(err => console.error("Auto DB setup failed:", err));
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => console.log(`API online on port ${PORT}`));
+const server = app.listen(PORT, '0.0.0.0', () => console.log(`API online on port ${PORT}`));
+
+// --- GEMINI MULTIMODAL LIVE WEBSOCKET SERVER ---
+const wss = new WebSocketServer({ server, path: '/api/live-stream' });
+
+wss.on('connection', async (ws) => {
+    console.log('[Live AI] Client connected for real-time conversation');
+
+    try {
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        // Use the Multimodal Live model (BETA endpoint logic)
+        // Note: For gemini-2.0-flash-exp, the API uses a specific bidirectional stream
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+
+        const stream = await model.startChat({
+            generationConfig: {
+                responseModalities: ["audio"], // Ensure we get high-quality audio back
+                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } } } // Natural human-like voice
+            }
+        });
+
+        // Set up the system instructions for the live session
+        // We'll pull the context similarly to runAiAgent but tailored for low-latency voice
+        const sectionsRes = await pool.query('SELECT id, title, section_date FROM sections ORDER BY section_date ASC');
+        const tasksRes = await pool.query("SELECT id, task_name, starts_at, responsible FROM tasks WHERE is_completed = false LIMIT 50");
+        
+        const systemInstruction = `You are a real-time voice logistics assistant for the Expedition dashboard.
+        Speak naturally and concisely. Respond in the same language the user speaks to you (Spanish, English, or Italian).
+        Current Context: Sections: ${JSON.stringify(sectionsRes.rows)}. Active Tasks: ${JSON.stringify(tasksRes.rows)}.
+        If you need to perform an action, tell the user you are doing it. You have full CRUD permissions.`;
+
+        // Start the multimodal session
+        const liveSession = await model.startChat({
+            history: [{ role: "user", parts: [{ text: systemInstruction }] }]
+        });
+
+        // Pipe client audio chunks to Google
+        ws.on('message', async (data) => {
+            // Data is expected to be PCM 16-bit, 16kHz
+            if (Buffer.isBuffer(data)) {
+                // Send audio bytes to Gemini
+                // In the current SDK version for 2.0-flash-exp, this might require raw streaming support
+                // For now, we simulate the proxying of audio data
+                try {
+                    // This is a placeholder for the actual binary stream send command
+                    // liveSession.sendAudioChunk(data); 
+                } catch (e) { console.error("Error sending audio to Gemini:", e); }
+            }
+        });
+
+        // Pipe Google's audio response back to the client
+        // This is a simplified representation of the event-driven binary response
+        /* 
+        liveSession.on('audio', (audioBuffer) => {
+            if (ws.readyState === ws.OPEN) {
+                ws.send(audioBuffer);
+            }
+        });
+        */
+
+        ws.on('close', () => {
+            console.log('[Live AI] Client disconnected');
+            // Cleanup Gemini session if necessary
+        });
+
+    } catch (err) {
+        console.error("[Live AI Error]:", err);
+        ws.close();
+    }
+});

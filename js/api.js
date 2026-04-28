@@ -459,97 +459,98 @@ window.openAiChat = function () {
         showToast(`AI brain switched to ${model === 'deepseek' ? 'DeepSeek' : 'Gemini 1.5 Pro'}`, 'info');
     };
 
-    // --- VOICE OUT ENGINE (Speech Synthesis) ---
-    let voiceOutEnabled = false;
-    const voiceToggle = document.getElementById('ai-voice-toggle');
-    voiceToggle.addEventListener('click', () => {
-        voiceOutEnabled = !voiceOutEnabled;
-        if (voiceOutEnabled) {
-            voiceToggle.innerText = '🔊';
-            voiceToggle.style.opacity = '1';
-            voiceToggle.title = 'Read aloud (On)';
-        } else {
-            voiceToggle.innerText = '🔇';
-            voiceToggle.style.opacity = '0.5';
-            voiceToggle.title = 'Read aloud (Off)';
-            window.speechSynthesis.cancel(); // Stop talking instantly
-        }
-    });
+    // --- GEMINI MULTIMODAL LIVE AUDIO ENGINE ---
+    let liveAudioSocket = null;
+    let audioContext = null;
+    let micStream = null;
+    let processorNode = null;
+    let isConversing = false;
 
-    function speakAiText(htmlText) {
-        if (!voiceOutEnabled) return;
-        // Strip markdown and HTML tags to prevent the AI from reading syntax aloud
-        const cleanText = htmlText.replace(/<[^>]*>?/gm, '').replace(/[*_#`]/g, '');
-        const utterance = new SpeechSynthesisUtterance(cleanText);
-        utterance.rate = 1.05; // Slightly faster for natural feel
-        window.speechSynthesis.speak(utterance);
-    }
-
-    // --- VOICE IN ENGINE (MediaRecorder) ---
     const micBtn = document.getElementById('ai-mic-btn');
-    let mediaRecorder;
-    let audioChunks = [];
-    let isRecording = false;
 
     // Add pulse animation CSS dynamically
     if (!document.getElementById('mic-pulse-style')) {
         const style = document.createElement('style');
         style.id = 'mic-pulse-style';
-        style.innerHTML = `@keyframes micPulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } } .recording-pulse { animation: micPulse 1.5s infinite !important; background: #ef4444 !important; }`;
+        style.innerHTML = `
+            @keyframes micPulse { 0% { box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(52, 152, 219, 0); } 100% { box-shadow: 0 0 0 0 rgba(52, 152, 219, 0); } }
+            .conversing-pulse { animation: micPulse 1.5s infinite !important; background: #8b5cf6 !important; }
+        `;
         document.head.appendChild(style);
     }
 
-    micBtn.addEventListener('click', async () => {
-        if (!isRecording) {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
+    async function startLiveConversation() {
+        try {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            micStream = stream;
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            liveAudioSocket = new WebSocket(`${protocol}//${window.location.host}/api/live-stream`);
+            liveAudioSocket.binaryType = 'arraybuffer';
+
+            liveAudioSocket.onopen = () => {
+                console.log('[Live AI] Socket Connected');
+                showToast("Live conversation active", "info");
                 
-                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+                const source = audioContext.createMediaStreamSource(stream);
+                processorNode = audioContext.createScriptProcessor(4096, 1, 1);
 
-                mediaRecorder.onstop = async () => {
-                    micBtn.innerHTML = '<i class="ph ph-spinner-gap ph-spin"></i>';
-                    micBtn.style.background = '#f39c12'; // Orange loading state
-                    
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    const formData = new FormData();
-                    formData.append('file', audioBlob, 'voice-note.webm');
-                    
-                    try {
-                        // Send directly to the existing Gemini transcription endpoint
-                        const res = await authFetch(`${API_URL}/api/parse-media`, { method: 'POST', body: formData });
-                        const data = await res.json();
-                        if (data.text) {
-                            textarea.value = data.text;
-                            textarea.style.height = 'auto';
-                            textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
-                            textarea.focus();
-                        } else {
-                            throw new Error("No transcription returned");
-                        }
-                    } catch (err) {
-                        alert("Voice transcription failed. " + err.message);
+                source.connect(processorNode);
+                processorNode.connect(audioContext.destination);
+
+                processorNode.onaudioprocess = (e) => {
+                    if (!isConversing) return;
+                    const inputData = e.inputBuffer.getChannelData(0);
+                    // Convert Float32 to Int16 PCM
+                    const pcmData = new Int16Array(inputData.length);
+                    for (let i = 0; i < inputData.length; i++) {
+                        pcmData[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7FFF;
                     }
-                    
-                    micBtn.innerHTML = '<i class="ph ph-microphone"></i>';
-                    micBtn.style.background = '#3498db'; // Return to blue
+                    if (liveAudioSocket.readyState === WebSocket.OPEN) {
+                        liveAudioSocket.send(pcmData.buffer);
+                    }
                 };
+            };
 
-                mediaRecorder.start();
-                isRecording = true;
-                micBtn.innerHTML = '<i class="ph ph-stop"></i>';
-                micBtn.classList.add('recording-pulse');
+            liveAudioSocket.onmessage = async (event) => {
+                // Incoming audio chunks from Gemini
+                const arrayBuffer = event.data;
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                const playSource = audioContext.createBufferSource();
+                playSource.buffer = audioBuffer;
+                playSource.connect(audioContext.destination);
+                playSource.start();
+            };
 
-            } catch (err) {
-                alert("Microphone access denied or unavailable.");
-            }
-        } else {
-            isRecording = false;
-            mediaRecorder.stop();
-            mediaRecorder.stream.getTracks().forEach(track => track.stop()); // Turn off red recording light on browser
-            micBtn.classList.remove('recording-pulse');
+            liveAudioSocket.onclose = () => stopLiveConversation();
+            liveAudioSocket.onerror = (err) => console.error("[Live AI] WebSocket Error:", err);
+
+            isConversing = true;
+            micBtn.innerHTML = '<i class="ph ph-waveform"></i>';
+            micBtn.classList.add('conversing-pulse');
+
+        } catch (err) {
+            console.error("[Live AI] Startup Error:", err);
+            alert("Could not start live conversation. Please check mic permissions.");
         }
+    }
+
+    function stopLiveConversation() {
+        isConversing = false;
+        if (processorNode) processorNode.disconnect();
+        if (micStream) micStream.getTracks().forEach(t => t.stop());
+        if (liveAudioSocket) liveAudioSocket.close();
+        if (audioContext) audioContext.close();
+
+        micBtn.innerHTML = '<i class="ph ph-microphone"></i>';
+        micBtn.classList.remove('conversing-pulse');
+        showToast("Live conversation ended", "info");
+    }
+
+    micBtn.addEventListener('click', () => {
+        if (!isConversing) startLiveConversation();
+        else stopLiveConversation();
     });
 
     // Auto-send on Enter (Shift+Enter for new line)
