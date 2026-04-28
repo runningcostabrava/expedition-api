@@ -1241,115 +1241,6 @@ async function executeTool(name, args) {
     return toolResult;
 }
 
-// Map the rest of the file
-const restOfFileStart = `
-app.post('/api/ai/command', adminAuth, async (req, res) => {
-`;
-            let toolResult = "";
-
-            try {
-                if (name === "create_task") {
-                    const result = await pool.query(
-                        'INSERT INTO tasks (task_name, section_id, starts_at, responsible, characteristics, is_milestone) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
-                        [args.task_name, args.section_id || null, args.starts_at || null, args.responsible || null, args.characteristics || null, args.is_milestone || false]
-                    );
-                    toolResult = `SUCCESS: Task created with ID ${result.rows[0].id}`;
-                }
-                else if (name === "update_task") {
-                    const fields = Object.keys(args.updates).map((key, i) => `${key} = $${i + 2}`).join(', ');
-                    const values = Object.values(args.updates);
-                    await pool.query(`UPDATE tasks SET ${fields} WHERE id = $1`, [args.id, ...values]);
-                    toolResult = `SUCCESS: Task ${args.id} updated.`;
-                }
-                else if (name === "search_internet") {
-                    const searchResults = await search(args.query, { safeSearch: "off" });
-                    const snippets = searchResults.results.slice(0, 5).map(r => r.description).join('\n\n');
-                    toolResult = snippets ? `WEB RESULTS FOUND:\n${snippets}` : "No results found on the web.";
-                }
-                else if (name === "update_core_memory") {
-                    await pool.query('UPDATE ai_memory SET memory_text = $1 WHERE id = 1', [args.new_memory_text]);
-                    toolResult = `SUCCESS: Permanent memory updated.`;
-                }
-                else if (name === "create_section") {
-                    const res = await pool.query(
-                        'INSERT INTO sections (title, section_date, description) VALUES ($1, $2, $3) RETURNING id',
-                        [args.title, args.section_date || null, args.description || null]
-                    );
-                    toolResult = `SUCCESS: Section created with ID ${res.rows[0].id}`;
-                }
-                else if (name === "create_category") {
-                    const res = await pool.query(
-                        'INSERT INTO categories (name, color, icon, line_type) VALUES ($1, $2, $3, $4) RETURNING id',
-                        [args.name, args.color || '#3498db', args.icon || 'ph-map-pin', args.line_type || 'solid']
-                    );
-                    toolResult = `SUCCESS: Category created with ID ${res.rows[0].id}`;
-                }
-                else if (name === "create_task_type") {
-                    const res = await pool.query(
-                        'INSERT INTO task_types (name, color, icon) VALUES ($1, $2, $3) RETURNING id',
-                        [args.name, args.color || '#95a5a6', args.icon || 'ph-tag']
-                    );
-                    toolResult = `SUCCESS: Task type created with ID ${res.rows[0].id}`;
-                }
-                else if (name === "search_nearby_places") {
-                    try {
-                        const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN;
-                        const searchUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(args.query + ' ' + args.location_context)}.json?access_token=${mapboxToken}&limit=5`;
-                        const response = await axios.get(searchUrl);
-                        const results = response.data.features.map(f => ({ name: f.text, address: f.place_name, coordinates: f.center }));
-                        toolResult = JSON.stringify(results);
-                    } catch (err) { toolResult = "Error: " + err.message; }
-                }
-                else if (name === "create_contact") {
-                    const res = await pool.query(
-                        'INSERT INTO contacts (name, contact_type, phone, email, notes) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-                        [args.name, args.contact_type || 'Staff', args.phone, args.email, args.notes]
-                    );
-                    toolResult = `SUCCESS: Contact created with ID ${res.rows[0].id}.`;
-                }
-                else if (name === "search_directory") {
-                    const searchQuery = `%${args.query}%`;
-                    const res = await pool.query(
-                        'SELECT id, name, contact_type, phone FROM contacts WHERE name ILIKE $1 OR contact_type ILIKE $1 LIMIT 5',
-                        [searchQuery]
-                    );
-                    toolResult = res.rows.length > 0 ? `FOUND CONTACTS:\n${JSON.stringify(res.rows)}` : `No contacts found.`;
-                }
-                else if (name === "link_contact_to_waypoint") {
-                    await pool.query(
-                        'INSERT INTO waypoint_contacts (waypoint_id, contact_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-                        [args.waypoint_id, args.contact_id]
-                    );
-                    toolResult = `SUCCESS: Linked contact to waypoint.`;
-                }
-                else if (name === "highlight_task_in_ui") {
-                    pendingUiAction = { type: 'focus_task', taskId: args.task_id };
-                    toolResult = `SUCCESS: UI told to highlight task.`;
-                }
-                else if (name === "create_waypoint") {
-                    const wpRes = await pool.query(
-                        'INSERT INTO waypoints (title, lat, lng, description, icon, color) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
-                        [args.title, args.lat, args.lng, args.description || '', args.icon || 'ph-map-pin', args.color || '#3498db']
-                    );
-                    const newWpId = wpRes.rows[0].id;
-                    const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, waypoint_id) VALUES ($1, $2) RETURNING id', ['point', newWpId]);
-                    if (args.existing_task_id) {
-                        await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [args.existing_task_id, anchorRes.rows[0].id]);
-                    }
-                    toolResult = `SUCCESS: Waypoint created with ID ${newWpId}.`;
-                }
-            } catch (err) {
-                console.error(`[AI Tool Error] ${name}:`, err);
-                toolResult = `ERROR executing ${name}: ${err.message}`;
-            }
-
-            messages.push({ role: "tool", tool_call_id: toolCall.id, content: toolResult });
-        }
-    }
-
-    return { success: true, message: finalResponseText, uiAction: pendingUiAction };
-}
-
 app.post('/api/ai/command', adminAuth, async (req, res) => {
     const { prompt, imageUrl, history = [], model = 'deepseek', activeTaskId = null } = req.body;
     if (!prompt && !imageUrl) return res.status(400).json({ error: "Prompt or Image is required" });
@@ -1380,7 +1271,7 @@ app.post('/api/ai/audio-command', adminAuth, upload.single('file'), async (req, 
     try {
         // 1. Transcribe using Gemini
         const base64Audio = req.file.buffer.toString('base64');
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
         const geminiRes = await axios.post(geminiUrl, {
             contents: [{
                 parts: [
