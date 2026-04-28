@@ -229,6 +229,18 @@
                 opacity: 1;
             }
         }
+
+        @keyframes pulse-sync {
+            from {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7);
+            }
+
+            to {
+                transform: scale(1.15);
+                box-shadow: 0 0 0 10px rgba(231, 76, 60, 0);
+            }
+        }
     </style>
 </head>
 
@@ -249,8 +261,6 @@
 
     <div
         style="position: absolute; top: 150px; right: 15px; display: flex; flex-direction: column; gap: 8px; z-index: 100;">
-        <button class="fab-fleet" style="position: static; width: 36px; height: 36px; background: #8b5cf6;"
-            onclick="processAiCommand()"><i class="ph ph-robot"></i></button>
         <button class="fab-pin" style="position: static; width: 36px; height: 36px; margin: 0;"
             onclick="enableDropPinMode()"><i class="ph ph-map-pin"></i></button>
         <button class="fab-fleet" style="position: static; width: 36px; height: 36px; margin: 0;"
@@ -343,13 +353,11 @@
     </div>
 
     <!-- Quick Capture Floating Bar -->
-    <div id="quick-capture-bar"
-        style="position: fixed; bottom: 90px; left: 15px; display: flex; flex-direction: column; gap: 12px; z-index: 99999;">
+    <div id="quick-capture-bar" style="position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: row; gap: 15px; z-index: 99999; background: rgba(15, 23, 42, 0.8); padding: 10px 20px; border-radius: 50px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
         <button onclick="quickPin()" class="qc-btn" style="background: #3498db;" title="Quick Pin">📍</button>
-        <button onclick="document.getElementById('photo-input').click()" class="qc-btn" style="background: #e67e22;"
-            title="Photo Pin">📷</button>
-        <button onclick="document.getElementById('audio-input').click()" class="qc-btn" style="background: #9b59b6;"
-            title="Audio AI Pin">🎙️</button>
+        <button onclick="document.getElementById('photo-input').click()" class="qc-btn" style="background: #e67e22;" title="Photo Pin">📷</button>
+        <button onclick="document.getElementById('audio-input').click()" class="qc-btn" style="background: #9b59b6;" title="Audio AI Pin">🎙️</button>
+        <button onclick="processAiCommand()" class="qc-btn" style="background: #ef4444;" title="AI Chat">🤖</button>
     </div>
     <input type="file" id="photo-input" accept="image/*" capture="environment" style="display: none;"
         onchange="handlePhoto(this)">
@@ -474,6 +482,21 @@
                 }
 
                 OfflineManager.init(map);
+
+                // Modern Push Architecture: Listen for Server-Sent Events
+                const syncStream = new EventSource(`${API_URL}/api/live-sync`);
+
+                syncStream.onmessage = function (event) {
+                    if (event.data === 'refresh') {
+                        console.log("📡 Server pushed an update. Refreshing map...");
+                        const activeSection = document.getElementById('day-selector').value || 'all';
+                        if (typeof loadDayTracks === 'function') loadDayTracks(activeSection, true);
+                    }
+                };
+
+                syncStream.onerror = function () {
+                    console.warn("📡 Live sync stream disconnected. Reconnecting in background...");
+                };
             });
         }
 
@@ -672,14 +695,14 @@
             navigator.serviceWorker.register('/sw.js').then(() => console.log("Offline mode ready."));
         }
 
-        async function loadDayTracks(sectionId) {
+        async function loadDayTracks(sectionId, isSilent = false) {
             // 1. Clean up existing layers
-            if (map.getLayer('daily-route')) map.removeLayer('daily-route');
-            if (map.getSource('daily-route')) map.removeSource('daily-route');
-
-            // 2. SELECTIVE CLEANUP: Remove only itinerary markers, NOT guide markers
-            itineraryMarkers.forEach(m => m.remove());
-            itineraryMarkers = [];
+            if (!isSilent) {
+                if (map.getLayer('daily-route')) map.removeLayer('daily-route');
+                if (map.getSource('daily-route')) map.removeSource('daily-route');
+                itineraryMarkers.forEach(m => m.remove());
+                itineraryMarkers = [];
+            }
 
             const url = sectionId === 'all' ? `${API_URL}/itinerary` : `${API_URL}/itinerary?section_id=${sectionId}`;
             const res = await fetch(url);
@@ -687,6 +710,9 @@
 
             let features = [];
             let boundsFeatures = []; // Used specifically for centering the map
+
+            // Create a set of existing marker IDs to prevent stacking
+            const currentMarkerKeys = new Set(itineraryMarkers.map(m => `${m.getLngLat().lng.toFixed(6)},${m.getLngLat().lat.toFixed(6)}`));
 
             tasks.forEach(task => {
                 if (task.geometries) task.geometries.forEach(g => {
@@ -714,13 +740,17 @@
                             </div>
                         `;
 
-                        // NEW: Save the marker to the array so we can delete it later without touching guides
-                        const marker = new mapboxgl.Marker({ element: el })
-                            .setLngLat([g.lng, g.lat])
-                            .setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML(popupHtml))
-                            .addTo(map);
+                        // PREVENT STACKING: Only add if coordinates don't already have a marker
+                        const key = `${parseFloat(g.lng).toFixed(6)},${parseFloat(g.lat).toFixed(6)}`;
+                        if (!currentMarkerKeys.has(key)) {
+                            const marker = new mapboxgl.Marker({ element: el })
+                                .setLngLat([g.lng, g.lat])
+                                .setPopup(new mapboxgl.Popup({ offset: 10 }).setHTML(popupHtml))
+                                .addTo(map);
 
-                        itineraryMarkers.push(marker);
+                            itineraryMarkers.push(marker);
+                            currentMarkerKeys.add(key);
+                        }
                     }
                 });
             });
@@ -838,6 +868,17 @@
             });
         }
 
+        // Global variables for live sync
+        let syncPollingInterval = null;
+        let lastSyncTimestamp = 0;
+
+        window.dropTempPin = function (lat, lng, icon, color) {
+            const el = document.createElement('div');
+            el.innerHTML = `<div style="background:${color}; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; border:2px solid white; animation: pulse-sync 1s infinite; font-size:12px;">${window.getSafeIconHtml(icon, 'ph-map-pin', true)}</div>`;
+            const marker = new mapboxgl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+            itineraryMarkers.push(marker); // Add to array so it cleans up on next load
+        };
+
         async function quickPin() {
             try {
                 const urlParams = new URLSearchParams(window.location.search);
@@ -845,10 +886,15 @@
 
                 showToast("🛰️ Fetching GPS...");
                 const pos = await getGPS();
+                const jitterLat = pos.coords.latitude + ((Math.random() - 0.5) * 0.00005);
+                const jitterLng = pos.coords.longitude + ((Math.random() - 0.5) * 0.00005);
+
+                dropTempPin(jitterLat, jitterLng, 'ph-map-pin', '#3498db');
+
                 const payload = {
                     title: "Quick Pin",
-                    lat: pos.coords.latitude,
-                    lng: pos.coords.longitude,
+                    lat: jitterLat,
+                    lng: jitterLng,
                     icon: 'ph-map-pin',
                     color: '#3498db'
                 };
@@ -860,7 +906,7 @@
                     body: JSON.stringify(payload)
                 });
                 showToast("📍 Pin Dropped!", "success");
-                if (typeof loadDayTracks === 'function') loadDayTracks(document.getElementById('day-selector').value || 'all');
+                // The silent polling will catch the real database version soon
             } catch (err) {
                 showToast("❌ GPS Denied: " + err.message, "error");
             }
@@ -875,11 +921,15 @@
 
                 showToast("📸 Processing Photo...");
                 const pos = await getGPS();
+                const jitterLat = pos.coords.latitude + ((Math.random() - 0.5) * 0.00005);
+                const jitterLng = pos.coords.longitude + ((Math.random() - 0.5) * 0.00005);
+
+                dropTempPin(jitterLat, jitterLng, 'ph-camera', '#e67e22');
 
                 const formData = new FormData();
                 formData.append('file', file);
-                formData.append('lat', pos.coords.latitude);
-                formData.append('lng', pos.coords.longitude);
+                formData.append('lat', jitterLat);
+                formData.append('lng', jitterLng);
                 formData.append('title', "Photo Waypoint");
                 formData.append('icon', 'ph-camera');
                 formData.append('color', '#e67e22');
@@ -895,7 +945,6 @@
                 if (!data.photo_url && !data.offline_queued) throw new Error("Cloudinary failed to return an image URL.");
 
                 showToast("📷 Photo Saved!", "success");
-                if (typeof loadDayTracks === 'function') loadDayTracks(document.getElementById('day-selector').value || 'all');
                 input.value = "";
             } catch (err) {
                 showToast("❌ Error: " + err.message, "error");
@@ -912,13 +961,16 @@
 
                 showToast("🎙️ Processing Audio AI Command...");
                 const pos = await getGPS();
-                const { latitude, longitude } = pos.coords;
+                const jitterLat = pos.coords.latitude + ((Math.random() - 0.5) * 0.00005);
+                const jitterLng = pos.coords.longitude + ((Math.random() - 0.5) * 0.00005);
+
+                dropTempPin(jitterLat, jitterLng, 'ph-microphone', '#9b59b6');
 
                 const formData = new FormData();
                 formData.append('file', file);
-                formData.append('lat', latitude);
-                formData.append('lng', longitude);
-                if (activeTaskId) formData.append('activeTaskId', activeTaskId);
+                formData.append('lat', jitterLat);
+                formData.append('lng', jitterLng);
+                if (activeTaskId) formData.append('existing_task_id', activeTaskId);
 
                 await authFetch(`${API_URL}/api/ai/audio-command`, {
                     method: 'POST',

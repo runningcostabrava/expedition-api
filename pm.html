@@ -568,7 +568,7 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
                     if (g.loss) stats += `▼ ${Math.abs(parseFloat(g.loss)).toFixed(0)}m`;
 
                     geometryHtml += `
-                        <div style="background: #f8fafc; padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0;">
+                        <div onclick="window.location.href='field.html?task_id=${task.task_id}'; event.stopPropagation();" style="background: #f8fafc; padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#f8fafc'">
                             <div style="min-width: 0; flex: 1;">
                                 <div style="font-weight: 600; font-size: 0.9em; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                                     ${icon} ${g.title || 'Unnamed Location'}

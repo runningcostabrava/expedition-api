@@ -66,6 +66,73 @@ async function authFetch(url, options = {}) {
     return response;
 }
 
+window.handleBatchPhotoImport = async function (input) {
+    const files = input.files;
+    const taskId = typeof AppStore !== 'undefined' ? AppStore.get('activeTaskId') : null;
+    if (!files || files.length === 0 || !taskId) return;
+
+    let successCount = 0;
+    let noGpsCount = 0;
+
+    const btn = document.querySelector('button[onclick*="batch-photo-input"]');
+    const origText = btn ? btn.innerText : '📸 Batch Import GPS Photos';
+    if (btn) btn.disabled = true;
+
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        try {
+            if (btn) btn.innerText = `⏳ Extracting GPS ${i + 1}/${files.length}...`;
+
+            // 1. Extract GPS natively
+            const gps = await exifr.gps(file);
+            if (!gps || !gps.latitude || !gps.longitude) {
+                noGpsCount++;
+                continue; // Skip photos without location data
+            }
+
+            if (btn) btn.innerText = `⏳ Uploading ${i + 1}/${files.length}...`;
+
+            // 2. Upload to Cloudinary
+            const formData = new FormData();
+            formData.append('file', file);
+            const upRes = await authFetch(`${API_URL}/api/upload`, { method: 'POST', body: formData });
+            const upData = await upRes.json();
+            if (!upData.secure_url) throw new Error("Cloudinary upload failed");
+
+            // 3. Create and Link Waypoint
+            const wpPayload = {
+                title: file.name.split('.')[0] || "Imported Photo",
+                lat: gps.latitude,
+                lng: gps.longitude,
+                photo_url: upData.secure_url,
+                icon: 'ph-camera',
+                color: '#e67e22',
+                existing_task_id: taskId
+            };
+            await authFetch(`${API_URL}/waypoints`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(wpPayload)
+            });
+            successCount++;
+        } catch (e) {
+            console.error("Failed to import photo:", file.name, e);
+        }
+    }
+
+    input.value = ''; // Reset input
+    if (btn) { btn.innerText = origText; btn.disabled = false; }
+
+    alert(`Batch Import Complete!\n✅ ${successCount} Photos mapped and linked.\n⚠️ ${noGpsCount} Photos skipped (No GPS data found).`);
+
+    // Force a hard refresh of the data and re-open the panel
+    if (typeof refreshData === 'function') await refreshData();
+    if (typeof AppStore !== 'undefined' && typeof openTaskDetailPanel === 'function') {
+        const task = AppStore.get('itinerary').find(t => t.task_id === taskId);
+        if (task) openTaskDetailPanel(task);
+    }
+};
+
 async function refreshData() {
     // 1. Capture the currently open section before refreshing
     const openContent = document.querySelector('.section-content:not(.collapsed)');

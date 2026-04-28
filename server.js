@@ -28,6 +28,31 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const app = express();
 app.use(cors());
+
+let sseClients = [];
+
+app.get('/api/live-sync', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    sseClients.push(res);
+
+    req.on('close', () => {
+        sseClients = sseClients.filter(c => c !== res);
+    });
+});
+
+// Heartbeat to keep connections alive on Render (prevents 100s timeout)
+setInterval(() => {
+    sseClients.forEach(res => res.write(': heartbeat\n\n'));
+}, 25000);
+
+function triggerMapRefresh() {
+    sseClients.forEach(res => res.write('data: refresh\n\n'));
+}
+
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true })); // <--- 🚨 ADD THIS CRITICAL LINE 🚨
 
@@ -218,10 +243,29 @@ app.post('/api/upload', adminAuth, upload.single('file'), (req, res) => {
   }
 });
 
+async function getOrCreateFallbackTask() {
+    let secRes = await pool.query("SELECT id FROM sections WHERE title = '🛟 Recovered Items'");
+    let secId;
+    if (secRes.rows.length === 0) {
+        const today = new Date().toISOString().split('T')[0];
+        const newSec = await pool.query("INSERT INTO sections (title, section_date) VALUES ($1, $2) RETURNING id", ['🛟 Recovered Items', today]);
+        secId = newSec.rows[0].id;
+    } else {
+        secId = secRes.rows[0].id;
+    }
+
+    let taskRes = await pool.query("SELECT id FROM tasks WHERE task_name = 'Unassigned task' AND section_id = $1", [secId]);
+    if (taskRes.rows.length === 0) {
+        const newTask = await pool.query("INSERT INTO tasks (task_name, section_id, characteristics) VALUES ($1, $2, $3) RETURNING id", ['Unassigned task', secId, 'Auto-generated task for unlinked field data.']);
+        return newTask.rows[0].id;
+    }
+    return taskRes.rows[0].id;
+}
+
 app.post('/api/waypoints/photo', adminAuth, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file provided' });
-        const { lat, lng, title, category, color, icon, parent_track_id, phone, address, google_maps_url, section_id } = req.body;
+        const { lat, lng, title, category, color, icon, parent_track_id, phone, address, google_maps_url, section_id, existing_task_id } = req.body;
 
         // 1. Upload to Cloudinary
         const isImage = req.file.mimetype.startsWith('image/');
@@ -254,8 +298,12 @@ app.post('/api/waypoints/photo', adminAuth, upload.single('file'), async (req, r
             [title || 'Photo Waypoint', lat, lng, cloudinaryRes.secure_url, category, color || '#e67e22', icon || 'ph-camera', parent_track_id, phone, address, google_maps_url, section_id]
         );
         const wpId = wp.rows[0].id;
-        await pool.query('INSERT INTO spatial_anchors (kind, waypoint_id) VALUES ($1, $2)', ['point', wpId]);
+        const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, waypoint_id) VALUES ($1, $2) RETURNING id', ['point', wpId]);
+        const anchorId = anchorRes.rows[0].id;
+        const finalTaskId = existing_task_id || await getOrCreateFallbackTask();
+        await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [finalTaskId, anchorId]);
 
+        triggerMapRefresh();
         res.json({ success: true, waypoint_id: wpId, photo_url: cloudinaryRes.secure_url });
     } catch (error) {
         console.error("Photo Waypoint Error:", error);
@@ -266,7 +314,7 @@ app.post('/api/waypoints/photo', adminAuth, upload.single('file'), async (req, r
 app.post('/api/waypoints/audio', adminAuth, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-        const { lat, lng, title, category, color, icon, parent_track_id, section_id } = req.body;
+        const { lat, lng, title, category, color, icon, parent_track_id, section_id, existing_task_id } = req.body;
 
         // 1. Transcribe using Gemini
         const base64Audio = req.file.buffer.toString('base64');
@@ -288,8 +336,12 @@ app.post('/api/waypoints/audio', adminAuth, upload.single('file'), async (req, r
             [title || 'Audio Field Note', lat, lng, "Audio Field Note: " + transcript, category, color || '#9b59b6', icon || 'ph-microphone', parent_track_id, section_id]
         );
         const wpId = wp.rows[0].id;
-        await pool.query('INSERT INTO spatial_anchors (kind, waypoint_id) VALUES ($1, $2)', ['point', wpId]);
+        const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, waypoint_id) VALUES ($1, $2) RETURNING id', ['point', wpId]);
+        const anchorId = anchorRes.rows[0].id;
+        const finalTaskId = existing_task_id || await getOrCreateFallbackTask();
+        await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [finalTaskId, anchorId]);
 
+        triggerMapRefresh();
         res.json({ success: true, waypoint_id: wpId, transcript });
     } catch (err) {
         console.error("Audio Waypoint error:", err.response?.data || err.message);
@@ -907,6 +959,7 @@ app.post('/tracks', adminAuth, async (req, res) => {
       }
     }
 
+    triggerMapRefresh();
     res.status(200).send({ message: "Track uploaded" });
   } catch (err) {
     console.error("DEBUG POST /tracks error:", err);
@@ -963,6 +1016,7 @@ app.put('/tracks/:id', adminAuth, async (req, res) => {
           [task.name, task.responsible, task.target_group, task.day_label, task.starts_at, task.ends_at, task.is_completed, anchorId, task.section_id, task.category_id]);
       }
     }
+    triggerMapRefresh();
     res.status(200).send({ message: "Track updated successfully" });
   } catch (err) { res.status(500).send({ error: err.message }); }
 });
@@ -987,8 +1041,13 @@ app.post('/waypoints', adminAuth, async (req, res) => {
     const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, waypoint_id) VALUES ($1, $2) RETURNING id', ['point', wpId]);
     const anchorId = anchorRes.rows[0].id;
 
-    if (existing_task_id) {
-      await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [existing_task_id, anchorId]);
+    let targetTaskId = existing_task_id;
+    if (!targetTaskId && (!tasks || tasks.length === 0)) {
+        targetTaskId = await getOrCreateFallbackTask();
+    }
+
+    if (targetTaskId) {
+      await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [targetTaskId, anchorId]);
     } else if (tasks && tasks.length > 0) {
       for (let t of tasks) {
         const taskRes = await pool.query('INSERT INTO tasks (task_name, responsible, characteristics, target_group, day_label, starts_at, ends_at, is_completed, section_id, category_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id',
@@ -997,6 +1056,7 @@ app.post('/waypoints', adminAuth, async (req, res) => {
         await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2)', [newTaskId, anchorId]);
       }
     }
+    triggerMapRefresh();
     res.status(200).send({ message: "Waypoint created and linked!" });
   } catch (err) {
     console.error("DEBUG POST /waypoints error:", err);
@@ -1041,6 +1101,7 @@ app.put('/waypoints/:id', adminAuth, async (req, res) => {
           [task.name, task.responsible, task.target_group, task.day_label, task.starts_at, task.ends_at, task.is_completed, anchorId, task.section_id, task.category_id]);
       }
     }
+    triggerMapRefresh();
     res.status(200).send({ message: "Waypoint updated successfully" });
   } catch (err) { res.status(500).send({ error: err.message }); }
 });

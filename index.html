@@ -31,11 +31,13 @@
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.js"></script>
     <link rel="stylesheet" href="styles.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
 
 <body>
+    <input type="file" id="batch-photo-input" multiple accept="image/*" style="display:none;" onchange="handleBatchPhotoImport(this)">
     <div id="lightbox-modal"
         style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:999999; align-items:center; justify-content:center; cursor:zoom-out;"
         onclick="this.style.display='none'">
@@ -614,6 +616,20 @@
                     if (initZoom >= 15.5) document.getElementById('map').classList.add('show-pin-labels');
 
                     OfflineManager.init(map);
+
+                    // Modern Push Architecture: Listen for Server-Sent Events
+                    const syncStream = new EventSource(`${API_URL}/api/live-sync`);
+
+                    syncStream.onmessage = function (event) {
+                        if (event.data === 'refresh') {
+                            console.log("📡 Server pushed an update. Refreshing Command Center...");
+                            if (typeof refreshData === 'function') refreshData();
+                        }
+                    };
+
+                    syncStream.onerror = function () {
+                        console.warn("📡 Live sync stream disconnected. Reconnecting in background...");
+                    };
 
                     map.on('draw.create', (e) => {
                         const feature = e.features[0];
@@ -3137,7 +3153,10 @@
                 </div>
                 ${parsedCharacteristics ? `<div style="font-size: 0.95em; line-height: 1.6; color: #334155; margin-bottom: 30px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; overflow-wrap: anywhere;">${parsedCharacteristics}</div>` : ''}
 
-            <h3 style="font-size: 1.1em; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px;">Route & Waypoints</h3>
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 15px;">
+                <h3 style="margin:0; font-size: 1.1em; color: #0f172a;">Route & Waypoints</h3>
+                <button onclick="document.getElementById('batch-photo-input').click()" style="background:#e67e22; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.85em; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📸 Batch Import GPS Photos</button>
+            </div>
         `;
 
             if (task.geometries && task.geometries.length > 0) {
@@ -3279,6 +3298,41 @@
             });
             if (!geom) return;
 
+            const itinerary = AppStore.get('itinerary') || [];
+            const sections = AppStore.get('sections') || [];
+
+            const groupedTasks = {};
+            itinerary.forEach(t => {
+                const sId = t.section_id || 'unscheduled';
+                if (!groupedTasks[sId]) groupedTasks[sId] = [];
+                groupedTasks[sId].push(t);
+            });
+
+            let taskOptionsHtml = '<option value="">-- No Task (Orphan) --</option>';
+
+            // Add scheduled sections
+            sections.forEach(sec => {
+                if (groupedTasks[sec.id] && groupedTasks[sec.id].length > 0) {
+                    const dateStr = sec.section_date ? new Date(sec.section_date).toISOString().split('T')[0] : '';
+                    taskOptionsHtml += `<optgroup label="${dateStr} ${sec.title}">`;
+                    groupedTasks[sec.id].forEach(t => {
+                        const isSelected = t.geometries && t.geometries.some(g => (kind === 'point' ? g.waypoint_id : g.track_id) === id) ? 'selected' : '';
+                        taskOptionsHtml += `<option value="${t.task_id}" ${isSelected}>${t.task_name || 'Unnamed Task'}</option>`;
+                    });
+                    taskOptionsHtml += `</optgroup>`;
+                }
+            });
+
+            // Add unscheduled tasks
+            if (groupedTasks['unscheduled'] && groupedTasks['unscheduled'].length > 0) {
+                taskOptionsHtml += `<optgroup label="Unscheduled">`;
+                groupedTasks['unscheduled'].forEach(t => {
+                    const isSelected = t.geometries && t.geometries.some(g => (kind === 'point' ? g.waypoint_id : g.track_id) === id) ? 'selected' : '';
+                    taskOptionsHtml += `<option value="${t.task_id}" ${isSelected}>${t.task_name || 'Unnamed Task'}</option>`;
+                });
+                taskOptionsHtml += `</optgroup>`;
+            }
+
             const safeTitle = (geom.title || '').replace(/"/g, '"');
             const safeComments = (geom.comments || '').replace(/"/g, '"');
             const safeAddress = (geom.address || '').replace(/"/g, '"');
@@ -3361,8 +3415,7 @@
                     <div>
                         <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:5px; color:#34495e;">Assigned Task</label>
                         <select id="edit-waypoint-task-id" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
-                            <option value="">-- No Task (Orphan) --</option>
-                            ${(AppStore.get('itinerary') || []).map(t => `<option value="${t.task_id}" ${t.geometries && t.geometries.some(g => (kind === 'point' ? g.waypoint_id : g.track_id) === id) ? 'selected' : ''}>${t.task_name || t.task}</option>`).join('')}
+                            ${taskOptionsHtml}
                         </select>
                     </div>
                     <div>
