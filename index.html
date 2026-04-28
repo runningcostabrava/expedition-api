@@ -1234,11 +1234,11 @@
                         const iconHtml = window.getSafeIconHtml(renderIcon, 'ph-map-pin', true);
                         
                         // 1. Update the shortName extraction to be more aggressive
-                        const shortName = (geom.title || '').includes('-') ? (geom.title.split('-')[1].trim().split(' ')[0]) : (geom.title || '').substring(0, 5);
+                        const shortName = (geom.title || '').includes('-') ? (geom.title.split('-')[1].trim().split(' ')[0]) : (geom.title || '').trim().substring(0, 3);
 
                         // 2. Add logic to decide between showing an icon or text inside the circle
-                        const showNumber = (geom.title && geom.title.match(/[Ww]\d+-\d+/));
-                        const pinContent = showNumber ? `<span style="font-weight:900; font-size:11px; color:white;">${shortName}</span>` : iconHtml;
+                        const isNumbered = !isNaN(shortName) && shortName !== '';
+                        const pinContent = isNumbered ? `<span style="font-weight:900; font-size:11px; color:white; pointer-events:none;">${shortName}</span>` : iconHtml;
 
                         el.innerHTML = `
                             <div style="background-color: ${isPhotoSpot ? '#ef4444' : markerColor}; 
