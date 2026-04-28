@@ -328,6 +328,12 @@
     </style>
 
     <script>
+        window.getSafeIconHtml = function(iconVal, fallbackClass, isFill = false) {
+            const val = (iconVal && iconVal !== 'marker' && iconVal.trim() !== '') ? iconVal : fallbackClass;
+            if (val.startsWith('ph-')) return `<i class="ph ${val} ${isFill ? 'ph-fill' : ''}"></i>`;
+            return val; 
+        };
+
         // Register Offline Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -561,7 +567,9 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
             if (hasMapData) {
                 geometryHtml = `<div style="margin-top: 10px; border-top: 1px dashed #e2e8f0; padding-top: 10px;">`;
                 task.geometries.forEach(g => {
-                    const icon = g.kind === 'point' ? (g.icon || '📍') : (g.kind === 'polygon' ? '🛑' : '📈');
+                    const icon = g.kind === 'point' ? window.getSafeIconHtml(g.icon, 'ph-map-pin', true) : (g.kind === 'polygon' ? '🛑' : '📈');
+                    const displayTitle = (g.title || 'Location').includes('-') ? (g.title.split('-')[1].split(' ')[0]) : (g.title || 'Location').substring(0, 5);
+
                     let stats = '';
                     if (g.distance) stats += `📏 ${parseFloat(g.distance).toFixed(2)}km `;
                     if (g.gain) stats += `▲ ${parseFloat(g.gain).toFixed(0)}m `;
@@ -571,7 +579,7 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
                         <div onclick="window.location.href='field.html?task_id=${task.task_id}'; event.stopPropagation();" style="background: #f8fafc; padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#f8fafc'">
                             <div style="min-width: 0; flex: 1;">
                                 <div style="font-weight: 600; font-size: 0.9em; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                    ${icon} ${g.title || 'Unnamed Location'}
+                                    ${icon} ${displayTitle}
                                 </div>
                                 ${stats ? `<div style="font-size: 0.8em; color: #64748b; margin-top: 2px;">${stats}</div>` : ''}
                             </div>
