@@ -403,6 +403,7 @@ window.openAiChat = function () {
                         <div id="model-gemini" class="ai-model-btn" onclick="window.setAiModel('gemini')">✨ Gemini</div>
                     </div>
                     <span id="ai-voice-toggle" style="cursor:pointer; font-size:1.2em; opacity:0.5; transition:0.2s;" title="Read aloud (Off)">🔇</span>
+                    <span onclick="window.clearAiSession()" style="cursor:pointer; font-size:1.2em; color:#94a3b8; transition:0.2s;" title="Clear Session"><i class="ph ph-trash"></i></span>
                     <span onclick="window.closeAiChat()" style="cursor: pointer; font-size: 1.8em; line-height: 1; padding: 0 5px;"><i class="ph ph-x"></i></span>
                 </div>
             </div>
@@ -435,6 +436,19 @@ window.openAiChat = function () {
 
     const textarea = document.getElementById('ai-prompt-text');
     const history = document.getElementById('ai-chat-history');
+
+    // --- SESSION MANAGEMENT ---
+    window.clearAiSession = function() {
+        if (!confirm("Clear this conversation and reset session? (Database items are safe!)")) return;
+        aiConversationMemory = [];
+        const historyContainer = document.getElementById('ai-chat-history');
+        historyContainer.innerHTML = `
+            <div style="text-align: center; color: #64748b; font-size: 0.85em; margin-bottom: 10px; background: rgba(255,255,255,0.8); padding: 6px 12px; border-radius: 12px; align-self: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                Session cleared to save money. Permanent memory and database items are still safe!
+            </div>
+        `;
+        showToast("AI Session Reset", "info");
+    };
 
     // --- MODEL SELECTION ---
     let selectedAiModel = 'deepseek';

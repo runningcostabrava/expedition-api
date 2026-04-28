@@ -905,7 +905,7 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
       FROM tasks t
       WHERE t.is_completed = false
       ORDER BY t.starts_at ASC
-      LIMIT 50
+      LIMIT 200
     `;
     const currentTasks = await pool.query(currentTasksQuery);
     const contextString = JSON.stringify(currentTasks.rows);
@@ -943,7 +943,8 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
           16. REFRESH: Always trigger database changes immediately. The system will auto-refresh the UI.
           17. SELECTION AWARENESS: When the user refers to 'this' or 'the current' item, check the [UI CONTEXT] first before asking for clarification.
           18. NAVIGATION: When calculating a route, always tell the user the total distance in kilometers and the estimated travel time in your response.
-          
+          19. PROJECT MANAGEMENT: You have full vision of the expedition database via [Expedition Days] and [Current Active Tasks]. If the user asks for a review or optimization, analyze every task, its responsible person, its location in 'map_data', and its 'starts_at' time to provide professional project management advice.
+
           [UI CONTEXT]: The user currently has Task ID ${activeTaskId} open and selected in their dashboard. If they say "this task" or "this waypoint," they are likely referring to this ID or its attached geometries.` 
         }
     ];
