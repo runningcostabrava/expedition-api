@@ -171,7 +171,13 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
             },
             scales: {
                 y: { beginAtZero: false, ticks: { color: '#000', font: { weight: 'bold' } } },
-                x: { ticks: { color: '#000', font: { weight: 'bold' } } }
+                x: { 
+                    ticks: { color: '#000', font: { weight: 'bold' } },
+                    grid: { 
+                        color: (c) => (c.tick && c.tick.value % 1 === 0 ? 'rgba(56, 189, 248, 0.5)' : 'rgba(0,0,0,0.05)'),
+                        lineWidth: (c) => (c.tick && c.tick.value % 1 === 0 ? 2 : 1)
+                    }
+                }
             }
         }
     });

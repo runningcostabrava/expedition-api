@@ -3,6 +3,7 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
 let AUTH_TOKEN = localStorage.getItem('expedition_token');
 
 let aiConversationMemory = [];
+let totalSessionCost = 0;
 
 function showToast(message, type = 'success') {
     const toast = document.createElement('div');
@@ -390,7 +391,10 @@ window.openAiChat = function () {
                     <div style="width:34px; height:34px; background:#8b5cf6; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.2em;"><i class="ph ph-robot"></i></div>
                     <div style="display:flex; flex-direction:column;">
                         <span style="line-height:1.1;">AI Co-Pilot</span>
-                        <span style="font-size:0.7em; color:#94a3b8; font-weight:normal;">Online</span>
+                        <div style="display:flex; align-items:center;">
+                            <span style="font-size:0.7em; color:#94a3b8; font-weight:normal;">Online</span>
+                            <span id="ai-session-cost" style="color:#10b981; font-weight:bold; margin-left:5px; font-size:0.7em;">$0.000</span>
+                        </div>
                     </div>
                 </div>
                 <div style="display:flex; gap:12px; align-items:center;">
@@ -410,15 +414,10 @@ window.openAiChat = function () {
             </div>
 
             <div style="background: white; padding: 12px 15px; border-top: 1px solid #cbd5e0; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0;">
-                <div id="ai-attachment-preview" style="display:none; align-items:center; justify-content:space-between; background:#f1f5f9; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0; font-size:0.85em;">
-                    <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
-                        <span style="font-size:1.2em;"><i class="ph ph-paperclip"></i></span>
-                        <span id="ai-image-name" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#475569; font-weight:bold;">No image</span>
-                    </div>
-                    <button onclick="window.clearAiAttachment()" style="background:none; border:none; color:#ef4444; cursor:pointer; font-weight:bold; font-size:1.2em; padding:0 5px;"><i class="ph ph-x"></i></button>
+                <div id="ai-attachment-preview" style="display:none; flex-wrap:wrap; gap:8px; background:#f1f5f9; padding:8px 12px; border-radius:8px; border:1px solid #e2e8f0; font-size:0.85em;">
                 </div>
                 <div style="display: flex; gap: 8px; align-items: flex-end;">
-                    <input type="file" id="ai-image-upload" accept="image/*,application/pdf,text/plain,audio/*" style="display: none;">
+                    <input type="file" id="ai-image-upload" multiple accept="image/*,application/pdf,text/plain,audio/*" style="display: none;">
                     <button onclick="document.getElementById('ai-image-upload').click()" style="background: #f8fafc; color: #475569; border: 1px solid #cbd5e0; border-radius: 50%; width: 42px; height: 42px; display:flex; align-items:center; justify-content:center; cursor: pointer; flex-shrink: 0; font-size:1.2em; transition:0.2s;"><i class="ph ph-plus"></i></button>
                     
                     <textarea id="ai-prompt-text" rows="1" placeholder="Message..." style="flex: 1; padding: 12px 15px; border: 1px solid #cbd5e0; border-radius: 20px; font-family: inherit; resize: none; overflow-y:hidden; box-sizing: border-box; font-size:0.95em; outline:none; max-height:120px;" oninput="this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 120) + 'px';"></textarea>
@@ -548,18 +547,43 @@ window.openAiChat = function () {
     });
 
     // Attachment Handlers
-    let attachedFile = null;
-    window.clearAiAttachment = function () {
-        attachedFile = null;
-        document.getElementById('ai-image-upload').value = '';
-        document.getElementById('ai-attachment-preview').style.display = 'none';
+    let attachedFiles = [];
+    window.clearAiAttachment = function (index = null) {
+        if (index === null) {
+            attachedFiles = [];
+        } else {
+            attachedFiles.splice(index, 1);
+        }
+        renderAiAttachmentPreview();
     };
+
+    function renderAiAttachmentPreview() {
+        const container = document.getElementById('ai-attachment-preview');
+        if (attachedFiles.length === 0) {
+            container.style.display = 'none';
+            container.innerHTML = '';
+            document.getElementById('ai-image-upload').value = '';
+            return;
+        }
+
+        container.style.display = 'flex';
+        container.innerHTML = attachedFiles.map((file, idx) => {
+            const isImage = file.type.startsWith('image/');
+            const icon = isImage ? 'ph-image' : (file.type.startsWith('audio/') ? 'ph-microphone' : 'ph-file-text');
+            return `
+                <div style="display:flex; align-items:center; gap:6px; background:white; padding:4px 8px; border-radius:16px; border:1px solid #cbd5e0; max-width:180px;">
+                    <i class="ph ${icon}" style="font-size:1.2em; color:#64748b;"></i>
+                    <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#475569; font-size:0.9em; font-weight:bold;">${file.name}</span>
+                    <i class="ph ph-x-circle" style="cursor:pointer; color:#ef4444; font-size:1.2em;" onclick="window.clearAiAttachment(${idx})"></i>
+                </div>
+            `;
+        }).join('') + `<button onclick="window.clearAiAttachment()" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:0.8em; font-weight:bold; text-decoration:underline; margin-left:auto;">Clear All</button>`;
+    }
 
     document.getElementById('ai-image-upload').addEventListener('change', function (e) {
         if (e.target.files.length > 0) {
-            attachedFile = e.target.files[0];
-            document.getElementById('ai-image-name').innerText = attachedFile.name;
-            document.getElementById('ai-attachment-preview').style.display = 'flex';
+            attachedFiles = [...attachedFiles, ...Array.from(e.target.files)];
+            renderAiAttachmentPreview();
             textarea.focus();
         }
     });
@@ -608,16 +632,21 @@ window.openAiChat = function () {
     // Submit Handler
     document.getElementById('ai-submit-btn').addEventListener('click', async function () {
         const promptText = textarea.value.trim();
-        if (!promptText && !attachedFile) return;
+        if (!promptText && attachedFiles.length === 0) return;
 
         const btn = this;
         btn.disabled = true;
         btn.style.transform = 'scale(0.9)';
 
-        // Render User Message instantly
-        let previewUrl = null;
-        if (attachedFile) previewUrl = URL.createObjectURL(attachedFile);
-        appendMessage('user', promptText, previewUrl);
+        // Render User Message instantly with first image preview if any
+        let firstImageUrl = null;
+        const firstImage = attachedFiles.find(f => f.type.startsWith('image/'));
+        if (firstImage) firstImageUrl = URL.createObjectURL(firstImage);
+        appendMessage('user', promptText, firstImageUrl);
+
+        const currentFiles = [...attachedFiles];
+        attachedFiles = [];
+        renderAiAttachmentPreview();
 
         textarea.value = '';
         textarea.style.height = 'auto';
@@ -626,29 +655,28 @@ window.openAiChat = function () {
         const typingIndicator = appendMessage('ai', '<span style="color:#94a3b8; font-style:italic;">thinking...</span>');
 
         try {
-            let uploadedImageUrl = null;
+            let imageUrls = [];
             let documentContext = "";
 
-            if (attachedFile) {
-                const formData = new FormData();
-                formData.append('file', attachedFile);
+            if (currentFiles.length > 0) {
+                typingIndicator.innerHTML = `<span style="color:#94a3b8; font-style:italic;">processing ${currentFiles.length} files...</span>`;
+                
+                await Promise.all(currentFiles.map(async (file) => {
+                    const formData = new FormData();
+                    formData.append('file', file);
 
-                if (attachedFile.type.startsWith('image/')) {
-                    // Upload Image to Cloudinary
-                    const uploadRes = await authFetch(`${API_URL}/api/upload`, { method: 'POST', body: formData });
-                    if (!uploadRes.ok) throw new Error("Failed to upload image");
-                    const uploadData = await uploadRes.json();
-                    uploadedImageUrl = uploadData.secure_url;
-                } else {
-                    // Parse Document/Audio for Text
-                    typingIndicator.innerHTML = '<span style="color:#94a3b8; font-style:italic;">reading file...</span>';
-                    const parseRes = await authFetch(`${API_URL}/api/parse-media`, { method: 'POST', body: formData });
-                    if (!parseRes.ok) throw new Error("Failed to read file contents");
-                    const parseData = await parseRes.json();
-
-                    // Inject the extracted text invisibly into the prompt
-                    documentContext = `\n\n[CONTENTS OF ATTACHED FILE "${attachedFile.name}"]:\n${parseData.text}\n\n`;
-                }
+                    if (file.type.startsWith('image/')) {
+                        const uploadRes = await authFetch(`${API_URL}/api/upload`, { method: 'POST', body: formData });
+                        if (!uploadRes.ok) throw new Error(`Failed to upload ${file.name}`);
+                        const uploadData = await uploadRes.json();
+                        imageUrls.push(uploadData.secure_url);
+                    } else {
+                        const parseRes = await authFetch(`${API_URL}/api/parse-media`, { method: 'POST', body: formData });
+                        if (!parseRes.ok) throw new Error(`Failed to read ${file.name}`);
+                        const parseData = await parseRes.json();
+                        documentContext += `\n\n[CONTENTS OF ATTACHED FILE "${file.name}"]:\n${parseData.text}\n\n`;
+                    }
+                }));
             }
 
             const finalPrompt = documentContext ? (promptText + documentContext) : promptText;
@@ -659,7 +687,7 @@ window.openAiChat = function () {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     prompt: finalPrompt,
-                    imageUrl: uploadedImageUrl,
+                    imageUrls: imageUrls,
                     history: aiConversationMemory, // Inject memory here!
                     model: selectedAiModel,
                     activeTaskId: activeTaskId
@@ -669,6 +697,12 @@ window.openAiChat = function () {
             if (!res || res.status === 401) throw new Error("Unauthorized");
             const data = await res.json();
             if (data.error) throw new Error(data.error);
+
+            if (data.cost) {
+                totalSessionCost += data.cost;
+                const costDisplay = document.getElementById('ai-session-cost');
+                if (costDisplay) costDisplay.innerText = `$${totalSessionCost.toFixed(3)}`;
+            }
 
             // Save the exchange to short-term memory
             aiConversationMemory.push({ role: 'user', content: promptText });

@@ -251,6 +251,12 @@
         <select id="day-selector" onchange="loadDayTracks(this.value)">
             <option value="">Loading days...</option>
         </select>
+        <div style="display:flex; align-items:center; background: #f8fafc; padding: 0 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 0.8em; font-weight: bold; color: #475569;">
+            <label style="display:flex; align-items:center; gap:5px; cursor:pointer; margin:0;">
+                <input type="checkbox" id="show-km-markers-toggle" checked onchange="window.showKmMarkers = this.checked; renderMapGeometries();" style="width:auto; margin:0;">
+                KM
+            </label>
+        </div>
         <select id="style-selector" onchange="changeMapStyle(this.value)">
             <option value="mapbox://styles/mapbox/outdoors-v12" title="Hiking/Outdoors">⛰️ Outdoors</option>
             <option value="mapbox://styles/mapbox/satellite-streets-v12" title="Satellite">🌍 Satellite</option>
@@ -411,6 +417,7 @@
 
         let map, elevationChartInstance = null;
         let isDroppingPin = false;
+        let showKmMarkers = true;
         let itineraryMarkers = []; // NEW: Array to store only itinerary markers
 
         async function initFieldMap() {
@@ -698,6 +705,16 @@
             if (!isSilent) {
                 if (map.getLayer('daily-route')) map.removeLayer('daily-route');
                 if (map.getSource('daily-route')) map.removeSource('daily-route');
+                // Clean up KM markers
+                const style = map.getStyle();
+                if (style && style.layers) {
+                    style.layers.forEach(layer => {
+                        if (layer.id.startsWith('layer-km-')) {
+                            map.removeLayer(layer.id);
+                            if (map.getSource(layer.source)) map.removeSource(layer.source);
+                        }
+                    });
+                }
                 itineraryMarkers.forEach(m => m.remove());
                 itineraryMarkers = [];
             }
@@ -716,6 +733,42 @@
                 if (task.geometries) task.geometries.forEach(g => {
                     // Process Tracks (Lines)
                     if (g.kind === 'line' && g.geojson) {
+                        // KM Marker Logic
+                        if (window.showKmMarkers) {
+                            const trackLine = g.geojson.features[0];
+                            const length = turf.length(trackLine, { units: 'kilometers' });
+                            const points = [];
+                            for (let d = 1; d < length; d += 1) {
+                                const pt = turf.along(trackLine, d, { units: 'kilometers' });
+                                pt.properties = { km: d.toString() };
+                                points.push(pt);
+                            }
+                            if (points.length > 0) {
+                                const kmSourceId = `km-source-${g.track_id}`;
+                                const kmLayerId = `layer-km-${g.track_id}`;
+                                if (!map.getSource(kmSourceId)) {
+                                    map.addSource(kmSourceId, { type: 'geojson', data: turf.featureCollection(points) });
+                                    map.addLayer({
+                                        id: kmLayerId,
+                                        type: 'symbol',
+                                        source: kmSourceId,
+                                        layout: {
+                                            'text-field': ['get', 'km'],
+                                            'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
+                                            'text-size': 9,
+                                            'text-allow-overlap': true,
+                                            'text-ignore-placement': true
+                                        },
+                                        paint: {
+                                            'text-color': '#ffffff',
+                                            'text-halo-color': '#0f172a',
+                                            'text-halo-width': 2
+                                        }
+                                    });
+                                }
+                            }
+                        }
+
                         g.geojson.features.forEach(f => {
                             const feat = { ...f, properties: { ...f.properties, taskId: task.task_id, title: g.title, color: g.color } };
                             features.push(feat);

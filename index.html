@@ -119,6 +119,12 @@
         <div class="mobile-close-bar" onclick="document.getElementById('left-panel').classList.add('hidden')"
             style="display:none; text-align:center; padding:12px; background:#f1f5f9; font-weight:bold; color:#475569; border-bottom: 1px solid #cbd5e0; cursor:pointer; z-index: 10;">
             ⬇️ Tap to Hide List ⬇️</div>
+        <div style="padding: 10px 15px; border-bottom: 1px solid rgba(0,0,0,0.1); background: #f8fafc; display:flex; align-items:center; gap:10px;">
+            <label style="display:flex; align-items:center; gap:5px; font-size:0.85em; font-weight:bold; color:#475569; cursor:pointer; margin:0;">
+                <input type="checkbox" id="show-km-markers-toggle" checked onchange="window.showKmMarkers = this.checked; renderMapGeometries();" style="width:auto; margin:0;">
+                KM Markers
+            </label>
+        </div>
         <div id="panel-header" style="padding: 15px; border-bottom: 1px solid rgba(0,0,0,0.1);">
             <button class="mobile-only-btn" onclick="document.getElementById('left-panel').classList.add('hidden')"
                 style="width:100%; margin-bottom:12px; background:#e2e8f0; color:#0f172a; border:none; padding:12px; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.05);"><i class="ph ph-map-trifold"></i>
@@ -499,6 +505,7 @@
         let directionsControl = null; // Holds the Mapbox Directions UI
         let currentSmartProfile = 'driving'; // Safely tracks the active routing mode
         let currentSectionFilter = 'all';
+        let showKmMarkers = true;
         // --- RESTORED MAP STATE VARIABLES ---
         let activeAnchorId = null, activeWaypointId = null, activeTrackId = null;
         let isEditingGeometry = false, isRouting = false, isAnalyzingSegment = false;
@@ -1164,6 +1171,11 @@
         function renderMapGeometries() {
             activeMarkers.forEach(m => m.remove());
             activeMarkers = [];
+            
+            // Clean up KM markers separately if any exist
+            if (map.getLayer('km-marker-layer')) map.removeLayer('km-marker-layer');
+            if (map.getSource('km-marker-source')) map.removeSource('km-marker-source');
+
             const renderedAnchors = new Set();
             const style = map.getStyle();
             if (style && style.layers) {
@@ -1309,6 +1321,40 @@
 
                         activeMarkers.push(marker);
                     } else if (geom.geojson) {
+                        // KM Marker Logic
+                        if (window.showKmMarkers && geom.kind === 'line') {
+                            const trackLine = geom.geojson.features[0];
+                            const length = turf.length(trackLine, { units: 'kilometers' });
+                            const points = [];
+                            for (let d = 1; d < length; d += 1) {
+                                const pt = turf.along(trackLine, d, { units: 'kilometers' });
+                                pt.properties = { km: d.toString() };
+                                points.push(pt);
+                            }
+                            if (points.length > 0) {
+                                const kmSourceId = `km-source-${geom.track_id}`;
+                                const kmLayerId = `layer-km-${geom.track_id}`;
+                                map.addSource(kmSourceId, { type: 'geojson', data: turf.featureCollection(points) });
+                                map.addLayer({
+                                    id: kmLayerId,
+                                    type: 'symbol',
+                                    source: kmSourceId,
+                                    layout: {
+                                        'text-field': ['get', 'km'],
+                                        'text-font': ['DIN Offc Pro Bold', 'Arial Unicode MS Bold'],
+                                        'text-size': 9,
+                                        'text-allow-overlap': true,
+                                        'text-ignore-placement': true
+                                    },
+                                    paint: {
+                                        'text-color': '#ffffff',
+                                        'text-halo-color': '#0f172a',
+                                        'text-halo-width': 2
+                                    }
+                                });
+                            }
+                        }
+
                         // Apply the inherited color to lines/polygons as well
                         const layerId = `layer-${geom.track_id}`;
                         map.addSource(`track-${geom.track_id}`, { type: 'geojson', data: geom.geojson });

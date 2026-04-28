@@ -997,6 +997,8 @@ body.zen-mode #zen-toggle-btn {
     pointer-events: none;
 }
 
+.km-marker-label { background: #0f172a; color: white; padding: 2px 5px; border-radius: 4px; font-size: 9px; font-weight: 800; border: 1px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+
 .section-content {
     display: block;
 }

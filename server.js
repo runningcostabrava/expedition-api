@@ -866,7 +866,7 @@ const aiTools = [
   }
 ];
 
-async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', activeTaskId = null) {
+async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', activeTaskId = null, imageUrls = []) {
     // Fetch AI's permanent memory
     const memoryRes = await pool.query('SELECT memory_text FROM ai_memory WHERE id = 1');
     const longTermMemory = memoryRes.rows[0]?.memory_text || "No specific memories or guidelines saved yet.";
@@ -921,6 +921,7 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
           Current Active Tasks (with Map Data): ${contextString}.
           
           RULES:
+          0. MULTIMODAL: You may receive multiple OCR results or images. Integrate all provided information into your response.
           1. SECRECY: Keep all database IDs strictly internal. Do not EVER write "Task ID", "Section ID", or numbers like "341" in your text replies.
           2. FORMATTING: When referring to tasks, use bullet points and bold text like this: **[Day/Section] - [Task Name]**.
           3. TONE: Speak like a human assistant on WhatsApp. Be concise, clear, and avoid robotic robotic database jargon.
@@ -952,6 +953,12 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
     let finalResponseText = "";
     let pendingUiAction = null;
 
+    const RATES = { 
+        gemini: { input: 1.25 / 1000000, output: 5.00 / 1000000 },
+        deepseek: { input: 0.14 / 1000000, output: 0.28 / 1000000 }
+    };
+    let totalCost = 0;
+
     if (modelChoice === 'gemini') {
         // --- GEMINI 1.5 PRO AGENT ---
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -967,7 +974,21 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
             }))
         });
 
-        let result = await chat.sendMessage(finalPrompt);
+        const promptParts = [{ text: finalPrompt }];
+        if (imageUrls.length > 0) {
+            for (const url of imageUrls) {
+                const response = await axios.get(url, { responseType: 'arraybuffer' });
+                const mimeType = response.headers['content-type'];
+                promptParts.push({
+                    inlineData: {
+                        data: Buffer.from(response.data).toString('base64'),
+                        mimeType: mimeType
+                    }
+                });
+            }
+        }
+
+        let result = await chat.sendMessage(promptParts);
         let response = result.response;
         
         for (let step = 0; step < 10; step++) {
@@ -990,6 +1011,11 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
 
             result = await chat.sendMessage(toolResults);
             response = result.response;
+        }
+
+        const usage = response.usageMetadata;
+        if (usage) {
+            totalCost = (usage.promptTokenCount * RATES.gemini.input) + (usage.candidatesTokenCount * RATES.gemini.output);
         }
     } else {
         // --- DEEPSEEK AGENT LOOP ---
@@ -1020,9 +1046,14 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
                 messages.push({ role: "tool", tool_call_id: toolCall.id, content: (typeof toolResult === 'string' ? toolResult : toolResult.text) });
             }
         }
+
+        if (response.usage) {
+            const usage = response.usage;
+            totalCost = (usage.prompt_tokens * RATES.deepseek.input) + (usage.completion_tokens * RATES.deepseek.output);
+        }
     }
 
-    return { success: true, message: finalResponseText, uiAction: pendingUiAction };
+    return { success: true, message: finalResponseText, uiAction: pendingUiAction, cost: totalCost };
 }
 
 async function executeTool(name, args) {
@@ -1242,22 +1273,27 @@ async function executeTool(name, args) {
 }
 
 app.post('/api/ai/command', adminAuth, async (req, res) => {
-    const { prompt, imageUrl, history = [], model = 'deepseek', activeTaskId = null } = req.body;
-    if (!prompt && !imageUrl) return res.status(400).json({ error: "Prompt or Image is required" });
+    const { prompt, imageUrl, imageUrls = [], history = [], model = 'deepseek', activeTaskId = null } = req.body;
+    if (!prompt && !imageUrl && imageUrls.length === 0) return res.status(400).json({ error: "Prompt or Image is required" });
 
     try {
-        let finalPrompt = prompt || "Please process the extracted text from the attached image.";
-        if (imageUrl) {
+        let finalPrompt = prompt || "Please process the extracted text from the attached image(s).";
+        const allImageUrls = [...imageUrls];
+        if (imageUrl) allImageUrls.push(imageUrl);
+
+        if (allImageUrls.length > 0 && model === 'deepseek') {
             const Tesseract = require('tesseract.js');
-            try {
-                const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng+spa+ita');
-                finalPrompt += `\n\n[RAW TEXT EXTRACTED FROM IMAGE VIA OCR]:\n${text}`;
-            } catch (ocrErr) {
-                finalPrompt += `\n\n[SYSTEM NOTE: OCR extraction failed.]`;
+            for (const url of allImageUrls) {
+                try {
+                    const { data: { text } } = await Tesseract.recognize(url, 'eng+spa+ita');
+                    finalPrompt += `\n\n[RAW TEXT EXTRACTED FROM IMAGE VIA OCR (${url})]:\n${text}`;
+                } catch (ocrErr) {
+                    finalPrompt += `\n\n[SYSTEM NOTE: OCR extraction failed for image ${url}]`;
+                }
             }
         }
 
-        const result = await runAiAgent(finalPrompt, history, model, activeTaskId);
+        const result = await runAiAgent(finalPrompt, history, model, activeTaskId, allImageUrls);
         res.json(result);
     } catch (err) {
         console.error("AI Error:", err);
@@ -1284,7 +1320,7 @@ app.post('/api/ai/audio-command', adminAuth, upload.single('file'), async (req, 
         const transcript = geminiRes.data.candidates[0].content.parts[0].text;
 
         const finalPrompt = `[GPS: ${lat}, ${lng}] I just recorded an audio note here. Transcript: ${transcript}`;
-        const result = await runAiAgent(finalPrompt, [], 'deepseek', existing_task_id);
+        const result = await runAiAgent(finalPrompt, [], 'deepseek', existing_task_id, []);
         res.json(result);
     } catch (err) {
         console.error("Audio AI Error:", err.response?.data || err.message);
