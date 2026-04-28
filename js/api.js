@@ -479,8 +479,12 @@ window.openAiChat = function () {
         document.head.appendChild(style);
     }
 
+    let lastAudioSentTime = Date.now();
+    let thinkingToastTimeout = null;
+
     async function startLiveConversation() {
         try {
+            // Gemini requires 16kHz PCM
             audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             micStream = stream;
@@ -494,6 +498,7 @@ window.openAiChat = function () {
                 showToast("Live conversation active", "info");
                 
                 const source = audioContext.createMediaStreamSource(stream);
+                // ScriptProcessor is legacy but reliable for simple PCM conversion in this context
                 processorNode = audioContext.createScriptProcessor(4096, 1, 1);
 
                 source.connect(processorNode);
@@ -502,25 +507,53 @@ window.openAiChat = function () {
                 processorNode.onaudioprocess = (e) => {
                     if (!isConversing) return;
                     const inputData = e.inputBuffer.getChannelData(0);
-                    // Convert Float32 to Int16 PCM
+                    
+                    // 1. PCM Conversion (Int16, 16kHz)
                     const pcmData = new Int16Array(inputData.length);
+                    let hasSignal = false;
                     for (let i = 0; i < inputData.length; i++) {
-                        pcmData[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7FFF;
+                        const s = Math.max(-1, Math.min(1, inputData[i]));
+                        pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                        if (Math.abs(s) > 0.05) hasSignal = true; // Simple VAD check
                     }
+
                     if (liveAudioSocket.readyState === WebSocket.OPEN) {
                         liveAudioSocket.send(pcmData.buffer);
+                        if (hasSignal) {
+                            lastAudioSentTime = Date.now();
+                            if (thinkingToastTimeout) {
+                                clearTimeout(thinkingToastTimeout);
+                                thinkingToastTimeout = null;
+                            }
+                        } else {
+                            // If silent for 1.5s after talking, show thinking toast
+                            if (!thinkingToastTimeout && Date.now() - lastAudioSentTime > 1500) {
+                                thinkingToastTimeout = setTimeout(() => {
+                                    if (isConversing) showToast("Thinking... Give me a moment", "info");
+                                }, 500);
+                            }
+                        }
                     }
                 };
             };
 
             liveAudioSocket.onmessage = async (event) => {
-                // Incoming audio chunks from Gemini
-                const arrayBuffer = event.data;
-                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-                const playSource = audioContext.createBufferSource();
-                playSource.buffer = audioBuffer;
-                playSource.connect(audioContext.destination);
-                playSource.start();
+                if (thinkingToastTimeout) {
+                    clearTimeout(thinkingToastTimeout);
+                    thinkingToastTimeout = null;
+                }
+                
+                // 2. Low-Latency Playback
+                try {
+                    const arrayBuffer = event.data;
+                    // decodeAudioData is async and handles the raw bytes from the server
+                    audioContext.decodeAudioData(arrayBuffer, (buffer) => {
+                        const playSource = audioContext.createBufferSource();
+                        playSource.buffer = buffer;
+                        playSource.connect(audioContext.destination);
+                        playSource.start(0);
+                    }, (err) => console.error("Audio Decode Error:", err));
+                } catch (e) { console.error("Playback error:", e); }
             };
 
             liveAudioSocket.onclose = () => stopLiveConversation();

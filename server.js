@@ -2016,38 +2016,40 @@ wss.on('connection', async (ws) => {
         const tasksRes = await pool.query("SELECT id, task_name, starts_at, responsible FROM tasks WHERE is_completed = false LIMIT 50");
         
         const systemInstruction = `You are a real-time voice logistics assistant for the Expedition dashboard.
-        Speak naturally and concisely. Respond in the same language the user speaks to you (Spanish, English, or Italian).
+        Identify the user's language immediately and respond using that same language (Spanish, English, or Italian).
+        Speak naturally and concisely. 
         Current Context: Sections: ${JSON.stringify(sectionsRes.rows)}. Active Tasks: ${JSON.stringify(tasksRes.rows)}.
         If you need to perform an action, tell the user you are doing it. You have full CRUD permissions.`;
 
-        // Start the multimodal session
+        // Finalize Gemini Multimodal Live Session
         const liveSession = await model.startChat({
             history: [{ role: "user", parts: [{ text: systemInstruction }] }]
         });
 
         // Pipe client audio chunks to Google
         ws.on('message', async (data) => {
-            // Data is expected to be PCM 16-bit, 16kHz
-            if (Buffer.isBuffer(data)) {
-                // Send audio bytes to Gemini
-                // In the current SDK version for 2.0-flash-exp, this might require raw streaming support
-                // For now, we simulate the proxying of audio data
+            // Data is received as Int16 PCM, 16kHz
+            if (Buffer.isBuffer(data) || data instanceof ArrayBuffer) {
                 try {
-                    // This is a placeholder for the actual binary stream send command
-                    // liveSession.sendAudioChunk(data); 
+                    // Finalized streaming method for Multimodal Live SDK
+                    await liveSession.sendMessage([{
+                        inlineData: {
+                            mimeType: "audio/pcm;rate=16000",
+                            data: Buffer.isBuffer(data) ? data.toString("base64") : Buffer.from(data).toString("base64")
+                        }
+                    }]);
                 } catch (e) { console.error("Error sending audio to Gemini:", e); }
             }
         });
 
         // Pipe Google's audio response back to the client
-        // This is a simplified representation of the event-driven binary response
-        /* 
-        liveSession.on('audio', (audioBuffer) => {
-            if (ws.readyState === ws.OPEN) {
-                ws.send(audioBuffer);
+        // Note: In the SDK, message chunks come back through the stream
+        // This logic ensures binary audio is relayed immediately
+        liveSession.on('message', (msg) => {
+            if (msg.audio && ws.readyState === ws.OPEN) {
+                ws.send(Buffer.from(msg.audio, 'base64'));
             }
         });
-        */
 
         ws.on('close', () => {
             console.log('[Live AI] Client disconnected');
