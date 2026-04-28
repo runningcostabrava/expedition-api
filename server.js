@@ -317,19 +317,20 @@ app.post('/api/waypoints/audio', adminAuth, upload.single('file'), async (req, r
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
         const { lat, lng, title, category, color, icon, parent_track_id, section_id, existing_task_id } = req.body;
 
-        // 1. Transcribe using Gemini
-        const base64Audio = req.file.buffer.toString('base64');
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-3-flash-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
-        const geminiRes = await axios.post(geminiUrl, {
-            contents: [{
-                parts: [
-                    { text: "You are a transcriber. Transcribe this audio exactly as spoken. Return ONLY the transcribed text." },
-                    { inlineData: { mimeType: req.file.mimetype, data: base64Audio } }
-                ]
-            }]
-        }, { headers: { 'Content-Type': 'application/json' } });
-        
-        const transcript = geminiRes.data.candidates[0].content.parts[0].text;
+        // --- NEW ROBUST TRANSCRIPTION LOGIC ---
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+
+        const result = await model.generateContent([
+            "You are a professional transcriber. Transcribe this audio exactly. Return ONLY text.",
+            {
+                inlineData: {
+                    mimeType: req.file.mimetype,
+                    data: req.file.buffer.toString("base64")
+                }
+            }
+        ]);
+        const transcript = result.response.text();
 
         // 2. Create Waypoint
         const wp = await pool.query(
@@ -375,18 +376,20 @@ app.post('/api/parse-media', adminAuth, upload.single('file'), async (req, res) 
                         req.file.originalname.toLowerCase().endsWith('.wav');
 
         if (isAudio) {
-            const base64Audio = req.file.buffer.toString('base64');
-            const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-3-flash-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
-            const geminiRes = await axios.post(geminiUrl, {
-                contents: [{
-                    parts: [
-                        { text: "You are a transcriber. Transcribe this audio exactly as spoken. Return ONLY the transcribed text." },
-                        { inlineData: { mimeType: req.file.mimetype, data: base64Audio } }
-                    ]
-                }]
-            }, { headers: { 'Content-Type': 'application/json' } });
-            
-            return res.json({ text: geminiRes.data.candidates[0].content.parts[0].text });
+            // --- NEW ROBUST TRANSCRIPTION LOGIC ---
+            const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+            const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+
+            const result = await model.generateContent([
+                "You are a professional transcriber. Transcribe this audio exactly. Return ONLY text.",
+                {
+                    inlineData: {
+                        mimeType: req.file.mimetype,
+                        data: req.file.buffer.toString("base64")
+                    }
+                }
+            ]);
+            return res.json({ text: result.response.text() });
         }
         
         return res.status(400).json({ error: 'Unsupported file type for text extraction.' });
@@ -1305,19 +1308,20 @@ app.post('/api/ai/audio-command', adminAuth, upload.single('file'), async (req, 
     if (!req.file) return res.status(400).json({ error: 'No audio file provided' });
     const { lat, lng, existing_task_id } = req.body;
     try {
-        // 1. Transcribe using Gemini
-        const base64Audio = req.file.buffer.toString('base64');
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-3-flash-preview:generateContent?key=${process.env.GEMINI_API_KEY}`;
-        const geminiRes = await axios.post(geminiUrl, {
-            contents: [{
-                parts: [
-                    { text: "You are a transcriber. Transcribe this audio exactly as spoken. Return ONLY the transcribed text." },
-                    { inlineData: { mimeType: req.file.mimetype, data: base64Audio } }
-                ]
-            }]
-        }, { headers: { 'Content-Type': 'application/json' } });
-        
-        const transcript = geminiRes.data.candidates[0].content.parts[0].text;
+        // --- NEW ROBUST TRANSCRIPTION LOGIC ---
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+
+        const result = await model.generateContent([
+            "You are a professional transcriber. Transcribe this audio exactly. Return ONLY text.",
+            {
+                inlineData: {
+                    mimeType: req.file.mimetype,
+                    data: req.file.buffer.toString("base64")
+                }
+            }
+        ]);
+        const transcript = result.response.text();
 
         const finalPrompt = `[GPS: ${lat}, ${lng}] I just recorded an audio note here. Transcript: ${transcript}`;
         const result = await runAiAgent(finalPrompt, [], 'deepseek', existing_task_id, []);
