@@ -53,10 +53,15 @@
         window.getResponsivePadding = function () {
             const isMobile = window.innerWidth <= 768;
             const leftHidden = document.getElementById('left-panel').classList.contains('hidden');
+            const rightHidden = document.getElementById('right-panel').classList.contains('hidden');
+            const detailClosed = !document.getElementById('task-detail-panel').classList.contains('open');
             const leftWide = document.getElementById('left-panel').classList.contains('wide');
 
             if (isMobile) {
-                return { top: 180, bottom: window.innerHeight * 0.75 + 20, left: 20, right: 20 };
+                // Si todos los paneles están cerrados, no aplicamos el margen gigante del 75%
+                const anyPanelOpen = !leftHidden || !rightHidden || !detailClosed;
+                const bottomPad = anyPanelOpen ? (window.innerHeight * 0.75 + 20) : 120;
+                return { top: 80, bottom: bottomPad, left: 20, right: 20 };
             } else {
                 let leftPad = 20;
                 if (!leftHidden) leftPad = leftWide ? 620 : 460;
@@ -2188,9 +2193,29 @@
             if (id === 'command-modal') {
                 resetForm();
                 draw.deleteAll();
-                KomootEngine.cleanup();
+                if (typeof KomootEngine !== 'undefined' && KomootEngine.cleanup) KomootEngine.cleanup();
             }
         }
+
+        // --- 🛠️ MOBILE UI FIX: Adjust Mapbox Draw Tools Position ---
+        function updateDrawControlPosition() {
+            const isMobile = window.innerWidth <= 768;
+            const drawControl = document.querySelector('.mapboxgl-ctrl-group:has(.mapbox-gl-draw_trash)');
+            if (drawControl) {
+                if (isMobile) {
+                    drawControl.style.position = 'fixed';
+                    drawControl.style.top = '70px';
+                    drawControl.style.right = '50px'; // Pushed left of the zoom controls
+                    drawControl.style.zIndex = '1000';
+                } else {
+                    drawControl.style.position = '';
+                    drawControl.style.top = '';
+                    drawControl.style.right = '';
+                }
+            }
+        }
+        window.addEventListener('resize', updateDrawControlPosition);
+        setTimeout(updateDrawControlPosition, 2000); // Wait for Mapbox to inject tools
 
         async function deleteTask(id) {
             if (!id || id === 'undefined') {
