@@ -567,28 +567,57 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
             if (hasMapData) {
                 geometryHtml = `<div style="margin-top: 10px; border-top: 1px dashed #e2e8f0; padding-top: 10px;">`;
                 task.geometries.forEach(g => {
-                    const icon = g.kind === 'point' ? window.getSafeIconHtml(g.icon, 'ph-map-pin', true) : (g.kind === 'polygon' ? '🛑' : '📈');
-                    const shortTitle = (g.title || '').includes('-') ? (g.title.split('-')[1].split(' ')[0]) : (g.title || '').substring(0, 5);
+                    const shortTitle = (g.title || '').includes('-') ? (g.title.split('-')[1].trim()) : (g.title || 'Location').trim();
 
                     let stats = '';
-                    if (g.distance) stats += `📏 ${parseFloat(g.distance).toFixed(2)}km `;
-                    if (g.gain) stats += `▲ ${parseFloat(g.gain).toFixed(0)}m `;
+                    if (g.distance) stats += `📏 ${parseFloat(g.distance).toFixed(2)}km  `;
+                    if (g.gain) stats += `▲ ${parseFloat(g.gain).toFixed(0)}m  `;
                     if (g.loss) stats += `▼ ${Math.abs(parseFloat(g.loss)).toFixed(0)}m`;
 
-                    geometryHtml += `
-                        <div onclick="window.location.href='field.html?task_id=${task.task_id}'; event.stopPropagation();" style="background: #f8fafc; padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#f8fafc'">
-                            <div style="min-width: 0; flex: 1;">
-                                <div style="font-weight: 600; font-size: 0.9em; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                    ${icon} ${shortTitle}
+                    if (g.kind === 'line') {
+                        // 🗺️ HERO TRACK DESIGN (Big, obvious, impossible to miss)
+                        geometryHtml += `
+                            <div style="background: #f0f9ff; padding: 15px; border-radius: 12px; margin-bottom: 12px; border: 2px solid #38bdf8; box-shadow: 0 4px 6px rgba(56, 189, 248, 0.15);">
+                                <div style="font-weight: 900; font-size: 1.1em; color: #0369a1; margin-bottom: 5px; text-transform: uppercase;">
+                                    🗺️ ROUTE: ${shortTitle}
                                 </div>
-                                ${stats ? `<div style="font-size: 0.8em; color: #64748b; margin-top: 2px;">${stats}</div>` : ''}
+                                ${stats ? `<div style="font-size: 0.9em; color: #0284c7; margin-bottom: 12px; font-weight: bold;">${stats}</div>` : ''}
+                                
+                                <button onclick="event.stopPropagation(); exportGeomToGPX('${g.kind}', ${g.waypoint_id || g.track_id})" 
+                                        style="width: 100%; background: #f39c12; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: 900; font-size: 1.1em; box-shadow: 0 4px 10px rgba(243, 156, 18, 0.3); display: flex; justify-content: center; align-items: center; gap: 8px; cursor: pointer;">
+                                    <i class="ph ph-download-simple" style="font-size: 1.3em;"></i> DOWNLOAD GPX TRACK
+                                </button>
+                                
+                                <div style="display:flex; gap:10px; margin-top: 10px;">
+                                    <button onclick="window.location.href='field.html?task_id=${task.task_id}'; event.stopPropagation();" 
+                                            style="flex: 1; background: #38bdf8; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 0.9em; cursor: pointer;">
+                                        📍 View on Map
+                                    </button>
+                                    ${g.link ? `
+                                    <button onclick="window.open('${g.link}', '_blank'); event.stopPropagation();" 
+                                            style="flex: 1; background: #10b981; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 0.9em; cursor: pointer;">
+                                        🔗 Open Link
+                                    </button>` : ''}
+                                </div>
                             </div>
-                            <div style="display: flex; gap: 5px;">
-                                <button onclick="event.stopPropagation(); exportGeomToGPX('${g.kind}', ${g.waypoint_id || g.track_id})" class="icon-btn" style="width:28px; height:28px; font-size:0.9em; background:#f39c12; color:white;" title="Download GPX"><i class="ph ph-upload-simple"></i></button>
-                                ${g.link ? `<button onclick="window.open('${g.link}', '_blank'); event.stopPropagation();" class="icon-btn" style="width:28px; height:28px; font-size:0.9em; background:#38bdf8; color:white;"><i class="ph ph-globe"></i></button>` : ''}
+                        `;
+                    } else {
+                        // 📍 STANDARD POINT DESIGN (Compact, secondary importance)
+                        const icon = window.getSafeIconHtml(g.icon, 'ph-map-pin', true);
+                        geometryHtml += `
+                            <div onclick="window.location.href='field.html?task_id=${task.task_id}'; event.stopPropagation();" 
+                                 style="background: #ffffff; padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0; cursor: pointer;">
+                                <div style="min-width: 0; flex: 1;">
+                                    <div style="font-weight: 700; font-size: 0.95em; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                        <span style="color:#e74c3c;">${icon}</span> ${shortTitle}
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 5px;">
+                                    <button onclick="event.stopPropagation(); exportGeomToGPX('${g.kind}', ${g.waypoint_id || g.track_id})" class="icon-btn" style="width:32px; height:32px; font-size:1em; background:#f1f5f9; color:#64748b;" title="Download Waypoint"><i class="ph ph-download-simple"></i></button>
+                                </div>
                             </div>
-                        </div>
-                    `;
+                        `;
+                    }
                 });
                 geometryHtml += `</div>`;
             }
