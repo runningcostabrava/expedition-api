@@ -1427,32 +1427,35 @@ body.zen-mode #fleet-panel {
     /* --- NEW POLISHED MOBILE FABS --- */
     #mobile-fab-container {
         position: fixed !important;
-        bottom: 25px !important; /* Slight lift for safe areas */
+        bottom: 85px !important; /* Slight lift for safe areas */
         right: 15px !important;
         flex-direction: column !important;
-        gap: 12px !important;
+        gap: 6px !important;
         z-index: 200 !important; /* Raised above the 150 of the command bar */
         align-items: flex-end !important;
     }
 
     #mobile-fab-container button {
-        width: 48px !important;
-        height: 48px !important;
+        width: 42px !important;
+        height: 42px !important;
         border-radius: 50% !important;
         border: none !important;
         box-shadow: 0 4px 12px rgba(0,0,0,0.25) !important;
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
-        font-size: 1.3em !important;
+        font-size: 1.1em !important;
         background: #1e293b !important; /* Uniform dark slate color */
         color: white !important;
         padding: 0 !important;
     }
 
+    #mobile-fab-container button[onclick*="gpx-file"] { display: none !important; }
+
     /* Transform the "+ Task" button into a perfect circle with just a plus icon on mobile */
     #mobile-fab-container .add-task-btn {
-        width: 48px !important;
+        width: 42px !important;
+        height: 42px !important;
         background: #10b981 !important; /* Keep it bright green */
         font-size: 0 !important; /* Hides the word "Task" */
     }

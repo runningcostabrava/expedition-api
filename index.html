@@ -87,16 +87,15 @@
                 </div>
             </div>
             <div id="google-search-container" style="position: relative; width: 100%; max-width: 300px;"></div>
-        </div>
-
-        <div id="style-switcher" style="margin-left: auto;">
-            <select onchange="changeMapStyle(this.value)"
-                style="padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); font-weight: bold; cursor: pointer; outline: none; background: rgba(255,255,255,0.1); color: white;">
-                <option value="mapbox://styles/mapbox/outdoors-v12">Outdoors</option>
-                <option value="mapbox://styles/mapbox/satellite-streets-v12">Satellite 3D</option>
-                <option value="mapbox://styles/mapbox/dark-v11">Dark Mode</option>
-                <option value="mapbox://styles/mapbox/streets-v12">Standard</option>
-            </select>
+            <div id="style-switcher" style="margin-left: auto;">
+                <select onchange="changeMapStyle(this.value)"
+                    style="padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); font-weight: bold; cursor: pointer; outline: none; background: rgba(255,255,255,0.1); color: white;">
+                    <option value="mapbox://styles/mapbox/outdoors-v12">Outdoors</option>
+                    <option value="mapbox://styles/mapbox/satellite-streets-v12">Satellite 3D</option>
+                    <option value="mapbox://styles/mapbox/dark-v11">Dark Mode</option>
+                    <option value="mapbox://styles/mapbox/streets-v12">Standard</option>
+                </select>
+            </div>
         </div>
     </div>
 
@@ -3793,7 +3792,7 @@
             background: #e2e8f0 !important;
         }
     </style>
-    <div id="app-switcher" style="position: fixed; bottom: 35px; left: 15px; z-index: 100000;">
+    <div id="app-switcher" style="position: fixed; bottom: 35px; left: 15px; z-index: 110;">
         <button onclick="document.getElementById('switcher-menu').classList.toggle('show')"
             style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;"><i class="ph ph-squares-four"></i></button>
         <div id="switcher-menu"
