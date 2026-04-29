@@ -483,7 +483,7 @@ window.openAiChat = function () {
 
     async function startLiveConversation() {
         try {
-            let isReady = false;
+            let serverIsReady = false;
             audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             micStream = stream;
@@ -499,10 +499,14 @@ window.openAiChat = function () {
                 if (typeof event.data === 'string') {
                     const msg = JSON.parse(event.data);
                     if (msg.status === "ready") {
-                        isReady = true;
+                        serverIsReady = true;
                         console.log('[Live AI] Google is READY 🚀');
                         showToast("Live conversation active", "success");
                         startMicProcessing();
+                    }
+                    if (msg.status === "error") {
+                        showToast(`AI Error: ${msg.reason}`, "error");
+                        stopLiveConversation();
                     }
                     return;
                 }
@@ -532,7 +536,9 @@ window.openAiChat = function () {
                 processorNode.connect(audioContext.destination);
 
                 processorNode.onaudioprocess = (e) => {
-                    if (!isConversing || !isReady) return;
+                    // CRITICAL GUARD: Only send data if server handshake is complete
+                    if (!isConversing || !serverIsReady) return;
+                    
                     const inputData = e.inputBuffer.getChannelData(0);
                     const pcmData = new Int16Array(inputData.length);
                     for (let i = 0; i < inputData.length; i++) {
