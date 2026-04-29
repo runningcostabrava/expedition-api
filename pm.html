@@ -678,7 +678,7 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
                                     </div>
                                 </div>
                                 <div style="display: flex; gap: 5px;">
-                                    <button onclick="event.stopPropagation(); exportGeomToGPX('${g.kind}', ${g.waypoint_id || g.track_id})" class="icon-btn" style="width:32px; height:32px; font-size:1em; background:#f1f5f9; color:#64748b;" title="Download Waypoint"><i class="ph ph-download-simple"></i></button>
+                                    <button onclick="event.stopPropagation(); openGpxExportModal(${task.task_id})" class="icon-btn" style="width:32px; height:32px; font-size:1em; background:#f1f5f9; color:#64748b;" title="Download GPX"><i class="ph ph-download-simple"></i></button>
                                 </div>
                             </div>
                         `;
