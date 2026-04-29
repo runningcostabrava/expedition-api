@@ -366,8 +366,10 @@ window.openAiChat = function () {
     modal.id = modalId;
 
     modal.innerHTML = `
-        <div class="ai-chat-box">
-            <div style="background: #0f172a; color: white; padding: 15px 20px; font-weight: bold; font-size: 1.1em; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+        <div class="ai-chat-box" style="position: relative;">
+            <button onclick="window.closeAiChat()" style="position: absolute; top: 12px; right: 12px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.2em; z-index: 10; padding: 0;"><i class="ph ph-x"></i></button>
+
+            <div style="background: #0f172a; color: white; padding: 15px 55px 15px 15px; font-weight: bold; font-size: 1.1em; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; flex-wrap: wrap; gap: 10px;">
                 <div style="display:flex; align-items:center; gap:10px;">
                     <div style="width:34px; height:34px; background:#8b5cf6; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.2em;"><i class="ph ph-robot"></i></div>
                     <div style="display:flex; flex-direction:column;">
@@ -383,9 +385,8 @@ window.openAiChat = function () {
                         <div id="model-deepseek" class="ai-model-btn active" onclick="window.setAiModel('deepseek')">🧠 DeepSeek</div>
                         <div id="model-gemini" class="ai-model-btn" onclick="window.setAiModel('gemini')">✨ Gemini</div>
                     </div>
-                    <span id="ai-voice-toggle" style="cursor:pointer; font-size:1.2em; opacity:0.5; transition:0.2s;" title="Read aloud (Off)" onclick="this.innerText = (this.innerText === '🔇' ? '🔊' : '🔇'); this.style.opacity = (this.innerText === '🔇' ? '0.5' : '1'); if(this.innerText === '🔇' && window.speechSynthesis) window.speechSynthesis.cancel();">🔇</span>
+                    <span id="ai-voice-toggle" style="cursor:pointer; font-size:1.2em; opacity:0.5; transition:0.2s;" title="Read aloud (Off)">🔇</span>
                     <span onclick="window.clearAiSession()" style="cursor:pointer; font-size:1.2em; color:#94a3b8; transition:0.2s;" title="Clear Session"><i class="ph ph-trash"></i></span>
-                    <span onclick="window.closeAiChat()" style="cursor: pointer; font-size: 1.8em; line-height: 1; padding: 0 5px;"><i class="ph ph-x"></i></span>
                 </div>
             </div>
 
