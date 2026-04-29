@@ -3821,76 +3821,71 @@
             document.getElementById('right-panel').classList.add('hidden');
         }
 
-        // --- BULK DELETE ENGINE ---
-        window.openBulkDeleteModal = function() {
+        function openBulkDeleteModal() {
             const list = document.getElementById('bulk-delete-list');
             list.innerHTML = '';
-            
-            // Collect all unique geometries across all tasks
-            const uniqueGeoms = new Map();
+            let count = 0;
+
             AppStore.get('itinerary').forEach(task => {
-                if (task.geometries) {
+                if (task.geometries && task.geometries.length > 0) {
+                    const taskHeader = document.createElement('div');
+                    taskHeader.innerHTML = `<div style="font-size:0.8em; color:#94a3b8; font-weight:bold; margin-top:15px; border-bottom:1px solid #e2e8f0; padding-bottom:4px; margin-bottom:8px; text-transform:uppercase;">${task.task_name}</div>`;
+                    list.appendChild(taskHeader);
+
                     task.geometries.forEach(g => {
+                        count++;
                         const id = g.waypoint_id || g.track_id;
-                        const key = `${g.kind}-${id}`;
-                        if (!uniqueGeoms.has(key)) {
-                            uniqueGeoms.set(key, { ...g, taskName: task.task_name });
-                        }
+                        const icon = g.kind === 'line' ? '📈' : window.getSafeIconHtml(g.icon, 'ph-map-pin');
+                        const title = g.title || 'Unnamed';
+                        const color = g.color || '#3498db';
+                        
+                        list.innerHTML += `
+                            <label style="display:flex; align-items:center; gap:12px; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0; cursor:pointer; transition:0.2s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#f8fafc'">
+                                <input type="checkbox" class="bulk-del-cb" value="${id}" data-kind="${g.kind}" style="width:20px; height:20px; accent-color: #ef4444; cursor:pointer; margin:0; flex-shrink:0;">
+                                <div style="flex:1; min-width:0; display:flex; align-items:center; gap:8px;">
+                                    <span style="color:${color}; font-size:1.2em;">${icon}</span>
+                                    <span style="font-weight:600; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${title}</span>
+                                </div>
+                            </label>
+                        `;
                     });
                 }
             });
 
-            if (uniqueGeoms.size === 0) {
-                list.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">No items found in database.</div>';
-            } else {
-                uniqueGeoms.forEach((g, key) => {
-                    const id = g.waypoint_id || g.track_id;
-                    const icon = g.kind === 'point' ? window.getSafeIconHtml(g.icon, 'ph-map-pin', true) : (g.kind === 'polygon' ? '<i class="ph ph-hexagon"></i>' : '<i class="ph ph-trend-up"></i>');
-                    
-                    const label = document.createElement('label');
-                    label.style.cssText = "display:flex; align-items:center; gap:12px; background:white; padding:12px; border-radius:8px; border:1px solid #e2e8f0; cursor:pointer; transition: 0.2s;";
-                    label.innerHTML = `
-                        <input type="checkbox" class="bulk-delete-check" data-kind="${g.kind}" data-id="${id}" style="width:20px; height:20px; accent-color:#ef4444;">
-                        <div style="flex:1; min-width:0;">
-                            <div style="font-weight:bold; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${icon} ${g.title || 'Unnamed'}</div>
-                            <div style="font-size:0.75em; color:#64748b;">From: ${g.taskName}</div>
-                        </div>
-                    `;
-                    list.appendChild(label);
-                });
-            }
+            if (count === 0) list.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:20px;">No map locations found in the itinerary.</div>';
+            document.getElementById('bulk-delete-modal').classList.add('open');
+        }
 
-            openModal('bulk-delete-modal');
-        };
+        async function executeBulkDelete() {
+            const checkboxes = document.querySelectorAll('.bulk-del-cb:checked');
+            if (checkboxes.length === 0) return alert("Select at least one item to delete.");
+            
+            if (!confirm(`⚠️ WARNING: You are about to permanently delete ${checkboxes.length} items from the map and database. This cannot be undone.\n\nProceed?`)) return;
 
-        window.executeBulkDelete = async function() {
-            const selected = Array.from(document.querySelectorAll('.bulk-delete-check:checked'));
-            if (selected.length === 0) return alert("Please select at least one item to delete.");
-
-            if (!confirm(`Are you sure you want to permanently delete these ${selected.length} items? This cannot be undone.`)) return;
-
-            const btn = document.querySelector('#bulk-delete-modal button[onclick="executeBulkDelete()"]');
-            btn.innerText = "Deleting...";
+            const btn = document.getElementById('btn-execute-bulk-del');
+            btn.innerText = "⏳ Deleting..."; 
             btn.disabled = true;
 
+            // Ejecutar borrados en paralelo para máxima velocidad
+            const deletePromises = Array.from(checkboxes).map(cb => {
+                const kind = cb.dataset.kind;
+                const id = cb.value;
+                const endpoint = kind === 'point' ? `waypoints/${id}` : `tracks/${id}`;
+                return authFetch(`${API_URL}/${endpoint}`, { method: 'DELETE' });
+            });
+
             try {
-                for (const input of selected) {
-                    const kind = input.dataset.kind;
-                    const id = input.dataset.id;
-                    const endpoint = kind === 'point' ? `waypoints/${id}` : `tracks/${id}`;
-                    await authFetch(`${API_URL}/${endpoint}`, { method: 'DELETE' });
-                }
-                
-                showToast(`Successfully deleted ${selected.length} items`, 'success');
-                closeModal('bulk-delete-modal');
+                await Promise.all(deletePromises);
+                if (typeof showToast !== 'undefined') showToast(`🗑️ Deleted ${checkboxes.length} items successfully`, 'success');
+                document.getElementById('bulk-delete-modal').classList.remove('open');
                 refreshData();
-            } catch (err) {
-                alert("Error during bulk delete: " + err.message);
+            } catch(e) {
+                alert("Error during bulk delete: " + e.message);
             } finally {
-                btn.innerText = "DELETE SELECTED";
+                btn.innerHTML = "🗑️ DELETE SELECTED"; 
                 btn.disabled = false;
             }
-        };
+        }
 
         // --- CRITICAL: Initialize App only after all scripts are ready ---
         document.addEventListener('DOMContentLoaded', () => {
