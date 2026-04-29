@@ -1467,6 +1467,21 @@ body.zen-mode #fleet-panel {
         display: block;
     }
 
+    #elevation-panel {
+        left: 0 !important;
+        width: 100% !important;
+        bottom: 0 !important;
+        height: 40vh !important; /* Ocupa un poco menos de la mitad de la pantalla */
+        border-radius: 24px 24px 0 0 !important;
+        padding-bottom: env(safe-area-inset-bottom, 20px) !important;
+        box-sizing: border-box !important;
+        z-index: 9999 !important;
+    }
+
+    #elevation-panel canvas {
+        max-height: calc(40vh - 60px) !important; /* Evita que el gráfico desborde */
+    }
+
     /* Add Native iOS Drawer Handle to Bottom Sheets */
     #task-detail-panel::before,
     #right-panel::before {
