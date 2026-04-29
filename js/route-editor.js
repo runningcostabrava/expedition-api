@@ -50,10 +50,9 @@ const KomootEngine = {
 
         // Simplify to get control points for the editor
         const simplified = turf.simplify(feature, { tolerance: 0.0005, highQuality: true });
-        let simpCoords = simplified.geometry.coordinates;
-        if (feature.geometry.type === 'Polygon') simpCoords = simpCoords[0];
-        
-        const origCoords = feature.geometry.type === 'Polygon' ? feature.geometry.coordinates[0] : feature.geometry.coordinates;
+        const isPolygon = feature.geometry.type === 'Polygon';
+        let simpCoords = isPolygon ? simplified.geometry.coordinates[0] : simplified.geometry.coordinates;
+        const origCoords = isPolygon ? feature.geometry.coordinates[0] : feature.geometry.coordinates;
 
         // Explicitly recover the Z-coordinates that Turf.simplify strips out
         this.state.intersections = simpCoords.map((c, i) => {
