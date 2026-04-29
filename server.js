@@ -2065,7 +2065,7 @@ wss.on('connection', async (ws) => {
         googleWs.on('open', () => {
             googleWs.send(JSON.stringify({
                 setup: {
-                    model: "models/gemini-3.1-pro", // Actualizado según petición del usuario
+                    model: "models/gemini-2.0-flash-exp",
                     generation_config: { 
                         response_modalities: ["AUDIO"],
                         speech_config: { voice_config: { prebuilt_voice_config: { voice_name: "Puck" } } }

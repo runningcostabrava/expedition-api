@@ -569,7 +569,9 @@ window.openAiChat = function () {
         if (processorNode) processorNode.disconnect();
         if (micStream) micStream.getTracks().forEach(t => t.stop());
         if (liveAudioSocket) liveAudioSocket.close();
-        if (audioContext) audioContext.close();
+        if (audioContext && audioContext.state !== 'closed') {
+            audioContext.close().catch(e => console.warn("[Live AI] Cierre de audio omitido: ", e));
+        }
 
         micBtn.innerHTML = '<i class="ph ph-microphone"></i>';
         micBtn.classList.remove('conversing-pulse');
