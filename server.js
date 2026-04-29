@@ -71,18 +71,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'emergency_fallback_secret'; // 2. 
 
 // REPLACED: adminAuth now verifies tokens, not a static key
 const adminAuth = (req, res, next) => {
-  // TEMP: Disabled password for testing
-  return next();
-
-  const token = req.headers['authorization']?.split(' ')[1]; // Expecting "Bearer <token>"
-
-  if (!token) return res.status(401).json({ error: 'No token provided' });
-
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) return res.status(403).json({ error: 'Invalid or expired token' });
-    req.user = decoded; // Token is valid
-    next();
-  });
+  // BYPASS: Autenticación desactivada temporalmente para desarrollo
+  req.user = { admin: true }; 
+  next();
 };
 
 // NEW: Add a Login endpoint
