@@ -545,33 +545,15 @@ window.openAiChat = function () {
 
     // --- TEXT-TO-SPEECH (LA IA HABLA) ---
     function speakText(text) {
-        if (!window.speechSynthesis || !isVoiceEnabled) return;
+        // GUARDIA: Si el botón está en mute o el navegador no soporta voz, no hacer nada
+        if (!isVoiceEnabled || !window.speechSynthesis) return; 
+        
         window.speechSynthesis.cancel();
         
         // Limpiar el texto de asteriscos y emojis para que suene natural
         const cleanText = text.replace(/[*_#\`~>]/g, '').replace(/\[.*?\]\(.*?\)/g, '').replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '');
         const utterance = new SpeechSynthesisUtterance(cleanText);
-        
-        // Detectar idioma (español o inglés básico) o usar el del sistema
-        // Intentar encontrar una voz natural que coincida con el idioma
-        const voices = window.speechSynthesis.getVoices();
-        
-        // Intentar detectar si es inglés o español (muy básico)
-        const isEnglish = /[a-zA-Z]/.test(cleanText) && !/[ñáéíóú¿¡]/.test(cleanText);
-        const targetLang = isEnglish ? 'en-US' : 'es-ES';
-        
-        // Buscar la mejor voz disponible
-        const bestVoice = voices.find(v => v.lang.startsWith(targetLang) && v.name.includes('Google')) 
-                       || voices.find(v => v.lang.startsWith(targetLang))
-                       || voices.find(v => v.default);
-        
-        if (bestVoice) {
-            utterance.voice = bestVoice;
-            utterance.lang = bestVoice.lang;
-        }
-
         utterance.rate = 1.05; 
-        utterance.pitch = 1.0;
         window.speechSynthesis.speak(utterance);
     }
 
