@@ -402,7 +402,7 @@ window.openAiChat = function () {
                         <div id="model-deepseek" class="ai-model-btn active" onclick="window.setAiModel('deepseek')">🧠 DeepSeek</div>
                         <div id="model-gemini" class="ai-model-btn" onclick="window.setAiModel('gemini')">✨ Gemini</div>
                     </div>
-                    <span id="ai-voice-toggle" style="cursor:pointer; font-size:1.2em; opacity:0.5; transition:0.2s;" title="Read aloud (Off)">🔇</span>
+                    <span id="ai-voice-toggle" style="cursor:pointer; font-size:1.2em; opacity:0.5; transition:0.2s;" title="Read aloud (Off)" onclick="this.innerText = (this.innerText === '🔇' ? '🔊' : '🔇'); this.style.opacity = (this.innerText === '🔇' ? '0.5' : '1'); if(this.innerText === '🔇' && window.speechSynthesis) window.speechSynthesis.cancel();">🔇</span>
                     <span onclick="window.clearAiSession()" style="cursor:pointer; font-size:1.2em; color:#94a3b8; transition:0.2s;" title="Clear Session"><i class="ph ph-trash"></i></span>
                     <span onclick="window.closeAiChat()" style="cursor: pointer; font-size: 1.8em; line-height: 1; padding: 0 5px;"><i class="ph ph-x"></i></span>
                 </div>
@@ -459,129 +459,79 @@ window.openAiChat = function () {
         showToast(`AI brain switched to ${model === 'deepseek' ? 'DeepSeek' : 'Gemini 1.5 Pro'}`, 'info');
     };
 
-    // --- GEMINI MULTIMODAL LIVE AUDIO ENGINE ---
-    let liveAudioSocket = null;
-    let audioContext = null;
-    let micStream = null;
-    let processorNode = null;
-    let isConversing = false;
-    let lastAiChunkTime = Date.now();
-    let thinkingToastActive = false;
+    // --- ASINCRONO WALKIE-TALKIE ENGINE (CON GEMINI 3.1 PRO) ---
+    let voiceRecorder = null;
+    let voiceChunks = [];
+    let isRecordingVoice = false;
 
     const micBtn = document.getElementById('ai-mic-btn');
 
-    // Add pulse animation CSS dynamically
     if (!document.getElementById('mic-pulse-style')) {
         const style = document.createElement('style');
         style.id = 'mic-pulse-style';
         style.innerHTML = `
-            @keyframes micPulse { 0% { box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(52, 152, 219, 0); } 100% { box-shadow: 0 0 0 0 rgba(52, 152, 219, 0); } }
-            .conversing-pulse { animation: micPulse 1.5s infinite !important; background: #8b5cf6 !important; }
+            @keyframes micPulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+            .conversing-pulse { animation: micPulse 1.5s infinite !important; background: #ef4444 !important; }
         `;
         document.head.appendChild(style);
     }
 
-    async function startLiveConversation() {
-        try {
-            let serverIsReady = false;
-            audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            micStream = stream;
+    async function toggleVoiceChat() {
+        if (!isRecordingVoice) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                voiceRecorder = new MediaRecorder(stream);
+                voiceChunks = [];
 
-            liveAudioSocket = new WebSocket(API_URL.replace('https:', 'wss:') + '/api/live-stream');
-            
-            liveAudioSocket.onopen = () => {
-                console.log('[Live AI] Socket Connected. Waiting for Google...');
-                showToast("Connecting brain...", "info");
-            };
+                voiceRecorder.ondataavailable = e => { if (e.data.size > 0) voiceChunks.push(e.data); };
 
-            liveAudioSocket.onmessage = async (event) => {
-                if (typeof event.data === 'string') {
-                    const msg = JSON.parse(event.data);
-                    if (msg.status === "ready") {
-                        serverIsReady = true;
-                        console.log('[Live AI] Google is READY 🚀');
-                        showToast("Live conversation active", "success");
-                        startMicProcessing();
-                    }
-                    if (msg.status === "error") {
-                        showToast(`AI Error: ${msg.reason}`, "error");
-                        stopLiveConversation();
-                    }
-                    return;
-                }
-
-                lastAiChunkTime = Date.now();
-                thinkingToastActive = false;
-
-                try {
-                    const pcmBuffer = new Int16Array(await event.data.arrayBuffer());
-                    const floatBuffer = new Float32Array(pcmBuffer.length);
-                    for (let i = 0; i < pcmBuffer.length; i++) {
-                        floatBuffer[i] = pcmBuffer[i] / (pcmBuffer[i] < 0 ? 0x8000 : 0x7FFF);
-                    }
-                    const audioBuffer = audioContext.createBuffer(1, floatBuffer.length, 16000);
-                    audioBuffer.getChannelData(0).set(floatBuffer);
-                    const playSource = audioContext.createBufferSource();
-                    playSource.buffer = audioBuffer;
-                    playSource.connect(audioContext.destination);
-                    playSource.start(0);
-                } catch (e) { console.error("Playback error:", e); }
-            };
-
-            function startMicProcessing() {
-                const source = audioContext.createMediaStreamSource(micStream);
-                processorNode = audioContext.createScriptProcessor(4096, 1, 1);
-                source.connect(processorNode);
-                processorNode.connect(audioContext.destination);
-
-                processorNode.onaudioprocess = (e) => {
-                    // CRITICAL GUARD: Only send data if server handshake is complete
-                    if (!isConversing || !serverIsReady) return;
+                voiceRecorder.onstop = async () => {
+                    micBtn.innerHTML = '<i class="ph ph-spinner-gap ph-spin"></i>';
                     
-                    const inputData = e.inputBuffer.getChannelData(0);
-                    const pcmData = new Int16Array(inputData.length);
-                    for (let i = 0; i < inputData.length; i++) {
-                        const s = Math.max(-1, Math.min(1, inputData[i]));
-                        pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-                    }
-                    if (liveAudioSocket.readyState === WebSocket.OPEN) {
-                        liveAudioSocket.send(pcmData.buffer);
-                    }
+                    const audioBlob = new Blob(voiceChunks, { type: 'audio/webm' });
+                    const audioFile = new File([audioBlob], "voice_prompt.webm", { type: 'audio/webm' });
+                    
+                    // Añadir como adjunto y autoejecutar el envío
+                    attachedFiles.push(audioFile);
+                    renderAiAttachmentPreview();
+                    document.getElementById('ai-submit-btn').click(); // Auto-Send!
+                    
+                    stream.getTracks().forEach(t => t.stop()); // Apagar luz del micrófono
+                    micBtn.innerHTML = '<i class="ph ph-microphone"></i>';
                 };
+
+                voiceRecorder.start();
+                isRecordingVoice = true;
+                micBtn.innerHTML = '<i class="ph ph-stop"></i>';
+                micBtn.classList.add('conversing-pulse');
+                showToast("Grabando... Pulsa el micro de nuevo para enviar", "info");
+                
+                if (window.speechSynthesis) window.speechSynthesis.cancel(); // Callar a la IA si empieza a hablar
+
+            } catch (err) {
+                console.error("Mic access denied:", err);
+                showToast("Permiso de micrófono denegado", "error");
             }
-
-            liveAudioSocket.onclose = () => stopLiveConversation();
-            liveAudioSocket.onerror = (err) => console.error("[Live AI] WebSocket Error:", err);
-
-            isConversing = true;
-            micBtn.innerHTML = '<i class="ph ph-waveform"></i>';
-            micBtn.classList.add('conversing-pulse');
-
-        } catch (err) {
-            console.error("[Live AI] Startup Error:", err);
-            alert("Could not start live conversation. Please check mic permissions.");
+        } else {
+            isRecordingVoice = false;
+            voiceRecorder.stop();
+            micBtn.classList.remove('conversing-pulse');
         }
     }
 
-    function stopLiveConversation() {
-        isConversing = false;
-        if (processorNode) processorNode.disconnect();
-        if (micStream) micStream.getTracks().forEach(t => t.stop());
-        if (liveAudioSocket) liveAudioSocket.close();
-        if (audioContext && audioContext.state !== 'closed') {
-            audioContext.close().catch(e => console.warn("[Live AI] Cierre de audio omitido: ", e));
-        }
+    micBtn.addEventListener('click', toggleVoiceChat);
 
-        micBtn.innerHTML = '<i class="ph ph-microphone"></i>';
-        micBtn.classList.remove('conversing-pulse');
-        showToast("Live conversation ended", "info");
+    // --- TEXT-TO-SPEECH (LA IA HABLA) ---
+    function speakText(text) {
+        if (!window.speechSynthesis) return;
+        window.speechSynthesis.cancel();
+        
+        // Limpiar el texto de asteriscos y emojis para que suene natural
+        const cleanText = text.replace(/[*_#\`~>]/g, '').replace(/\[.*?\]\(.*?\)/g, '').replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '');
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.rate = 1.05; // Un poco más rápido para mayor fluidez
+        window.speechSynthesis.speak(utterance);
     }
-
-    micBtn.addEventListener('click', () => {
-        if (!isConversing) startLiveConversation();
-        else stopLiveConversation();
-    });
 
     // Auto-send on Enter (Shift+Enter for new line)
     textarea.addEventListener('keydown', function (e) {
@@ -755,6 +705,7 @@ window.openAiChat = function () {
 
             typingIndicator.remove();
             appendMessage('ai', data.message);
+            speakText(data.message);
 
             if (data.uiAction) {
                 if (data.uiAction.type === 'focus_task') {
