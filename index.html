@@ -144,6 +144,9 @@
                     style="background: #f1f5f9; border: 1px solid #cbd5e0; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; color: #475569; display: flex; align-items: center; gap: 4px;">
                     <i class="ph ph-gear"></i> Filters
                 </button>
+                <button onclick="openBulkDeleteModal()" style="background: #fee2e2; border: 1px solid #fca5a5; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; color: #ef4444; display: flex; align-items: center; gap: 4px; transition: 0.2s;" onmouseover="this.style.background='#fecaca'" onmouseout="this.style.background='#fee2e2'">
+                    <i class="ph ph-trash"></i> Bulk Delete
+                </button>
             </div>
 
             <div id="advanced-filters"
@@ -437,6 +440,27 @@
                 <button onclick="saveTaskType()"
                     style="background: #27ae60; color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer;">Create
                     Type</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="bulk-delete-modal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; color: #ef4444;"><i class="ph ph-trash"></i> Bulk Delete Map Items</h3>
+                <span onclick="closeModal('bulk-delete-modal')" style="font-size: 24px; cursor: pointer; color:#64748b;"><i class="ph ph-x"></i></span>
+            </div>
+            <p style="font-size: 0.9em; color: #475569; margin-bottom: 15px;">Select the items you want to permanently remove from the database:</p>
+            
+            <div id="bulk-delete-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; margin-bottom: 20px;">
+                <!-- List will be populated by JS -->
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button onclick="closeModal('bulk-delete-modal')" style="flex: 1; background: #e2e8f0; color: #1e293b;">Cancel</button>
+                <button onclick="executeBulkDelete()" style="flex: 1; background: #ef4444; color: white; font-weight: bold; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3);">
+                    DELETE SELECTED
+                </button>
             </div>
         </div>
     </div>
@@ -3800,6 +3824,77 @@
             document.getElementById('left-panel').classList.add('hidden');
             document.getElementById('right-panel').classList.add('hidden');
         }
+
+        // --- BULK DELETE ENGINE ---
+        window.openBulkDeleteModal = function() {
+            const list = document.getElementById('bulk-delete-list');
+            list.innerHTML = '';
+            
+            // Collect all unique geometries across all tasks
+            const uniqueGeoms = new Map();
+            AppStore.get('itinerary').forEach(task => {
+                if (task.geometries) {
+                    task.geometries.forEach(g => {
+                        const id = g.waypoint_id || g.track_id;
+                        const key = `${g.kind}-${id}`;
+                        if (!uniqueGeoms.has(key)) {
+                            uniqueGeoms.set(key, { ...g, taskName: task.task_name });
+                        }
+                    });
+                }
+            });
+
+            if (uniqueGeoms.size === 0) {
+                list.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">No items found in database.</div>';
+            } else {
+                uniqueGeoms.forEach((g, key) => {
+                    const id = g.waypoint_id || g.track_id;
+                    const icon = g.kind === 'point' ? window.getSafeIconHtml(g.icon, 'ph-map-pin', true) : (g.kind === 'polygon' ? '<i class="ph ph-hexagon"></i>' : '<i class="ph ph-trend-up"></i>');
+                    
+                    const label = document.createElement('label');
+                    label.style.cssText = "display:flex; align-items:center; gap:12px; background:white; padding:12px; border-radius:8px; border:1px solid #e2e8f0; cursor:pointer; transition: 0.2s;";
+                    label.innerHTML = `
+                        <input type="checkbox" class="bulk-delete-check" data-kind="${g.kind}" data-id="${id}" style="width:20px; height:20px; accent-color:#ef4444;">
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-weight:bold; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${icon} ${g.title || 'Unnamed'}</div>
+                            <div style="font-size:0.75em; color:#64748b;">From: ${g.taskName}</div>
+                        </div>
+                    `;
+                    list.appendChild(label);
+                });
+            }
+
+            openModal('bulk-delete-modal');
+        };
+
+        window.executeBulkDelete = async function() {
+            const selected = Array.from(document.querySelectorAll('.bulk-delete-check:checked'));
+            if (selected.length === 0) return alert("Please select at least one item to delete.");
+
+            if (!confirm(`Are you sure you want to permanently delete these ${selected.length} items? This cannot be undone.`)) return;
+
+            const btn = document.querySelector('#bulk-delete-modal button[onclick="executeBulkDelete()"]');
+            btn.innerText = "Deleting...";
+            btn.disabled = true;
+
+            try {
+                for (const input of selected) {
+                    const kind = input.dataset.kind;
+                    const id = input.dataset.id;
+                    const endpoint = kind === 'point' ? `waypoints/${id}` : `tracks/${id}`;
+                    await authFetch(`${API_URL}/${endpoint}`, { method: 'DELETE' });
+                }
+                
+                showToast(`Successfully deleted ${selected.length} items`, 'success');
+                closeModal('bulk-delete-modal');
+                refreshData();
+            } catch (err) {
+                alert("Error during bulk delete: " + err.message);
+            } finally {
+                btn.innerText = "DELETE SELECTED";
+                btn.disabled = false;
+            }
+        };
 
         // --- CRITICAL: Initialize App only after all scripts are ready ---
         document.addEventListener('DOMContentLoaded', () => {
