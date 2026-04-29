@@ -529,8 +529,33 @@ window.openAiChat = function () {
         // Limpiar el texto de asteriscos y emojis para que suene natural
         const cleanText = text.replace(/[*_#\`~>]/g, '').replace(/\[.*?\]\(.*?\)/g, '').replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '');
         const utterance = new SpeechSynthesisUtterance(cleanText);
-        utterance.rate = 1.05; // Un poco más rápido para mayor fluidez
+        
+        // Detectar idioma (español o inglés básico) o usar el del sistema
+        // Intentar encontrar una voz natural que coincida con el idioma
+        const voices = window.speechSynthesis.getVoices();
+        
+        // Intentar detectar si es inglés o español (muy básico)
+        const isEnglish = /[a-zA-Z]/.test(cleanText) && !/[ñáéíóú¿¡]/.test(cleanText);
+        const targetLang = isEnglish ? 'en-US' : 'es-ES';
+        
+        // Buscar la mejor voz disponible
+        const bestVoice = voices.find(v => v.lang.startsWith(targetLang) && v.name.includes('Google')) 
+                       || voices.find(v => v.lang.startsWith(targetLang))
+                       || voices.find(v => v.default);
+        
+        if (bestVoice) {
+            utterance.voice = bestVoice;
+            utterance.lang = bestVoice.lang;
+        }
+
+        utterance.rate = 1.05; 
+        utterance.pitch = 1.0;
         window.speechSynthesis.speak(utterance);
+    }
+
+    // Asegurar que las voces carguen (algunos navegadores las cargan asíncronamente)
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
     }
 
     // Auto-send on Enter (Shift+Enter for new line)
