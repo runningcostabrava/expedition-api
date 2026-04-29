@@ -225,15 +225,14 @@
                 const config = await res.json();
                 mapboxgl.accessToken = config.MAPBOX_TOKEN;
 
-                const isPolygon = editContext.geojson.features[0].geometry.type === 'Polygon';
-                const initialCoords = isPolygon ? editContext.geojson.features[0].geometry.coordinates[0][0] : editContext.geojson.features[0].geometry.coordinates[0];
+                // Extraer el centro de forma segura (soporta Lines y Polygons)
+                const geom = editContext.geojson.features[0].geometry;
+                const centerCoord = geom.type === 'Polygon' ? geom.coordinates[0][0] : geom.coordinates[0];
 
-                // Initialize map and assign to window immediately
                 map = new mapboxgl.Map({
                     container: 'map',
                     style: 'mapbox://styles/mapbox/outdoors-v12',
-                    // Coordinates: Longitude, Latitude
-                    center: initialCoords || [12.5928, 38.0662],
+                    center: centerCoord || [12.5928, 38.0662],
                     zoom: 14
                 });
 
