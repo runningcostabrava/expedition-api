@@ -2054,9 +2054,7 @@ const server = app.listen(PORT, '0.0.0.0', () => console.log(`API online on port
 const wss = new WebSocketServer({ server, path: '/api/live-stream' });
 
 wss.on('connection', async (ws) => {
-    console.log('[Live AI] Cliente conectado. Iniciando puente...');
-    let setupConfirmed = false;
-
+    console.log('[Live AI] Cliente intentando conexión...');
     try {
         const WebSocket = require('ws');
         const googleUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${process.env.GEMINI_API_KEY}`;
@@ -2064,10 +2062,9 @@ wss.on('connection', async (ws) => {
 
         googleWs.on('open', () => {
             console.log('[Live AI] Puente con Google ABIERTO ✅');
-            // Enviamos el setup con el formato exacto requerido
             googleWs.send(JSON.stringify({
                 setup: {
-                    model: "models/gemini-2.4-flash-exp", // Actualizado a la versión más estable de 2026
+                    model: "models/gemini-2.0-flash-exp",
                     generation_config: { 
                         response_modalities: ["AUDIO"],
                         speech_config: { voice_config: { prebuilt_voice_config: { voice_name: "Puck" } } }
@@ -2078,33 +2075,26 @@ wss.on('connection', async (ws) => {
 
         googleWs.on('message', (data) => {
             const resp = JSON.parse(data);
-            
-            // Si Google confirma el setup, ya podemos recibir/enviar audio
+            // Log para depuración: Ver qué dice Google antes de cerrar
             if (resp.setupComplete) {
-                setupConfirmed = true;
-                console.log('[Live AI] Setup confirmado por Google 🚀');
-                return;
+                console.log('[Live AI] Handshake completado: Google listo 🚀');
+                if (ws.readyState === 1) ws.send(JSON.stringify({ status: "ready" }));
             }
-
             if (resp.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data) {
-                const audioB64 = resp.serverContent.modelTurn.parts[0].inlineData.data;
-                if (ws.readyState === 1) ws.send(Buffer.from(audioB64, 'base64'));
+                if (ws.readyState === 1) ws.send(Buffer.from(resp.serverContent.modelTurn.parts[0].inlineData.data, 'base64'));
             }
+        });
+
+        googleWs.on('close', (code, reason) => {
+            console.error(`[Live AI] Google cerró conexión. Código: ${code}, Razón: ${reason}`);
+            ws.close();
         });
 
         ws.on('message', (data) => {
-            if (googleWs.readyState === 1 && setupConfirmed) {
+            if (googleWs.readyState === 1) {
                 const b64 = Buffer.isBuffer(data) ? data.toString("base64") : Buffer.from(data).toString("base64");
-                googleWs.send(JSON.stringify({ 
-                    realtime_input: { 
-                        media_chunks: [{ mime_type: "audio/pcm;rate=16000", data: b64 }] 
-                    } 
-                }));
+                googleWs.send(JSON.stringify({ realtime_input: { media_chunks: [{ mime_type: "audio/pcm;rate=16000", data: b64 }] } }));
             }
         });
-
-        googleWs.on('close', () => { console.log('[Live AI] Google cerró conexión'); ws.close(); });
-        ws.on('close', () => googleWs.close());
-
-    } catch (e) { console.error('Error en socket:', e); ws.close(); }
+    } catch (e) { ws.close(); }
 });

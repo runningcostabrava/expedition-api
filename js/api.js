@@ -483,76 +483,67 @@ window.openAiChat = function () {
 
     async function startLiveConversation() {
         try {
-            // Gemini requires 16kHz PCM
+            let isReady = false;
             audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             micStream = stream;
 
             liveAudioSocket = new WebSocket(API_URL.replace('https:', 'wss:') + '/api/live-stream');
-            liveAudioSocket.binaryType = 'arraybuffer';
-
+            
             liveAudioSocket.onopen = () => {
-                console.log('[Live AI] Socket Connected');
-                showToast("Live conversation active", "info");
-                
-                const source = audioContext.createMediaStreamSource(stream);
-                // 1. High-Performance PCM Conversion (Int16, 16kHz)
-                processorNode = audioContext.createScriptProcessor(4096, 1, 1);
-
-                source.connect(processorNode);
-                processorNode.connect(audioContext.destination);
-
-                processorNode.onaudioprocess = (e) => {
-                    if (!isConversing) return;
-                    const inputData = e.inputBuffer.getChannelData(0);
-                    
-                    const pcmData = new Int16Array(inputData.length);
-                    let hasSignal = false;
-                    for (let i = 0; i < inputData.length; i++) {
-                        const s = Math.max(-1, Math.min(1, inputData[i]));
-                        pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-                        if (Math.abs(s) > 0.05) hasSignal = true; 
-                    }
-
-                    if (liveAudioSocket.readyState === WebSocket.OPEN) {
-                        liveAudioSocket.send(pcmData.buffer);
-                    }
-                };
-
-                // 2. Latency Watcher & Thinking Logic
-                setInterval(() => {
-                    if (!isConversing) return;
-                    const now = Date.now();
-                    // If AI hasn't sent audio in 1.5s and user isn't talking (simplified)
-                    if (now - lastAiChunkTime > 1500 && !thinkingToastActive) {
-                        showToast("Give me a moment...", "info");
-                        thinkingToastActive = true;
-                    }
-                }, 500);
+                console.log('[Live AI] Socket Connected. Waiting for Google...');
+                showToast("Connecting brain...", "info");
             };
 
             liveAudioSocket.onmessage = async (event) => {
+                if (typeof event.data === 'string') {
+                    const msg = JSON.parse(event.data);
+                    if (msg.status === "ready") {
+                        isReady = true;
+                        console.log('[Live AI] Google is READY 🚀');
+                        showToast("Live conversation active", "success");
+                        startMicProcessing();
+                    }
+                    return;
+                }
+
                 lastAiChunkTime = Date.now();
                 thinkingToastActive = false;
 
-                // 3. High-Performance Raw PCM Playback (Int16 to Float32)
                 try {
-                    const pcmBuffer = new Int16Array(event.data);
+                    const pcmBuffer = new Int16Array(await event.data.arrayBuffer());
                     const floatBuffer = new Float32Array(pcmBuffer.length);
-                    
                     for (let i = 0; i < pcmBuffer.length; i++) {
                         floatBuffer[i] = pcmBuffer[i] / (pcmBuffer[i] < 0 ? 0x8000 : 0x7FFF);
                     }
-
                     const audioBuffer = audioContext.createBuffer(1, floatBuffer.length, 16000);
                     audioBuffer.getChannelData(0).set(floatBuffer);
-
                     const playSource = audioContext.createBufferSource();
                     playSource.buffer = audioBuffer;
                     playSource.connect(audioContext.destination);
                     playSource.start(0);
                 } catch (e) { console.error("Playback error:", e); }
             };
+
+            function startMicProcessing() {
+                const source = audioContext.createMediaStreamSource(micStream);
+                processorNode = audioContext.createScriptProcessor(4096, 1, 1);
+                source.connect(processorNode);
+                processorNode.connect(audioContext.destination);
+
+                processorNode.onaudioprocess = (e) => {
+                    if (!isConversing || !isReady) return;
+                    const inputData = e.inputBuffer.getChannelData(0);
+                    const pcmData = new Int16Array(inputData.length);
+                    for (let i = 0; i < inputData.length; i++) {
+                        const s = Math.max(-1, Math.min(1, inputData[i]));
+                        pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                    }
+                    if (liveAudioSocket.readyState === WebSocket.OPEN) {
+                        liveAudioSocket.send(pcmData.buffer);
+                    }
+                };
+            }
 
             liveAudioSocket.onclose = () => stopLiveConversation();
             liveAudioSocket.onerror = (err) => console.error("[Live AI] WebSocket Error:", err);
