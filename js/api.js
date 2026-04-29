@@ -466,6 +466,28 @@ window.openAiChat = function () {
 
     const micBtn = document.getElementById('ai-mic-btn');
 
+    // --- CONTROL DE LECTURA EN VOZ ALTA (TTS TOGGLE) ---
+    const voiceToggleBtn = document.getElementById('ai-voice-toggle');
+    let isVoiceEnabled = false; // Por defecto apagado (🔇)
+
+    if (voiceToggleBtn) {
+        voiceToggleBtn.addEventListener('click', () => {
+            isVoiceEnabled = !isVoiceEnabled;
+            if (isVoiceEnabled) {
+                voiceToggleBtn.innerHTML = '🔊';
+                voiceToggleBtn.style.opacity = '1';
+                voiceToggleBtn.title = 'Read aloud (On)';
+                showToast("Voz de IA Activada", "success");
+            } else {
+                voiceToggleBtn.innerHTML = '🔇';
+                voiceToggleBtn.style.opacity = '0.5';
+                voiceToggleBtn.title = 'Read aloud (Off)';
+                if (window.speechSynthesis) window.speechSynthesis.cancel(); // Calla a la IA al instante
+                showToast("Voz de IA Desactivada", "info");
+            }
+        });
+    }
+
     if (!document.getElementById('mic-pulse-style')) {
         const style = document.createElement('style');
         style.id = 'mic-pulse-style';
@@ -523,7 +545,7 @@ window.openAiChat = function () {
 
     // --- TEXT-TO-SPEECH (LA IA HABLA) ---
     function speakText(text) {
-        if (!window.speechSynthesis) return;
+        if (!window.speechSynthesis || !isVoiceEnabled) return;
         window.speechSynthesis.cancel();
         
         // Limpiar el texto de asteriscos y emojis para que suene natural
