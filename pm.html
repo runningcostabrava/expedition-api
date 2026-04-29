@@ -515,24 +515,64 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
             chevron.classList.toggle('open');
         };
 
-        function exportTaskToGPX(taskId) {
-            const task = fullItinerary.find(t => t.task_id === taskId);
-            if (!task || !task.geometries || task.geometries.length === 0) return alert('No locations to export for this task.');
+        let currentExportTask = null;
 
-            let gpx = '<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="ExpeditionApp">';
-            task.geometries.forEach(g => {
-                if (g.kind === 'point') {
-                    gpx += `<wpt lat="${g.lat}" lon="${g.lng}"><name>${(g.title || 'Waypoint').replace(/&/g, '&')}</name></wpt>`;
-                } else if (g.geojson) {
-                    gpx += `<trk><name>${(g.title || 'Track').replace(/&/g, '&')}</name><trkseg>`;
+        function openGpxExportModal(taskId) {
+            const task = fullItinerary.find(t => t.task_id === taskId);
+            if (!task || !task.geometries || task.geometries.length === 0) return alert('No locations to export.');
+
+            currentExportTask = task;
+            const list = document.getElementById('gpx-export-list');
+            list.innerHTML = '';
+
+            task.geometries.forEach((g, index) => {
+                const isTrack = g.kind === 'line';
+                const icon = isTrack ? '📈' : window.getSafeIconHtml(g.icon, 'ph-map-pin', true);
+                const title = g.title || (isTrack ? 'Track' : 'Waypoint');
+                
+                list.innerHTML += `
+                    <label style="display:flex; align-items:center; gap:12px; background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; cursor:pointer;">
+                        <input type="checkbox" id="gpx-item-${index}" value="${index}" checked style="width:22px; height:22px; margin:0; flex-shrink:0; accent-color: #f39c12;">
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-weight:bold; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                <span style="color:${isTrack ? '#38bdf8' : '#e74c3c'};">${icon}</span> ${title}
+                            </div>
+                            <div style="font-size:0.8em; color:#64748b;">${isTrack ? 'Route / Track' : 'Point of Interest'}</div>
+                        </div>
+                    </label>
+                `;
+            });
+
+            document.getElementById('gpx-export-modal').classList.add('open');
+        }
+
+        function downloadSelectedGPX() {
+            if (!currentExportTask) return;
+
+            const checkboxes = document.querySelectorAll('#gpx-export-list input[type="checkbox"]:checked');
+            if (checkboxes.length === 0) return alert("Select at least one item to download.");
+
+            let gpx = '<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="ExpeditionApp">\n';
+
+            checkboxes.forEach(cb => {
+                const index = parseInt(cb.value);
+                const g = currentExportTask.geometries[index];
+
+                if (g.kind === 'point' && g.lat) {
+                    gpx += `  <wpt lat="${g.lat}" lon="${g.lng}">\n    <name>${(g.title || 'Waypoint').replace(/&/g, '&')}</name>\n  </wpt>\n`;
+                } else if (g.geojson && g.geojson.features && g.geojson.features.length > 0) {
+                    gpx += `  <trk>\n    <name>${(g.title || 'Track').replace(/&/g, '&')}</name>\n    <trkseg>\n`;
                     const coords = g.geojson.features[0].geometry.type === 'Polygon' ? g.geojson.features[0].geometry.coordinates[0] : g.geojson.features[0].geometry.coordinates;
-                    coords.forEach(c => { gpx += `<trkpt lat="${c[1]}" lon="${c[0]}"><ele>${c[2] || 0}</ele></trkpt>`; });
-                    gpx += `</trkseg></trk>`;
+                    coords.forEach(c => {
+                        gpx += `      <trkpt lat="${c[1]}" lon="${c[0]}">${c[2] !== undefined ? `\n        <ele>${c[2]}</ele>\n      ` : ''}</trkpt>\n`;
+                    });
+                    gpx += `    </trkseg>\n  </trk>\n`;
                 }
             });
             gpx += '</gpx>';
 
-            triggerDownload(gpx, `${(task.task_name || 'export').replace(/[^a-z0-9]/gi, '_')}.gpx`);
+            triggerDownload(gpx, `${(currentExportTask.task_name || 'export').replace(/[^a-z0-9]/gi, '_')}_Compiled.gpx`);
+            document.getElementById('gpx-export-modal').classList.remove('open');
         }
 
         function exportGeomToGPX(kind, id) {
@@ -608,7 +648,7 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
                                 </div>
                                 ${stats ? `<div style="font-size: 0.9em; color: #0284c7; margin-bottom: 12px; font-weight: bold;">${stats}</div>` : ''}
                                 
-                                <button onclick="event.stopPropagation(); exportGeomToGPX('${g.kind}', ${g.waypoint_id || g.track_id})" 
+                                <button onclick="event.stopPropagation(); openGpxExportModal(${task.task_id})" 
                                         style="width: 100%; background: #f39c12; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: 900; font-size: 1.1em; box-shadow: 0 4px 10px rgba(243, 156, 18, 0.3); display: flex; justify-content: center; align-items: center; gap: 8px; cursor: pointer;">
                                     <i class="ph ph-download-simple" style="font-size: 1.3em;"></i> DOWNLOAD GPX TRACK
                                 </button>
@@ -666,7 +706,7 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
                             ${task.responsible ? `<span class="meta-badge">👤 ${task.responsible}</span>` : ''}
                         </div>
                         <div class="action-icons">
-                            ${hasMapData ? `<button class="icon-btn" style="background:#f39c12; color:white;" title="Download All GPX" onclick="event.stopPropagation(); exportTaskToGPX(${task.task_id})"><i class="ph ph-upload-simple"></i></button>` : ''}
+                            ${hasMapData ? `<button class="icon-btn" style="background:#f39c12; color:white;" title="Download All GPX" onclick="event.stopPropagation(); openGpxExportModal(${task.task_id})"><i class="ph ph-upload-simple"></i></button>` : ''}
                             <button class="icon-btn edit" onclick="event.stopPropagation(); openTaskModal(${task.task_id})"><i class="ph ph-pencil-simple"></i></button>
                             ${hasMapData ? `<a href="field.html?task_id=${task.task_id}" class="icon-btn map" title="View on Map" onclick="event.stopPropagation();"><i class="ph ph-compass"></i></a>` : ''}
                             <button class="icon-btn ${task.is_completed ? '' : 'complete'}" onclick="event.stopPropagation(); toggleComplete(${task.task_id}, ${!task.is_completed})">
