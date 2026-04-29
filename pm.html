@@ -275,7 +275,15 @@
             &times;</div>
     </div>
 
-    <header><i class="ph ph-clipboard-text"></i> Expedition Itinerary</header>
+    <header style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="flex:1;"></span>
+        <span style="flex:2; text-align:center;"><i class="ph ph-clipboard-text"></i> Expedition Itinerary</span>
+        <div style="flex:1; display:flex; justify-content:flex-end;">
+            <button onclick="openSelectiveExport()" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 12px; border-radius: 8px; font-size: 0.7em; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                <i class="ph ph-download-simple" style="font-size: 1.4em;"></i> EXPORT GPX
+            </button>
+        </div>
+    </header>
     <div id="pm-container">
         <div style="text-align: center; padding: 40px; color: #64748b;">⏳ Syncing...</div>
     </div>
@@ -306,6 +314,23 @@
             <button id="delete-btn" onclick="deleteTask()"
                 style="width: 100%; background: #ef4444; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer; margin-top: 10px; display: none;"><i class="ph ph-trash"></i>
                 Delete Task</button>
+        </div>
+    </div>
+
+    <div id="gpx-export-modal" class="modal">
+        <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 style="margin: 0; color:#0f172a;"><i class="ph ph-download-simple"></i> Select Data to Export</h3>
+                <span onclick="document.getElementById('gpx-export-modal').classList.remove('open')" style="font-size: 24px; cursor: pointer; color:#64748b;"><i class="ph ph-x"></i></span>
+            </div>
+            <p style="font-size:0.9em; color:#475569; margin-top:0; margin-bottom: 15px;">Check the items to include in your single GPX file:</p>
+            
+            <div id="gpx-export-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px; max-height: 50vh; overflow-y:auto; padding-right: 5px;">
+                </div>
+
+            <button onclick="downloadSelectedGPX()" style="width: 100%; background: #f39c12; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: 900; font-size: 1.1em; cursor: pointer; box-shadow: 0 4px 10px rgba(243, 156, 18, 0.3);">
+                📥 DOWNLOAD COMPILED GPX
+            </button>
         </div>
     </div>
 
@@ -751,6 +776,86 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
             }, 800);
         }
 
+
+        // --- SELECTIVE GPX EXPORT ENGINE ---
+        window.openSelectiveExport = function() {
+            const list = document.getElementById('gpx-export-list');
+            list.innerHTML = '';
+            
+            // Collect all unique geometries from the entire itinerary
+            const uniqueGeoms = new Map();
+            fullItinerary.forEach(task => {
+                if (task.geometries) {
+                    task.geometries.forEach(g => {
+                        const id = g.waypoint_id || g.track_id;
+                        const key = `${g.kind}-${id}`;
+                        if (!uniqueGeoms.has(key)) {
+                            uniqueGeoms.set(key, { ...g, taskName: task.task_name });
+                        }
+                    });
+                }
+            });
+
+            if (uniqueGeoms.size === 0) {
+                list.innerHTML = '<div style="text-align:center; padding:20px; color:#64748b;">No items found to export.</div>';
+            } else {
+                uniqueGeoms.forEach((g, key) => {
+                    const id = g.waypoint_id || g.track_id;
+                    const isTrack = g.kind === 'line';
+                    const icon = isTrack ? '🗺️' : '📍';
+                    const title = (g.title || 'Unnamed').trim();
+                    
+                    const item = document.createElement('label');
+                    item.style.cssText = "display:flex; align-items:center; gap:12px; background:#f8fafc; padding:12px; border-radius:10px; border:1px solid #e2e8f0; cursor:pointer;";
+                    item.innerHTML = `
+                        <input type="checkbox" class="gpx-select-item" data-kind="${g.kind}" data-id="${id}" checked style="width:20px; height:20px;">
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-weight:bold; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${icon} ${title}</div>
+                            <div style="font-size:0.75em; color:#64748b;">From: ${g.taskName}</div>
+                        </div>
+                    `;
+                    list.appendChild(item);
+                });
+            }
+
+            document.getElementById('gpx-export-modal').classList.add('open');
+        };
+
+        window.downloadSelectedGPX = function() {
+            const selected = Array.from(document.querySelectorAll('.gpx-select-item:checked'));
+            if (selected.length === 0) return alert("Please select at least one item.");
+
+            let gpx = '<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="ExpeditionApp">';
+            
+            selected.forEach(input => {
+                const kind = input.dataset.kind;
+                const id = parseInt(input.dataset.id);
+                
+                // Find geometry in data
+                let geom = null;
+                for (const t of fullItinerary) {
+                    if (t.geometries) {
+                        geom = t.geometries.find(g => (kind === 'point' ? g.waypoint_id : g.track_id) === id);
+                        if (geom) break;
+                    }
+                }
+
+                if (geom) {
+                    if (kind === 'point') {
+                        gpx += `<wpt lat="${geom.lat}" lon="${geom.lng}"><name>${(geom.title || 'Waypoint').replace(/&/g, '&')}</name></wpt>`;
+                    } else if (geom.geojson) {
+                        gpx += `<trk><name>${(geom.title || 'Track').replace(/&/g, '&')}</name><trkseg>`;
+                        const coords = geom.geojson.features[0].geometry.type === 'Polygon' ? geom.geojson.features[0].geometry.coordinates[0] : geom.geojson.features[0].geometry.coordinates;
+                        coords.forEach(c => { gpx += `<trkpt lat="${c[1]}" lon="${c[0]}"><ele>${c[2] || 0}</ele></trkpt>`; });
+                        gpx += `</trkseg></trk>`;
+                    }
+                }
+            });
+
+            gpx += '</gpx>';
+            triggerDownload(gpx, `Expedition_Export_${new Date().getTime()}.gpx`);
+            document.getElementById('gpx-export-modal').classList.remove('open');
+        };
 
         initPM();
     </script>
