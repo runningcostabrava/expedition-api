@@ -3143,7 +3143,7 @@
             if (kind === 'point') {
                 const marker = (typeof itineraryMarkers !== 'undefined' && itineraryMarkers.length > 0) 
                     ? itineraryMarkers.find(m => m.getElement().dataset.anchorId == id) 
-                    : activeMarkers.find(m => m.getElement().dataset.anchorId == id);
+                    : (typeof activeMarkers !== 'undefined' ? activeMarkers.find(m => m.getElement().dataset.anchorId == id) : null);
                 if (marker) {
                     const el = marker.getElement();
                     const isHidden = el.style.opacity === '0';
