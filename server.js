@@ -200,6 +200,18 @@ app.get('/setup-db', adminAuth, async (req, res) => {
   }
 });
 
+// Endpoint de emergencia para auditar backups
+app.get('/api/export-backups', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT id, backup_date, table_name, metadata, data_json FROM database_backups ORDER BY id DESC');
+        res.setHeader('Content-disposition', 'attachment; filename=expedition_backups.json');
+        res.setHeader('Content-type', 'application/json');
+        res.send(JSON.stringify(result.rows, null, 2));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- MEDIA UPLOAD (CLOUDINARY) ---
 app.post('/api/upload', adminAuth, upload.single('file'), (req, res) => {
   try {
