@@ -931,15 +931,15 @@ const aiTools = [
     type: "function",
     function: {
       name: "analyze_track_point",
-      description: "Calcula el KM exacto, la altitud y el contexto de giro de una coordenada respecto a un track.",
+      description: "Calcula el KM exacto, la altitud y el contexto de giro de una coordenada respecto a un track. Si no se proporcionan lat/lng, el sistema elegirá automáticamente puntos clave del track para analizarlos.",
       parameters: {
         type: "object",
         properties: {
           track_id: { type: "integer" },
-          lat: { type: "number" },
-          lng: { type: "number" }
+          lat: { type: "number", nullable: true },
+          lng: { type: "number", nullable: true }
         },
-        required: ["track_id", "lat", "lng"]
+        required: ["track_id"]
       }
     }
   }
@@ -980,7 +980,8 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
                      'elevation_loss_m', COALESCE(w.loss, tr.loss),
                      'comments_attachments', COALESCE(w.comments, tr.comments),
                      'url_link', COALESCE(w.link, tr.link),
-                     'lat', w.lat, 'lng', w.lng
+                     'lat', w.lat, 'lng', w.lng,
+                     'geojson', tr.geojson_data
                    )
                  )
                  FROM task_anchors ta
