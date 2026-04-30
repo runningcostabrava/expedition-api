@@ -1609,7 +1609,8 @@ app.post('/waypoints', adminAuth, async (req, res) => {
       }
     }
     triggerMapRefresh();
-    res.status(200).send({ message: "Waypoint created and linked!" });
+    const wpComplete = await pool.query('SELECT * FROM waypoints WHERE id = $1', [wpId]);
+    res.status(200).json(wpComplete.rows[0]);
   } catch (err) {
     console.error("DEBUG POST /waypoints error:", err);
     res.status(500).send({ error: err.message });
