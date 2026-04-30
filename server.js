@@ -892,23 +892,24 @@ const aiTools = [
         },
         required: ["backup_id", "table_name"]
       }
-    },
-    {
-      type: "function",
-      function: {
-        name: "inspect_backup",
-        description: "Read the contents of a specific database backup without restoring it. Use this to find deleted tasks, waypoints, or tracks so you can answer user questions or manually recreate the missing items.",
-        parameters: {
-          type: "object",
-          properties: {
-            backup_id: { type: "integer" },
-            table_name: { type: "string", enum: ["waypoints", "tasks", "sections", "tracks"] },
-            search_term: { type: "string", description: "Filter results by name/title to avoid massive data responses." }
-          },
-          required: ["backup_id", "table_name"]
-        }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "inspect_backup",
+      description: "Read the contents of a specific database backup without restoring it. Use this to find deleted tasks, waypoints, or tracks so you can answer user questions or manually recreate the missing items.",
+      parameters: {
+        type: "object",
+        properties: {
+          backup_id: { type: "integer" },
+          table_name: { type: "string", enum: ["waypoints", "tasks", "sections", "tracks"] },
+          search_term: { type: "string", description: "Filter results by name/title to avoid massive data responses." }
+        },
+        required: ["backup_id", "table_name"]
       }
     }
+  }
 ];
 
 async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', activeTaskId = null, imageUrls = []) {
@@ -1360,15 +1361,17 @@ async function executeTool(name, args) {
                 if (tableData) {
                     if (args.search_term) {
                         const term = args.search_term.toLowerCase();
-                        tableData = tableData.filter(row => {
-                            const nameField = row.task_name || row.title || row.name || "";
-                            return nameField.toLowerCase().includes(term);
-                        });
+                        tableData = tableData.filter(row => JSON.stringify(row).toLowerCase().includes(term));
                     }
-                    toolResult = `BACKUP CONTENTS (${args.table_name}, ID ${args.backup_id}):\n${JSON.stringify(tableData.slice(0, 20))}`;
-                    if (tableData.length > 20) toolResult += `\n...and ${tableData.length - 20} more items.`;
-                } else { toolResult = `ERROR: Table ${args.table_name} not found in this backup.`; }
-            } else { toolResult = "ERROR: Backup not found."; }
+                    // Limit output size to prevent blowing up the AI's context window
+                    const output = tableData.slice(0, 15);
+                    toolResult = `BACKUP DATA (Matches: ${tableData.length}, Showing first 15):\n${JSON.stringify(output)}`;
+                } else { 
+                    toolResult = `ERROR: No data for table ${args.table_name} in this backup.`; 
+                }
+            } else { 
+                toolResult = "ERROR: Backup not found."; 
+            }
         }
     } catch (err) {
         console.error(`[AI Tool Error] ${name}:`, err);
