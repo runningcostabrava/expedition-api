@@ -1037,7 +1037,7 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
           21. RECUPERACIÓN DE DATOS. Si el usuario indica que has borrado información o cometido un error masivo, utiliza 'list_backups' para encontrar el snapshot anterior a tu acción y 'restore_from_backup' para revertir los cambios en la tabla afectada inmediatamente. NUNCA utilices 'list_backups' ante fallos de herramientas geográficas o de red.
           23. CONFIRMATION REQUIRED: Before calling any 'delete' tool (task, waypoint, track, or section), you MUST ask the user for explicit permission in the chat. Never delete data silently.
           24. GEOMETRY LINKING: You have full permission to use 'reassign_geometry' to organize the map. If a user asks to 'move' or 'assign' a pin/track, do it immediately and confirm the action.
-          25. PERFIL DE ELEVACIÓN: Cuando el usuario te pida crear un punto en una ruta o perfil, identifica el track_id de la tarea activa y asígnalo como 'parent_track_id'. Esto es vital para que el punto sea visible en el gráfico técnico.
+          25. PERFIL DE ELEVACIÓN: Cuando el usuario te pida crear un punto en una ruta o perfil, identifica el track_id de la tarea activa y asígnalo como 'parent_track_id'. Esto es vital para que el punto sea visible en el gráfico técnico. CRITICAL: 'parent_track_id' is NOT the 'task_id'. You must extract the specific 'track_id' from the 'map_data' array inside the task context. Do not confuse them.
           26. INTELIGENCIA DE TERRENO: Antes de crear cualquier waypoint en una ruta, DEBES llamar a 'analyze_track_point'. Usa los datos recibidos para escribir un título inteligente. Ej: 'KM 4.2 - Cima' o 'KM 1.5 - Giro a la derecha'. Cuando distribuyas waypoints, usa 'analyze_track_point' SOLO UNA VEZ con el track_id. La herramienta te devolverá un array con todos los puntos ya analizados (cima, giros, etc). Usa esos datos directamente para llamar a 'create_waypoint' en paralelo y ahorra pasos. Asegura que los waypoints no estén muy juntos.
           27. BÚSQUEDA DE ACCIDENTES: Solo busca accidentes geográficos (Rule 27) si el análisis de track tiene éxito. Si falla, genera el waypoint solo con el KM y la altitud básica para evitar bucles. Si el punto está en un valle o cerca de altitud 0, usa 'search_internet' con las coordenadas para ver si hay un río, puente o playa conocida cerca y menciónalo en la descripción.
 
@@ -1255,9 +1255,14 @@ async function executeTool(name, args) {
             toolResult = `SUCCESS: UI told to highlight task.`;
         }
         else if (name === "create_waypoint") {
+            let safeTrackId = args.parent_track_id || null;
+            if (safeTrackId) {
+                const trackCheck = await pool.query('SELECT id FROM tracks WHERE id = $1', [safeTrackId]);
+                if (trackCheck.rows.length === 0) safeTrackId = null;
+            }
             const wpRes = await pool.query(
                 'INSERT INTO waypoints (title, lat, lng, description, icon, color, parent_track_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
-                [args.title, args.lat, args.lng, args.description || '', args.icon || 'ph-map-pin', args.color || '#3498db', args.parent_track_id || null]
+                [args.title, args.lat, args.lng, args.description || '', args.icon || 'ph-map-pin', args.color || '#3498db', safeTrackId]
             );
             const newWpId = wpRes.rows[0].id;
             const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, waypoint_id) VALUES ($1, $2) RETURNING id', ['point', newWpId]);
@@ -1272,6 +1277,10 @@ async function executeTool(name, args) {
             toolResult = `SUCCESS: Waypoint created with ID ${newWpId}.`;
         }
         else if (name === "update_waypoint") {
+            if (args.updates.parent_track_id) {
+                const trackCheck = await pool.query('SELECT id FROM tracks WHERE id = $1', [args.updates.parent_track_id]);
+                if (trackCheck.rows.length === 0) args.updates.parent_track_id = null;
+            }
             const fields = Object.keys(args.updates).map((key, i) => `${key} = $${i + 2}`).join(', ');
             const values = Object.values(args.updates);
             await pool.query(`UPDATE waypoints SET ${fields} WHERE id = $1`, [args.id, ...values]);
