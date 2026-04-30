@@ -166,11 +166,11 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                                     // White Halo for legibility
                                     ctx.strokeStyle = '#ffffff';
                                     ctx.lineWidth = 3;
-                                    ctx.strokeText(waypointSequence[i], point.x, point.y - 25);
+                                    ctx.strokeText(waypointSequence[i], point.x, point.y - 32);
                                     
                                     // Dark text (--bg-main)
                                     ctx.fillStyle = '#0f172a';
-                                    ctx.fillText(waypointSequence[i], point.x, point.y - 25);
+                                    ctx.fillText(waypointSequence[i], point.x, point.y - 32);
                                 }
                     }
                 });
