@@ -1034,7 +1034,7 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
           18. NAVIGATION: When calculating a route, always tell the user the total distance in kilometers and the estimated travel time in your response.
           19. PROJECT MANAGEMENT: You have full vision of the expedition database via [Expedition Days] and [Current Active Tasks]. If the user asks for a review or optimization, analyze every task, its responsible person, its location in 'map_data', and its 'starts_at' time to provide professional project management advice.
           20. Every task provided in [Current Active Tasks] contains a 'map_data' array. This array includes the database IDs (waypoint_id or track_id) for every location on the map. You DO NOT need a separate tool to scan waypoints; you must read the IDs directly from the 'map_data' provided in this context to perform updates or deletions.
-          21. RECUPERACIÓN DE DATOS. Si el usuario indica que has borrado información o cometido un error masivo, utiliza 'list_backups' para encontrar el snapshot anterior a tu acción y 'restore_from_backup' para revertir los cambios en la tabla afectada inmediatamente.
+          21. RECUPERACIÓN DE DATOS. Si el usuario indica que has borrado información o cometido un error masivo, utiliza 'list_backups' para encontrar el snapshot anterior a tu acción y 'restore_from_backup' para revertir los cambios en la tabla afectada inmediatamente. NUNCA utilices 'list_backups' ante fallos de herramientas geográficas o de red.
           23. CONFIRMATION REQUIRED: Before calling any 'delete' tool (task, waypoint, track, or section), you MUST ask the user for explicit permission in the chat. Never delete data silently.
           24. GEOMETRY LINKING: You have full permission to use 'reassign_geometry' to organize the map. If a user asks to 'move' or 'assign' a pin/track, do it immediately and confirm the action.
           25. PERFIL DE ELEVACIÓN: Cuando el usuario te pida crear un punto en una ruta o perfil, identifica el track_id de la tarea activa y asígnalo como 'parent_track_id'. Esto es vital para que el punto sea visible en el gráfico técnico.
@@ -1425,6 +1425,7 @@ async function executeTool(name, args) {
             }
         }
         else if (name === "analyze_track_point") {
+            let kmCalculated = 0;
             try {
                 const res = await pool.query('SELECT geojson_data FROM tracks WHERE id = $1', [args.track_id]);
                 if (res.rows.length === 0) return JSON.stringify({ error: "Track not found" });
@@ -1450,7 +1451,8 @@ async function executeTool(name, args) {
                 // 1. KM Exacto
                 const startPoint = turf.point(coords[0]);
                 const sliced = turf.lineSlice(startPoint, snapped, line);
-                const km = parseFloat(turf.length(sliced, { units: 'kilometers' }).toFixed(3));
+                kmCalculated = parseFloat(turf.length(sliced, { units: 'kilometers' }).toFixed(3));
+                const km = kmCalculated;
 
                 // 2. Altitud
                 const altitude = snapped.geometry.coordinates[2] || 0;
@@ -1508,7 +1510,10 @@ async function executeTool(name, args) {
                 });
             } catch (err) {
                 console.error("Error en analyze_track_point:", err);
-                toolResult = "ERROR: No se pudo analizar este punto, continúa con el siguiente sin buscar en backups";
+                toolResult = JSON.stringify({ 
+                    error: "Geocoding no disponible", 
+                    km: kmCalculated 
+                });
             }
         }
     } catch (err) {

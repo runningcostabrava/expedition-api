@@ -1089,6 +1089,7 @@ body.zen-mode #zen-toggle-btn {
     position: absolute;
     top: 85px;
     left: 15px;
+    right: 80px;
     bottom: 15px;
     width: 420px;
     background: #ffffff !important;
@@ -1114,7 +1115,7 @@ body.zen-mode #zen-toggle-btn {
 #right-panel {
     position: absolute;
     top: 85px;
-    right: 15px;
+    right: 80px;
     bottom: auto;
     max-height: calc(100vh - 320px);
     width: 420px;
@@ -1141,7 +1142,7 @@ body.zen-mode #zen-toggle-btn {
 #fleet-panel {
     position: absolute;
     top: 85px;
-    right: 15px;
+    right: 80px;
     bottom: 15px;
     /* Takes full height */
     width: 420px;
