@@ -1038,7 +1038,7 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
           23. CONFIRMATION REQUIRED: Before calling any 'delete' tool (task, waypoint, track, or section), you MUST ask the user for explicit permission in the chat. Never delete data silently.
           24. GEOMETRY LINKING: You have full permission to use 'reassign_geometry' to organize the map. If a user asks to 'move' or 'assign' a pin/track, do it immediately and confirm the action.
           25. PERFIL DE ELEVACIÓN: Cuando el usuario te pida crear un punto en una ruta o perfil, identifica el track_id de la tarea activa y asígnalo como 'parent_track_id'. Esto es vital para que el punto sea visible en el gráfico técnico.
-          26. INTELIGENCIA DE TERRENO: Antes de crear cualquier waypoint en una ruta, DEBES llamar a 'analyze_track_point'. Usa los datos recibidos para escribir un título inteligente. Ej: 'KM 4.2 - Cima' o 'KM 1.5 - Giro a la derecha'. Cuando el usuario pida distribuir waypoints, primero llama a 'analyze_track_point' SOLO con el track_id. La herramienta te devolverá puntos clave espaciados. Usa ESOS puntos para crear los waypoints, asegurando que no estén muy juntos.
+          26. INTELIGENCIA DE TERRENO: Antes de crear cualquier waypoint en una ruta, DEBES llamar a 'analyze_track_point'. Usa los datos recibidos para escribir un título inteligente. Ej: 'KM 4.2 - Cima' o 'KM 1.5 - Giro a la derecha'. Cuando distribuyas waypoints, usa 'analyze_track_point' SOLO UNA VEZ con el track_id. La herramienta te devolverá un array con todos los puntos ya analizados (cima, giros, etc). Usa esos datos directamente para llamar a 'create_waypoint' en paralelo y ahorra pasos. Asegura que los waypoints no estén muy juntos.
           27. BÚSQUEDA DE ACCIDENTES: Solo busca accidentes geográficos (Rule 27) si el análisis de track tiene éxito. Si falla, genera el waypoint solo con el KM y la altitud básica para evitar bucles. Si el punto está en un valle o cerca de altitud 0, usa 'search_internet' con las coordenadas para ver si hay un río, puente o playa conocida cerca y menciónalo en la descripción.
 
           RECOVERY PROTOCOL: If the user asks to fix or recreate items from a backup:
@@ -1099,7 +1099,7 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
         let result = await chat.sendMessage(promptParts);
         let response = result.response;
         
-        for (let step = 0; step < 10; step++) {
+        for (let step = 0; step < 25; step++) {
             const calls = response.functionCalls();
             if (!calls || calls.length === 0) {
                 finalResponseText = response.text();
@@ -1128,7 +1128,7 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
     } else {
         // --- DEEPSEEK AGENT LOOP ---
         let lastDeepseekResponse = null;
-        for (let step = 0; step < 10; step++) {
+        for (let step = 0; step < 25; step++) {
             lastDeepseekResponse = await deepseek.chat.completions.create({
                 model: "deepseek-chat",
                 messages: messages,
@@ -1452,12 +1452,57 @@ async function executeTool(name, args) {
                         const suggested = turf.along(line, distance, { units: 'kilometers' });
                         const snapped = turf.nearestPointOnLine(line, suggested);
                         const idx = snapped.properties.index;
-                        const alt = coords[idx][2] || 0;
+                        
+                        // --- ANALISIS DE PUNTO ---
+                        const altitude = coords[idx][2] || 0;
+                        
+                        // 1. Análisis de Pendiente (Cimas)
+                        let terrainType = "plano";
+                        const checkDistance = 0.1; // 100m
+                        let isSummit = true;
+                        let higherPointFound = false;
+                        let lowerPointFound = false;
+
+                        for (let j = Math.max(0, idx - 10); j <= Math.min(coords.length - 1, idx + 10); j++) {
+                            const dist = turf.distance(snapped, turf.point(coords[j]), { units: 'kilometers' });
+                            if (dist <= checkDistance && j !== idx) {
+                                const otherAlt = coords[j][2] || 0;
+                                if (otherAlt > altitude) isSummit = false;
+                                if (otherAlt > altitude + 0.5) higherPointFound = true;
+                                if (otherAlt < altitude - 0.5) lowerPointFound = true;
+                            }
+                        }
+                        if (isSummit && altitude > 0) terrainType = "cima/summit";
+                        else if (higherPointFound && !lowerPointFound) terrainType = "bajada";
+                        else if (!higherPointFound && lowerPointFound) terrainType = "subida";
+                        else terrainType = "plano";
+
+                        // 2. Análisis de Dirección (Giros)
+                        let detectedTurn = null;
+                        if (idx >= 2 && idx <= coords.length - 3) {
+                            const prevPt = coords[idx - 2];
+                            const currPt = coords[idx];
+                            const nextPt = coords[idx + 2];
+                            const b1 = turf.bearing(turf.point(prevPt), turf.point(currPt));
+                            const b2 = turf.bearing(turf.point(currPt), turf.point(nextPt));
+                            let diff = b2 - b1;
+                            if (diff > 180) diff -= 360;
+                            if (diff < -180) diff += 360;
+                            if (Math.abs(diff) > 35) {
+                                detectedTurn = {
+                                    direction: diff > 0 ? "derecha" : "izquierda",
+                                    angle: Math.abs(parseFloat(diff.toFixed(1)))
+                                };
+                            }
+                        }
+
                         suggestedPoints.push({
                             km: distance.toFixed(2),
                             lat: suggested.geometry.coordinates[1],
                             lng: suggested.geometry.coordinates[0],
-                            altitude: alt
+                            altitude: altitude,
+                            terrain: terrainType,
+                            turn: detectedTurn
                         });
                     }
                     return JSON.stringify({
