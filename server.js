@@ -1955,6 +1955,26 @@ app.put('/api/fleet/devices/:id', adminAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Crear un nuevo dispositivo
+app.post('/api/fleet/devices', adminAuth, async (req, res) => {
+    const { device_identifier, display_name, color, icon } = req.body;
+    try {
+        const result = await pool.query(
+            "INSERT INTO live_devices (device_identifier, display_name, color, icon) VALUES ($1, $2, $3, $4) RETURNING *",
+            [device_identifier, display_name, color || '#3498db', icon || 'ph-user']
+        );
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Borrar un dispositivo
+app.delete('/api/fleet/devices/:id', adminAuth, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM live_devices WHERE id = $1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // 5. Fetch the Telemetry History (The Magic Translation)
 app.get('/api/fleet/telemetry', async (req, res) => {
     const minutes = parseInt(req.query.minutes) || 60; 
