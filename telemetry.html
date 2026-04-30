@@ -82,69 +82,63 @@
     <script>
         const API_URL = 'https://mapbox-api-uz9a.onrender.com';
 
-        // --- FLEET MANAGER LOGIC ---
-        window.openFleetManager = async function() {
+        window.openFleetManager = function() {
             document.getElementById('fleet-manager-modal').style.display = 'flex';
-            fetchFleetManagerList();
+            renderFleetManagerList();
         };
 
-        async function fetchFleetManagerList() {
-            const list = document.getElementById('fleet-manager-list');
-            list.innerHTML = '<div style="text-align:center; padding:10px;">Loading devices...</div>';
+        window.renderFleetManagerList = async function() {
             try {
                 const res = await fetch(`${API_URL}/api/fleet/devices`);
                 const devices = await res.json();
-                
-                if (devices.length === 0) {
-                    list.innerHTML = '<div style="text-align:center; padding:10px; color:#64748b;">No devices registered.</div>';
-                    return;
-                }
-
-                list.innerHTML = devices.map(dev => `
-                    <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0;">
+                const list = document.getElementById('fleet-manager-list');
+                list.innerHTML = devices.map(d => `
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:#f1f5f9; padding:12px; border-radius:8px; border:1px solid #cbd5e0;">
                         <div style="display:flex; align-items:center; gap:10px;">
-                            <div style="width:12px; height:12px; border-radius:50%; background:${dev.color};"></div>
+                            <div style="width:15px; height:15px; border-radius:50%; background:${d.color};"></div>
                             <div>
-                                <div style="font-weight:bold; color:#0f172a;">${dev.display_name}</div>
-                                <div style="font-size:0.7em; color:#64748b;">ID: ${dev.device_identifier}</div>
+                                <strong style="color:#0f172a;">${d.display_name}</strong> 
+                                <div style="font-size:0.8em; color:#64748b; font-weight:bold;">Traccar ID: ${d.device_identifier}</div>
                             </div>
                         </div>
-                        <button onclick="deleteFleetDevice(${dev.id})" style="background:transparent; border:none; color:#ef4444; cursor:pointer; font-size:1.1em; padding:5px;"><i class="ph ph-trash"></i></button>
+                        <button onclick="deleteFleetDevice(${d.id})" style="background:#fee2e2; color:#ef4444; border:1px solid #fca5a5; padding:6px 10px; border-radius:6px; cursor:pointer; font-weight:bold;">Delete</button>
                     </div>
                 `).join('');
-            } catch (err) {
-                list.innerHTML = `<div style="color:#ef4444; padding:10px;">Error: ${err.message}</div>`;
-            }
-        }
+            } catch (e) { console.error("Error loading devices", e); }
+        };
 
         window.saveNewFleetDevice = async function() {
-            const id = document.getElementById('new-dev-id').value.trim();
-            const name = document.getElementById('new-dev-name').value.trim();
-            const color = document.getElementById('new-dev-color').value;
-            const icon = document.getElementById('new-dev-icon').value.trim();
-
-            if (!id || !name) return alert("ID and Name are required");
-
+            const payload = {
+                device_identifier: document.getElementById('new-dev-id').value.trim(),
+                display_name: document.getElementById('new-dev-name').value.trim(),
+                color: document.getElementById('new-dev-color').value,
+                icon: document.getElementById('new-dev-icon').value
+            };
+            if(!payload.device_identifier || !payload.display_name) return alert("ID and Name are required!");
+            
+            const btn = document.querySelector('button[onclick="saveNewFleetDevice()"]');
+            btn.innerText = "Saving...";
+            
             try {
-                const res = await fetch(`${API_URL}/api/fleet/devices`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ device_identifier: id, display_name: name, color, icon })
+                await fetch(`${API_URL}/api/fleet/devices`, {
+                    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
                 });
-                if (res.ok) {
-                    document.getElementById('new-dev-id').value = '';
-                    document.getElementById('new-dev-name').value = '';
-                    fetchFleetManagerList();
-                }
-            } catch (err) { alert(err.message); }
+                document.getElementById('new-dev-id').value = '';
+                document.getElementById('new-dev-name').value = '';
+                renderFleetManagerList();
+                // Si hay una función global para refrescar telemetría, llámala
+                if (typeof fetchTelemetry === 'function') fetchTelemetry();
+            } catch(e) { alert("Error saving: " + e.message); }
+            btn.innerText = "➕ Save User";
         };
 
         window.deleteFleetDevice = async function(id) {
-            if (!confirm("Delete this device tracking?")) return;
+            if(!confirm("Are you sure you want to delete this user? Their old logs will become 'Unknown'.")) return;
             try {
-                const res = await fetch(`${API_URL}/api/fleet/devices/${id}`, { method: 'DELETE' });
-                if (res.ok) fetchFleetManagerList();
-            } catch (err) { alert(err.message); }
+                await fetch(`${API_URL}/api/fleet/devices/${id}`, { method: 'DELETE' });
+                renderFleetManagerList();
+                if (typeof fetchTelemetry === 'function') fetchTelemetry();
+            } catch(e) { alert("Error deleting: " + e.message); }
         };
 
         async function fetchLogs() {
