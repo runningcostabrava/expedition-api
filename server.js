@@ -1012,6 +1012,14 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
           20. Every task provided in [Current Active Tasks] contains a 'map_data' array. This array includes the database IDs (waypoint_id or track_id) for every location on the map. You DO NOT need a separate tool to scan waypoints; you must read the IDs directly from the 'map_data' provided in this context to perform updates or deletions.
           21. RECUPERACIÓN DE DATOS. Si el usuario indica que has borrado información o cometido un error masivo, utiliza 'list_backups' para encontrar el snapshot anterior a tu acción y 'restore_from_backup' para revertir los cambios en la tabla afectada inmediatamente.
 
+          RECOVERY PROTOCOL: If the user asks to fix or recreate items from a backup:
+          1. Use \`inspect_backup\` to read the data.
+          2. NEVER rely on old 'id', 'section_id', or 'parent_track_id' numbers. They have changed.
+          3. Use NAMES/TITLES as the source of truth. 
+          4. To relink a Task to a Day: Find the Section in the current database whose 'title' matches the one in the backup, and use its NEW id.
+          5. To recover Waypoints after the user uploads tracks: Find the new Track in the database with the same title as the 'parent_track_id' referenced in the backup, and link them.
+          6. If an ID cannot be matched by name, move the item to 'Unscheduled' or notify the user.
+
           [UI CONTEXT]: The user currently has Task ID ${activeTaskId} open and selected in their dashboard. If they say "this task" or "this waypoint," they are likely referring to this ID or its attached geometries.` 
         }
     ];
