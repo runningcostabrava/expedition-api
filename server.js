@@ -1251,13 +1251,18 @@ async function executeTool(name, args) {
         }
         else if (name === "create_waypoint") {
             const wpRes = await pool.query(
-                'INSERT INTO waypoints (title, lat, lng, description, icon, color) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
-                [args.title, args.lat, args.lng, args.description || '', args.icon || 'ph-map-pin', args.color || '#3498db']
+                'INSERT INTO waypoints (title, lat, lng, description, icon, color, parent_track_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
+                [args.title, args.lat, args.lng, args.description || '', args.icon || 'ph-map-pin', args.color || '#3498db', args.parent_track_id || null]
             );
             const newWpId = wpRes.rows[0].id;
             const anchorRes = await pool.query('INSERT INTO spatial_anchors (kind, waypoint_id) VALUES ($1, $2) RETURNING id', ['point', newWpId]);
+            
             if (args.existing_task_id) {
-                await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [args.existing_task_id, anchorRes.rows[0].id]);
+                try {
+                    await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [args.existing_task_id, anchorRes.rows[0].id]);
+                } catch (fkErr) {
+                    console.error("Task no existe, se guarda sin link:", fkErr.message);
+                }
             }
             toolResult = `SUCCESS: Waypoint created with ID ${newWpId}.`;
         }
