@@ -1261,20 +1261,18 @@
                         const isPhotoSpot = renderIcon === 'ph-camera';
                         const iconHtml = window.getSafeIconHtml(renderIcon, 'ph-map-pin', true);
                         
-                        // 1. Update the shortName extraction to be more aggressive
-                        const shortName = (geom.title || '').includes('-') ? (geom.title.split('-')[1].trim().split(' ')[0]) : (geom.title || '').trim().substring(0, 3);
-
-                        // 2. Add logic to decide between showing an icon or text inside the circle
-                        const isNumbered = !isNaN(shortName) && shortName !== '';
-                        const pinContent = isNumbered ? `<span style="font-weight:900; font-size:16px; color:white; pointer-events:none; text-shadow: 0 0 4px #0f172a;">${shortName}</span>` : iconHtml;
+                        const match = (geom.title || '').match(/^(\d+)/);
+                        const seqNum = match ? match[1] : '';
+                        const badgeHtml = seqNum ? `<div style="position: absolute; top: -8px; right: -8px; background: white; color: #0f172a; font-weight: 900; font-size: 11px; padding: 2px 6px; border-radius: 10px; border: 2px solid ${markerColor}; box-shadow: 0 2px 4px rgba(0,0,0,0.3); z-index: 2; pointer-events: none;">${seqNum}</div>` : '';
 
                         el.innerHTML = `
+                            ${badgeHtml}
                             <div style="background-color: ${isPhotoSpot ? '#ef4444' : markerColor}; 
                                         border-radius: 50%; width: 28px; height: 28px; 
                                         display: flex; justify-content: center; align-items: center; 
                                         border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); 
-                                        font-size: 14px; color: white; transform: ${isPhotoSpot ? 'scale(1.2)' : 'scale(1.1)'};">
-                                ${pinContent}
+                                        font-size: 14px; color: white; transform: ${isPhotoSpot ? 'scale(1.2)' : 'scale(1.1)'}; position: relative; z-index: 1;">
+                                ${iconHtml}
                             </div>
                             <div style="width: 0; height: 0; border-left: 6px solid transparent; 
                                         border-right: 6px solid transparent; 
