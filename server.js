@@ -1354,10 +1354,13 @@ async function executeTool(name, args) {
                     await pool.query('BEGIN');
                     await pool.query(`TRUNCATE TABLE ${args.table_name} CASCADE`);
                     for (const row of tableData) {
-                        // 🛟 BYPASS DE EMERGENCIA: Si estamos restaurando waypoints, 
-                        // desconectamos los tracks huérfanos para evitar el error de Clave Foránea (FK)
+                        // 🛟 BYPASS DE EMERGENCIA: Desconectar relaciones huérfanas
                         if (args.table_name === 'waypoints') {
                             row.parent_track_id = null;
+                        }
+                        if (args.table_name === 'tasks') {
+                            row.section_id = null;
+                            row.parent_id = null;
                         }
 
                         const fields = Object.keys(row).join(', ');
