@@ -1039,7 +1039,7 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
           24. GEOMETRY LINKING: You have full permission to use 'reassign_geometry' to organize the map. If a user asks to 'move' or 'assign' a pin/track, do it immediately and confirm the action.
           25. PERFIL DE ELEVACIÓN: Cuando el usuario te pida crear un punto en una ruta o perfil, identifica el track_id de la tarea activa y asígnalo como 'parent_track_id'. Esto es vital para que el punto sea visible en el gráfico técnico.
           26. INTELIGENCIA DE TERRENO: Antes de crear cualquier waypoint en una ruta, DEBES llamar a 'analyze_track_point'. Usa los datos recibidos para escribir un título inteligente. Ej: 'KM 4.2 - Cima' o 'KM 1.5 - Giro a la derecha'.
-          27. BÚSQUEDA DE ACCIDENTES: Si el punto está en un valle o cerca de altitud 0, usa 'search_internet' con las coordenadas para ver si hay un río, puente o playa conocida cerca y menciónalo en la descripción.
+          27. BÚSQUEDA DE ACCIDENTES: Solo busca accidentes geográficos (Rule 27) si el análisis de track tiene éxito. Si falla, genera el waypoint solo con el KM y la altitud básica para evitar bucles. Si el punto está en un valle o cerca de altitud 0, usa 'search_internet' con las coordenadas para ver si hay un río, puente o playa conocida cerca y menciónalo en la descripción.
 
           RECOVERY PROTOCOL: If the user asks to fix or recreate items from a backup:
           1. Use \`inspect_backup\` to read the data.
@@ -1163,6 +1163,9 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
     }
 
     return { success: true, message: finalResponseText, uiAction: pendingUiAction, cost: totalCost };
+    } catch (err) {
+        isAiProcessing = false;
+        throw err;
     } finally {
         isAiProcessing = false;
         triggerMapRefresh();
@@ -1216,7 +1219,7 @@ async function executeTool(name, args) {
             toolResult = `SUCCESS: Task type created with ID ${res.rows[0].id}`;
         }
         else if (name === "search_nearby_places") {
-            const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN;
+            const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN || process.env.MAPBOX_TOKEN;
             const searchUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(args.query + ' ' + args.location_context)}.json?access_token=${mapboxToken}&limit=5`;
             const response = await axios.get(searchUrl);
             const results = response.data.features.map(f => ({ name: f.text, address: f.place_name, coordinates: f.center }));
@@ -1348,7 +1351,7 @@ async function executeTool(name, args) {
         }
         else if (name === "calculate_smart_route") {
             try {
-                const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN;
+                const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN || process.env.MAPBOX_TOKEN;
                 const profile = args.profile || 'walking';
                 const url = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${args.start_coords};${args.end_coords}?geometries=geojson&access_token=${mapboxToken}`;
                 const response = await axios.get(url);
@@ -1422,11 +1425,24 @@ async function executeTool(name, args) {
             }
         }
         else if (name === "analyze_track_point") {
-            const res = await pool.query('SELECT geojson_data FROM tracks WHERE id = $1', [args.track_id]);
-            if (res.rows.length > 0) {
+            try {
+                const res = await pool.query('SELECT geojson_data FROM tracks WHERE id = $1', [args.track_id]);
+                if (res.rows.length === 0) return JSON.stringify({ error: "Track not found" });
+
                 const geojson = res.rows[0].geojson_data;
                 const line = geojson.features[0];
-                const point = turf.point([args.lng, args.lat]);
+                
+                // Si no hay lat/lng, tomamos el punto de inicio del track como fallback o puntos automáticos
+                let targetLat = args.lat;
+                let targetLng = args.lng;
+                
+                if (targetLat === undefined || targetLng === undefined) {
+                    // Si no se proporcionan, tomamos el primer punto del track por ahora (IA lo mejorará)
+                    targetLng = line.geometry.coordinates[0][0];
+                    targetLat = line.geometry.coordinates[0][1];
+                }
+
+                const point = turf.point([targetLng, targetLat]);
                 const snapped = turf.nearestPointOnLine(line, point);
                 const coords = line.geometry.coordinates;
                 const index = snapped.properties.index;
@@ -1490,8 +1506,9 @@ async function executeTool(name, args) {
                     turn: detectedTurn,
                     coordinates: snapped.geometry.coordinates
                 });
-            } else {
-                toolResult = JSON.stringify({ error: "Track not found" });
+            } catch (err) {
+                console.error("Error en analyze_track_point:", err);
+                toolResult = "ERROR: No se pudo analizar este punto, continúa con el siguiente sin buscar en backups";
             }
         }
     } catch (err) {
