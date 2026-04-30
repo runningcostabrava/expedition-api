@@ -359,6 +359,22 @@
                 }
                 // ----------------------------------------------
 
+                // --- ANTI-GHOST POINT CLEANUP ---
+                // Remove consecutive duplicate coordinates that Mapbox dragging might have generated
+                if (geometry.coordinates && geometry.coordinates.length > 0) {
+                    const cleanCoords = [geometry.coordinates[0]];
+                    for (let i = 1; i < geometry.coordinates.length; i++) {
+                        const prev = cleanCoords[cleanCoords.length - 1];
+                        const curr = geometry.coordinates[i];
+                        // Only add if it moved more than ~1 meter (0.00001 degrees)
+                        if (Math.abs(curr[0] - prev[0]) > 0.00001 || Math.abs(curr[1] - prev[1]) > 0.00001) {
+                            cleanCoords.push(curr);
+                        }
+                    }
+                    geometry.coordinates = cleanCoords;
+                }
+                // --------------------------------
+
                 // Calculate Stats on the FINAL geometry
                 const dist = turf.length(geometry, { units: 'kilometers' }).toFixed(2);
                 let gain = 0, loss = 0;
