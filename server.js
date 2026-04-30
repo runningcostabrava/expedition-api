@@ -1164,7 +1164,6 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
 
     return { success: true, message: finalResponseText, uiAction: pendingUiAction, cost: totalCost };
     } catch (err) {
-        isAiProcessing = false;
         throw err;
     } finally {
         isAiProcessing = false;
@@ -1511,7 +1510,7 @@ async function executeTool(name, args) {
             } catch (err) {
                 console.error("Error en analyze_track_point:", err);
                 toolResult = JSON.stringify({ 
-                    error: "Geocoding no disponible", 
+                    error: "Info de entorno no disponible", 
                     km: kmCalculated 
                 });
             }

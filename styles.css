@@ -1089,7 +1089,7 @@ body.zen-mode #zen-toggle-btn {
     position: absolute;
     top: 85px;
     left: 15px;
-    right: 80px;
+    right: 15px;
     bottom: 15px;
     width: 420px;
     background: #ffffff !important;
@@ -1115,7 +1115,7 @@ body.zen-mode #zen-toggle-btn {
 #right-panel {
     position: absolute;
     top: 85px;
-    right: 80px;
+    right: 15px;
     bottom: auto;
     max-height: calc(100vh - 320px);
     width: 420px;
@@ -1142,7 +1142,7 @@ body.zen-mode #zen-toggle-btn {
 #fleet-panel {
     position: absolute;
     top: 85px;
-    right: 80px;
+    right: 15px;
     bottom: 15px;
     /* Takes full height */
     width: 420px;
@@ -1663,6 +1663,13 @@ body.zen-mode #fleet-panel {
 #left-panel, #task-detail-panel, #right-panel, #app-switcher, #om-container {
     will-change: transform;
     -webkit-font-smoothing: antialiased;
+}
+
+/* DESKTOP PANEL ADJUSTMENTS: Move away from action buttons */
+@media (min-width: 769px) {
+    #right-panel, #fleet-panel, #task-detail-panel {
+        right: 80px !important;
+    }
 }
 
 /* Hide Offline Manager controls on desktop */
