@@ -21,7 +21,10 @@
 
     <header>
         <span>📊 Data Inspector</span>
-        <button class="btn-refresh" onclick="fetchLogs()">🔄 Refresh</button>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <button onclick="openFleetManager()" style="background:#3498db; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; font-weight:bold; margin-left: 10px;">⚙️ Manage Users</button>
+            <button class="btn-refresh" onclick="fetchLogs()">🔄 Refresh</button>
+        </div>
     </header>
 
     <div class="container">
@@ -41,6 +44,29 @@
         </table>
     </div>
 
+    <div id="fleet-manager-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:99999; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:white; width:100%; max-width:500px; border-radius:12px; padding:20px; max-height:80vh; overflow-y:auto; box-sizing:border-box;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h2 style="margin:0; color:#0f172a;">⚙️ Fleet Users</h2>
+                <span onclick="document.getElementById('fleet-manager-modal').style.display='none'" style="font-size:24px; cursor:pointer; color:#64748b;">&times;</span>
+            </div>
+            
+            <div style="background:#f8fafc; padding:15px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:20px;">
+                <h4 style="margin-top:0; color:#1e293b;">Register New Traccar User</h4>
+                <input type="text" id="new-dev-id" placeholder="Traccar Raw ID (e.g. 3)" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
+                <input type="text" id="new-dev-name" placeholder="Display Name (e.g. Pablo Guide)" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <input type="color" id="new-dev-color" value="#e74c3c" style="height:40px; border:none; cursor:pointer; border-radius:6px; width:50px;">
+                    <input type="text" id="new-dev-icon" placeholder="Icon (e.g. ph-user)" value="ph-user" style="flex:1; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
+                </div>
+                <button onclick="saveNewFleetDevice()" style="width:100%; padding:12px; background:#27ae60; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">➕ Save User</button>
+            </div>
+
+            <h4 style="margin-bottom:10px; color:#1e293b;">Registered Users</h4>
+            <div id="fleet-manager-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
+    </div>
+
     <div id="app-switcher" style="position: fixed; bottom: 25px; left: 20px; z-index: 100000;">
         <button onclick="document.getElementById('switcher-menu').classList.toggle('show')" style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center;">📱</button>
         <div id="switcher-menu" style="display: none; position: absolute; bottom: 65px; left: 0; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 220px; flex-direction: column; gap: 8px; border: 1px solid #e2e8f0;">
@@ -55,6 +81,71 @@
 
     <script>
         const API_URL = 'https://mapbox-api-uz9a.onrender.com';
+
+        // --- FLEET MANAGER LOGIC ---
+        window.openFleetManager = async function() {
+            document.getElementById('fleet-manager-modal').style.display = 'flex';
+            fetchFleetManagerList();
+        };
+
+        async function fetchFleetManagerList() {
+            const list = document.getElementById('fleet-manager-list');
+            list.innerHTML = '<div style="text-align:center; padding:10px;">Loading devices...</div>';
+            try {
+                const res = await fetch(`${API_URL}/api/fleet/devices`);
+                const devices = await res.json();
+                
+                if (devices.length === 0) {
+                    list.innerHTML = '<div style="text-align:center; padding:10px; color:#64748b;">No devices registered.</div>';
+                    return;
+                }
+
+                list.innerHTML = devices.map(dev => `
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <div style="width:12px; height:12px; border-radius:50%; background:${dev.color};"></div>
+                            <div>
+                                <div style="font-weight:bold; color:#0f172a;">${dev.display_name}</div>
+                                <div style="font-size:0.7em; color:#64748b;">ID: ${dev.device_identifier}</div>
+                            </div>
+                        </div>
+                        <button onclick="deleteFleetDevice(${dev.id})" style="background:transparent; border:none; color:#ef4444; cursor:pointer; font-size:1.1em; padding:5px;"><i class="ph ph-trash"></i></button>
+                    </div>
+                `).join('');
+            } catch (err) {
+                list.innerHTML = `<div style="color:#ef4444; padding:10px;">Error: ${err.message}</div>`;
+            }
+        }
+
+        window.saveNewFleetDevice = async function() {
+            const id = document.getElementById('new-dev-id').value.trim();
+            const name = document.getElementById('new-dev-name').value.trim();
+            const color = document.getElementById('new-dev-color').value;
+            const icon = document.getElementById('new-dev-icon').value.trim();
+
+            if (!id || !name) return alert("ID and Name are required");
+
+            try {
+                const res = await fetch(`${API_URL}/api/fleet/devices`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ device_identifier: id, display_name: name, color, icon })
+                });
+                if (res.ok) {
+                    document.getElementById('new-dev-id').value = '';
+                    document.getElementById('new-dev-name').value = '';
+                    fetchFleetManagerList();
+                }
+            } catch (err) { alert(err.message); }
+        };
+
+        window.deleteFleetDevice = async function(id) {
+            if (!confirm("Delete this device tracking?")) return;
+            try {
+                const res = await fetch(`${API_URL}/api/fleet/devices/${id}`, { method: 'DELETE' });
+                if (res.ok) fetchFleetManagerList();
+            } catch (err) { alert(err.message); }
+        };
 
         async function fetchLogs() {
             const tbody = document.getElementById('log-body');
