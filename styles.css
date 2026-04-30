@@ -52,24 +52,25 @@ body, input, button, select, textarea, .inline-edit {
     z-index: 150 !important;
     box-shadow: var(--card-shadow);
     color: white;
-    padding: 0 420px 0 20px !important; /* CRITICAL FIX: 420px right padding prevents overlap with FABs */
+    padding: 0 20px !important; 
     display: flex !important;
     flex-direction: row !important;
     align-items: center !important;
     gap: 15px !important;
     height: 55px;
+    overflow: visible !important;
 }
 
 /* Base Desktop Styling for the newly extracted FAB container */
 #mobile-fab-container {
     position: absolute;
-    top: 15px;
+    top: 75px;
     right: 15px;
-    height: 55px;
+    height: auto;
     display: flex;
+    flex-direction: column;
     gap: 8px;
     align-items: center;
-    padding-right: 15px;
     z-index: 160;
 }
 
@@ -153,11 +154,11 @@ body, input, button, select, textarea, .inline-edit {
 @media (min-width: 1024px) {
     .search-results-container {
         position: fixed !important;
-        top: 50% !important;
+        top: 40% !important; /* Slightly higher to avoid elevation panel */
         left: 50% !important;
         transform: translate(-50%, -50%) !important;
         width: 500px !important;
-        max-height: 80vh !important;
+        max-height: 400px !important;
         background: #ffffff !important;
         border-radius: 12px !important;
         box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1) !important;
@@ -725,10 +726,23 @@ body, input, button, select, textarea, .inline-edit {
     right: 0;
     height: 200px;
     background: white;
-    z-index: 1000;
+    z-index: 2000;
     border-top: 2px solid #ccc;
     padding: 10px;
     box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.elevation-label {
+    background: #ffffff;
+    border: 2px solid var(--label-color, #3498db);
+    color: #0f172a;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    font-weight: bold;
+    display: inline-block;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.15);
 }
 
 #close-elevation {
@@ -1314,6 +1328,17 @@ body.zen-mode #fleet-panel {
 
 .fleet-avatar-pin {
     animation: pulse-radar 2s infinite;
+}
+
+@keyframes point-pulse-ai {
+    0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7); transform: scale(1); }
+    70% { box-shadow: 0 0 0 15px rgba(56, 189, 248, 0); transform: scale(1.2); }
+    100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); transform: scale(1); }
+}
+
+.ai-point-pulse {
+    animation: point-pulse-ai 2s infinite;
+    border: 3px solid #38bdf8 !important;
 }
 
 /* Hide labels when zoomed out too far */

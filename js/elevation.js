@@ -1,6 +1,39 @@
 let elevationHoverMarker = null;
 let currentElevationTrackId = null;
 
+function createIconCanvas(iconClass, color) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 32;
+    const ctx = canvas.getContext('2d');
+    
+    // Draw background circle
+    ctx.beginPath();
+    ctx.arc(16, 16, 15, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Get the character from Phosphor icon class
+    const temp = document.createElement('i');
+    temp.className = `ph ${iconClass}`;
+    temp.style.position = 'absolute';
+    temp.style.visibility = 'hidden';
+    document.body.appendChild(temp);
+    const char = window.getComputedStyle(temp, ':before').content.replace(/['"]/g, '');
+    document.body.removeChild(temp);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '18px "Phosphor"';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(char, 16, 16);
+    
+    return canvas;
+}
+
 function showElevationProfile(geojson, title, metadata = null, trackId = null) {
     currentElevationTrackId = trackId;
     document.getElementById('elevation-panel').style.display = 'block';
@@ -28,6 +61,7 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
     const pointRadii = new Array(coords.length).fill(0);
     const pointBgColors = new Array(coords.length).fill('transparent');
     const pointBorderColors = new Array(coords.length).fill('transparent');
+    const waypointSequence = new Array(coords.length).fill(null);
 
     coords.forEach((c, i) => {
         elevations.push(c[2] || 0);
@@ -43,6 +77,7 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
     const task = AppStore.get('itinerary').find(t => t.task_id === AppStore.get('activeTaskId'));
 
     if (task && task.geometries && geojson.features[0].geometry.type !== 'Polygon') {
+        let seq = 1;
         task.geometries.forEach(g => {
             if (g.kind === 'point' && g.lng && g.lat) {
                 let minDist = Infinity;
@@ -60,12 +95,14 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                         icon: g.icon || 'ph-map-pin',
                         lng: g.lng,
                         lat: g.lat,
-                        x: distances[nearestIdx]
+                        x: distances[nearestIdx],
+                        color: g.color || '#e74c3c'
                     };
-                    customPointStyles[nearestIdx] = 'circle';
-                    pointRadii[nearestIdx] = 7; // Good, visible dot size
-                    pointBgColors[nearestIdx] = g.color || '#e74c3c'; // Match the waypoint color
-                    pointBorderColors[nearestIdx] = '#ffffff'; // Crisp white border
+                    waypointSequence[nearestIdx] = seq++;
+                    customPointStyles[nearestIdx] = createIconCanvas(g.icon || 'ph-map-pin', g.color || '#e74c3c');
+                    pointRadii[nearestIdx] = 15;
+                    pointBgColors[nearestIdx] = g.color || '#e74c3c';
+                    pointBorderColors[nearestIdx] = '#ffffff';
                 }
             }
         });
@@ -105,6 +142,37 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                 }
             ]
         },
+        plugins: [{
+            id: 'waypointLabels',
+            afterDatasetsDraw: (chart) => {
+                const { ctx, data } = chart;
+                ctx.save();
+                // Find the waypoint dataset
+                const waypointDatasetIndex = data.datasets.findIndex(d => d.label === 'Waypoints');
+                if (waypointDatasetIndex === -1) return;
+                
+                data.datasets[waypointDatasetIndex].data.forEach((value, i) => {
+                    if (value !== null && waypointSequence[i] !== null) {
+                        const meta = chart.getDatasetMeta(waypointDatasetIndex);
+                        const point = meta.data[i];
+                                if (point) {
+                                    ctx.font = 'bold 12px DM Sans';
+                                    ctx.textAlign = 'center';
+                                    
+                                    // White Halo for legibility
+                                    ctx.strokeStyle = '#ffffff';
+                                    ctx.lineWidth = 3;
+                                    ctx.strokeText(waypointSequence[i], point.x, point.y - 25);
+                                    
+                                    // Dark text (--bg-main)
+                                    ctx.fillStyle = '#0f172a';
+                                    ctx.fillText(waypointSequence[i], point.x, point.y - 25);
+                                }
+                    }
+                });
+                ctx.restore();
+            }
+        }],
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -141,6 +209,21 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                 }
             },
             onClick: (e, activeElements) => {
+                if (activeElements.length === 0) {
+                    // Check if clicked on the chart area (near the line)
+                    const points = window.elevationChart.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
+                    if (points.length > 0) {
+                        const index = points[0].index;
+                        const activeCoord = coords[index];
+                        const dist = distances[index];
+                        const gain = cumulativeGains[index];
+                        
+                        activeParentTrackId = trackId;
+                        showGeometryContextPopup([activeCoord[0], activeCoord[1]], { type: 'Point', coordinates: [activeCoord[0], activeCoord[1]] }, `KM ${dist}`, `<i class="ph ph-ruler"></i> ${dist}km | <i class="ph ph-trend-up"></i> +${gain}m`, null, 'ph-map-pin');
+                        return;
+                    }
+                }
+
                 if (activeElements.length > 0) {
                     const element = activeElements[0];
                     if (element.datasetIndex === 0) {

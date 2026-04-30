@@ -3,6 +3,7 @@ const cors = require('cors');
 const fs = require('fs');
 const os = require('os');
 const { OpenAI } = require('openai');
+const turf = require('@turf/turf');
 const { search, SafeSearchType } = require('duck-duck-scrape');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
@@ -32,6 +33,7 @@ const app = express();
 app.use(cors());
 
 let sseClients = [];
+let isAiProcessing = false;
 
 app.get('/api/live-sync', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
@@ -52,7 +54,9 @@ setInterval(() => {
 }, 25000);
 
 function triggerMapRefresh() {
-    sseClients.forEach(res => res.write('data: refresh\n\n'));
+    if (isAiProcessing === false) {
+        sseClients.forEach(res => res.write('data: refresh\n\n'));
+    }
 }
 
 app.use(bodyParser.json({ limit: '10mb' }));
@@ -668,7 +672,8 @@ const aiTools = [
           description: { type: "string", description: "The transcribed audio note" },
           icon: { type: "string", description: "Phosphor icon class, e.g., ph-warning, ph-map-pin" },
           color: { type: "string", description: "Hex color code" },
-          existing_task_id: { type: "integer", nullable: true, description: "Link to a task if requested" }
+          existing_task_id: { type: "integer", nullable: true, description: "Link to a task if requested" },
+          parent_track_id: { type: "integer", description: "ID del track al que pertenece este punto para que aparezca en el perfil de elevación" }
         },
         required: ["title", "lat", "lng"]
       }
@@ -921,10 +926,28 @@ const aiTools = [
         required: ["backup_id", "table_name"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "analyze_track_point",
+      description: "Calcula el KM exacto, la altitud y el contexto de giro de una coordenada respecto a un track.",
+      parameters: {
+        type: "object",
+        properties: {
+          track_id: { type: "integer" },
+          lat: { type: "number" },
+          lng: { type: "number" }
+        },
+        required: ["track_id", "lat", "lng"]
+      }
+    }
   }
 ];
 
 async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', activeTaskId = null, imageUrls = []) {
+    isAiProcessing = true;
+    try {
     // --- AUTO-SNAPSHOT BEFORE AI ACTIONS ---
     try {
         const wpSnap = await pool.query('SELECT * FROM waypoints');
@@ -1013,6 +1036,9 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
           21. RECUPERACIÓN DE DATOS. Si el usuario indica que has borrado información o cometido un error masivo, utiliza 'list_backups' para encontrar el snapshot anterior a tu acción y 'restore_from_backup' para revertir los cambios en la tabla afectada inmediatamente.
           23. CONFIRMATION REQUIRED: Before calling any 'delete' tool (task, waypoint, track, or section), you MUST ask the user for explicit permission in the chat. Never delete data silently.
           24. GEOMETRY LINKING: You have full permission to use 'reassign_geometry' to organize the map. If a user asks to 'move' or 'assign' a pin/track, do it immediately and confirm the action.
+          25. PERFIL DE ELEVACIÓN: Cuando el usuario te pida crear un punto en una ruta o perfil, identifica el track_id de la tarea activa y asígnalo como 'parent_track_id'. Esto es vital para que el punto sea visible en el gráfico técnico.
+          26. SPATIAL ANALYSIS: Antes de crear un waypoint en un perfil, usa 'analyze_track_point' para obtener el KM exacto y detectar si es una cima o un giro.
+          27. ENVIROMENT: Usa 'search_internet' para ver si las coordenadas coinciden con un río o paso conocido y añádelo al título.
 
           RECOVERY PROTOCOL: If the user asks to fix or recreate items from a backup:
           1. Use \`inspect_backup\` to read the data.
@@ -1136,6 +1162,10 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
     }
 
     return { success: true, message: finalResponseText, uiAction: pendingUiAction, cost: totalCost };
+    } finally {
+        isAiProcessing = false;
+        triggerMapRefresh();
+    }
 }
 
 async function executeTool(name, args) {
@@ -1402,6 +1432,57 @@ async function executeTool(name, args) {
                 }
             } else { 
                 toolResult = "ERROR: Backup not found."; 
+            }
+        }
+        else if (name === "analyze_track_point") {
+            const res = await pool.query('SELECT geojson_data FROM tracks WHERE id = $1', [args.track_id]);
+            if (res.rows.length > 0) {
+                const geojson = res.rows[0].geojson_data;
+                const point = turf.point([args.lng, args.lat]);
+                const line = geojson.features[0];
+                const snapped = turf.nearestPointOnLine(line, point);
+                const coords = line.geometry.coordinates;
+                const index = snapped.properties.index;
+                
+                // KM calculation (lineDistance style)
+                const start = turf.point(coords[0]);
+                const sliced = turf.lineSlice(start, snapped, line);
+                const km = turf.length(sliced, { units: 'kilometers' }).toFixed(3);
+                
+                // Altitude
+                const altitude = snapped.geometry.coordinates[2] || 0;
+                
+                // Turn detection (3 pts before/after)
+                let turnContext = "Straight path";
+                if (index >= 3 && index <= coords.length - 4) {
+                    const prevPt = coords[index - 3];
+                    const currPt = coords[index];
+                    const nextPt = coords[index + 3];
+                    const bearing1 = turf.bearing(turf.point(prevPt), turf.point(currPt));
+                    const bearing2 = turf.bearing(turf.point(currPt), turf.point(nextPt));
+                    let diff = Math.abs(bearing1 - bearing2);
+                    if (diff > 180) diff = 360 - diff;
+                    if (diff > 30) {
+                        const direction = (bearing2 - bearing1 + 360) % 360 > 180 ? "Giro a la izquierda" : "Giro a la derecha";
+                        turnContext = `${direction} (${diff.toFixed(1)}°)`;
+                    }
+                }
+
+                // Summit Detection (200m radius on track)
+                let isSummit = true;
+                const radiusKM = 0.2;
+                for (let i = Math.max(0, index - 20); i < Math.min(coords.length, index + 21); i++) {
+                    const d = turf.distance(snapped, turf.point(coords[i]));
+                    if (d <= radiusKM && (coords[i][2] || 0) > altitude + 0.5) {
+                        isSummit = false;
+                        break;
+                    }
+                }
+                if (isSummit && altitude > 0) turnContext += " | Summit/Cima";
+
+                toolResult = `ANALYSIS FOR TRACK ${args.track_id}:\n- Nearest Point: [${snapped.geometry.coordinates[0]}, ${snapped.geometry.coordinates[1]}]\n- Progress: ${km} km\n- Altitude: ${altitude}m\n- Context: ${turnContext}`;
+            } else {
+                toolResult = "ERROR: Track not found.";
             }
         }
     } catch (err) {
