@@ -1038,7 +1038,7 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
           23. CONFIRMATION REQUIRED: Before calling any 'delete' tool (task, waypoint, track, or section), you MUST ask the user for explicit permission in the chat. Never delete data silently.
           24. GEOMETRY LINKING: You have full permission to use 'reassign_geometry' to organize the map. If a user asks to 'move' or 'assign' a pin/track, do it immediately and confirm the action.
           25. PERFIL DE ELEVACIÓN: Cuando el usuario te pida crear un punto en una ruta o perfil, identifica el track_id de la tarea activa y asígnalo como 'parent_track_id'. Esto es vital para que el punto sea visible en el gráfico técnico.
-          26. INTELIGENCIA DE TERRENO: Antes de crear cualquier waypoint en una ruta, DEBES llamar a 'analyze_track_point'. Usa los datos recibidos para escribir un título inteligente. Ej: 'KM 4.2 - Cima' o 'KM 1.5 - Giro a la derecha'.
+          26. INTELIGENCIA DE TERRENO: Antes de crear cualquier waypoint en una ruta, DEBES llamar a 'analyze_track_point'. Usa los datos recibidos para escribir un título inteligente. Ej: 'KM 4.2 - Cima' o 'KM 1.5 - Giro a la derecha'. Cuando el usuario pida distribuir waypoints, primero llama a 'analyze_track_point' SOLO con el track_id. La herramienta te devolverá puntos clave espaciados. Usa ESOS puntos para crear los waypoints, asegurando que no estén muy juntos.
           27. BÚSQUEDA DE ACCIDENTES: Solo busca accidentes geográficos (Rule 27) si el análisis de track tiene éxito. Si falla, genera el waypoint solo con el KM y la altitud básica para evitar bucles. Si el punto está en un valle o cerca de altitud 0, usa 'search_internet' con las coordenadas para ver si hay un río, puente o playa conocida cerca y menciónalo en la descripción.
 
           RECOVERY PROTOCOL: If the user asks to fix or recreate items from a backup:
@@ -1188,9 +1188,14 @@ async function executeTool(name, args) {
             toolResult = `SUCCESS: Task ${args.id} updated.`;
         }
         else if (name === "search_internet") {
-            const searchResults = await search(args.query, { safeSearch: SafeSearchType.OFF });
-            const snippets = searchResults.results.slice(0, 5).map(r => r.description).join('\n\n');
-            toolResult = snippets ? `WEB RESULTS FOUND:\n${snippets}` : "No results found on the web.";
+            try {
+                const searchResults = await search(args.query, { safeSearch: SafeSearchType.OFF });
+                const snippets = searchResults.results.slice(0, 5).map(r => r.description).join('\n\n');
+                toolResult = snippets ? `WEB RESULTS FOUND:\n${snippets}` : "No results found on the web.";
+            } catch (err) {
+                console.error("DuckDuckGo Error:", err.message);
+                toolResult = "Búsqueda web no disponible, genera la descripción basándote solo en la topografía.";
+            }
         }
         else if (name === "update_core_memory") {
             await pool.query('UPDATE ai_memory SET memory_text = $1 WHERE id = 1', [args.new_memory_text]);
@@ -1436,18 +1441,33 @@ async function executeTool(name, args) {
 
                 const geojson = res.rows[0].geojson_data;
                 const line = geojson.features[0];
-                
-                // Si no hay lat/lng, tomamos el punto de inicio del track como fallback o puntos automáticos
-                let targetLat = args.lat;
-                let targetLng = args.lng;
-                
-                if (targetLat === undefined || targetLng === undefined) {
-                    // Si no se proporcionan, tomamos el primer punto del track por ahora (IA lo mejorará)
-                    targetLng = line.geometry.coordinates[0][0];
-                    targetLat = line.geometry.coordinates[0][1];
+                const coords = line.geometry.coordinates;
+
+                // DISTRIBUCIÓN INTELIGENTE: Si no hay lat/lng, devolvemos puntos sugeridos
+                if (args.lat === undefined || args.lng === undefined) {
+                    const totalLength = turf.length(line, { units: 'kilometers' });
+                    const suggestedPoints = [];
+                    for (let i = 0; i <= 10; i++) {
+                        const distance = (totalLength * i) / 10;
+                        const suggested = turf.along(line, distance, { units: 'kilometers' });
+                        const snapped = turf.nearestPointOnLine(line, suggested);
+                        const idx = snapped.properties.index;
+                        const alt = coords[idx][2] || 0;
+                        suggestedPoints.push({
+                            km: distance.toFixed(2),
+                            lat: suggested.geometry.coordinates[1],
+                            lng: suggested.geometry.coordinates[0],
+                            altitude: alt
+                        });
+                    }
+                    return JSON.stringify({
+                        track_id: args.track_id,
+                        total_km: totalLength.toFixed(2),
+                        suggested_points: suggestedPoints
+                    });
                 }
 
-                const point = turf.point([targetLng, targetLat]);
+                const point = turf.point([args.lng, args.lat]);
                 const snapped = turf.nearestPointOnLine(line, point);
                 const coords = line.geometry.coordinates;
                 const index = snapped.properties.index;

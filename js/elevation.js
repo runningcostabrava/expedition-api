@@ -88,7 +88,11 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                     if (d < minDist) { minDist = d; nearestIdx = idx; }
                 });
 
+                // Use increased minDist threshold or rely on title for identification
                 if (minDist < 5) {
+                    const match = g.title.match(/^(\d+)/);
+                    const seqNum = match ? match[1] : seq++;
+                    
                     waypointData[nearestIdx] = elevations[nearestIdx];
                     waypointMeta[nearestIdx] = {
                         title: g.title,
@@ -98,7 +102,7 @@ function showElevationProfile(geojson, title, metadata = null, trackId = null) {
                         x: distances[nearestIdx],
                         color: g.color || '#e74c3c'
                     };
-                    waypointSequence[nearestIdx] = seq++;
+                    waypointSequence[nearestIdx] = seqNum;
                     customPointStyles[nearestIdx] = createIconCanvas(g.icon || 'ph-map-pin', g.color || '#e74c3c');
                     pointRadii[nearestIdx] = 15;
                     pointBgColors[nearestIdx] = g.color || '#e74c3c';
