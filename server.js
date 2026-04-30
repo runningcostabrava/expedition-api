@@ -1037,8 +1037,8 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
           23. CONFIRMATION REQUIRED: Before calling any 'delete' tool (task, waypoint, track, or section), you MUST ask the user for explicit permission in the chat. Never delete data silently.
           24. GEOMETRY LINKING: You have full permission to use 'reassign_geometry' to organize the map. If a user asks to 'move' or 'assign' a pin/track, do it immediately and confirm the action.
           25. PERFIL DE ELEVACIÓN: Cuando el usuario te pida crear un punto en una ruta o perfil, identifica el track_id de la tarea activa y asígnalo como 'parent_track_id'. Esto es vital para que el punto sea visible en el gráfico técnico.
-          26. SPATIAL ANALYSIS: Antes de crear un waypoint en un perfil, usa 'analyze_track_point' para obtener el KM exacto y detectar si es una cima o un giro.
-          27. ENVIROMENT: Usa 'search_internet' para ver si las coordenadas coinciden con un río o paso conocido y añádelo al título.
+          26. INTELIGENCIA DE TERRENO: Antes de crear cualquier waypoint en una ruta, DEBES llamar a 'analyze_track_point'. Usa los datos recibidos para escribir un título inteligente. Ej: 'KM 4.2 - Cima' o 'KM 1.5 - Giro a la derecha'.
+          27. BÚSQUEDA DE ACCIDENTES: Si el punto está en un valle o cerca de altitud 0, usa 'search_internet' con las coordenadas para ver si hay un río, puente o playa conocida cerca y menciónalo en la descripción.
 
           RECOVERY PROTOCOL: If the user asks to fix or recreate items from a backup:
           1. Use \`inspect_backup\` to read the data.
@@ -1177,14 +1177,12 @@ async function executeTool(name, args) {
                 [args.task_name, args.section_id || null, args.starts_at || null, args.responsible || null, args.characteristics || null, args.is_milestone || false]
             );
             toolResult = `SUCCESS: Task created with ID ${result.rows[0].id}`;
-            triggerMapRefresh();
         }
         else if (name === "update_task") {
             const fields = Object.keys(args.updates).map((key, i) => `${key} = $${i + 2}`).join(', ');
             const values = Object.values(args.updates);
             await pool.query(`UPDATE tasks SET ${fields} WHERE id = $1`, [args.id, ...values]);
             toolResult = `SUCCESS: Task ${args.id} updated.`;
-            triggerMapRefresh();
         }
         else if (name === "search_internet") {
             const searchResults = await search(args.query, { safeSearch: SafeSearchType.OFF });
@@ -1201,7 +1199,6 @@ async function executeTool(name, args) {
                 [args.title, args.section_date || null, args.description || null]
             );
             toolResult = `SUCCESS: Section created with ID ${res.rows[0].id}`;
-            triggerMapRefresh();
         }
         else if (name === "create_category") {
             const res = await pool.query(
@@ -1209,7 +1206,6 @@ async function executeTool(name, args) {
                 [args.name, args.color || '#3498db', args.icon || 'ph-map-pin', args.line_type || 'solid']
             );
             toolResult = `SUCCESS: Category created with ID ${res.rows[0].id}`;
-            triggerMapRefresh();
         }
         else if (name === "create_task_type") {
             const res = await pool.query(
@@ -1217,7 +1213,6 @@ async function executeTool(name, args) {
                 [args.name, args.color || '#95a5a6', args.icon || 'ph-tag']
             );
             toolResult = `SUCCESS: Task type created with ID ${res.rows[0].id}`;
-            triggerMapRefresh();
         }
         else if (name === "search_nearby_places") {
             const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN;
@@ -1262,21 +1257,18 @@ async function executeTool(name, args) {
                 await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [args.existing_task_id, anchorRes.rows[0].id]);
             }
             toolResult = `SUCCESS: Waypoint created with ID ${newWpId}.`;
-            triggerMapRefresh();
         }
         else if (name === "update_waypoint") {
             const fields = Object.keys(args.updates).map((key, i) => `${key} = $${i + 2}`).join(', ');
             const values = Object.values(args.updates);
             await pool.query(`UPDATE waypoints SET ${fields} WHERE id = $1`, [args.id, ...values]);
             toolResult = `SUCCESS: Waypoint ${args.id} updated.`;
-            triggerMapRefresh();
         }
         else if (name === "update_track") {
             const fields = Object.keys(args.updates).map((key, i) => `${key} = $${i + 2}`).join(', ');
             const values = Object.values(args.updates);
             await pool.query(`UPDATE tracks SET ${fields} WHERE id = $1`, [args.id, ...values]);
             toolResult = `SUCCESS: Track ${args.id} updated.`;
-            triggerMapRefresh();
         }
         else if (name === "reassign_geometry") {
             // Logic must DELETE from task_anchors where waypoint_id or track_id matches, then INSERT a new row for the new_task_id.
@@ -1289,7 +1281,6 @@ async function executeTool(name, args) {
                 await pool.query('DELETE FROM task_anchors WHERE anchor_id = $1', [anchorId]);
                 await pool.query('INSERT INTO task_anchors (task_id, anchor_id) VALUES ($1, $2)', [args.new_task_id, anchorId]);
                 toolResult = `SUCCESS: Reassigned ${args.kind} ${args.id} to task ${args.new_task_id}.`;
-                triggerMapRefresh();
             } else {
                 toolResult = `ERROR: No spatial anchor found for ${args.kind} ${args.id}.`;
             }
@@ -1307,23 +1298,19 @@ async function executeTool(name, args) {
         else if (name === "delete_task") {
             await pool.query('DELETE FROM tasks WHERE id = $1', [args.id]);
             toolResult = `SUCCESS: Task ${args.id} deleted.`;
-            triggerMapRefresh();
         }
         else if (name === "delete_waypoint") {
             await pool.query('DELETE FROM waypoints WHERE id = $1', [args.id]);
             toolResult = `SUCCESS: Waypoint ${args.id} deleted.`;
-            triggerMapRefresh();
         }
         else if (name === "delete_track") {
             await pool.query('DELETE FROM tracks WHERE id = $1', [args.id]);
             toolResult = `SUCCESS: Track ${args.id} deleted.`;
-            triggerMapRefresh();
         }
         else if (name === "delete_section") {
             await pool.query('DELETE FROM tasks WHERE section_id = $1', [args.id]);
             await pool.query('DELETE FROM sections WHERE id = $1', [args.id]);
             toolResult = `SUCCESS: Section ${args.id} deleted.`;
-            triggerMapRefresh();
         }
         else if (name === "get_fleet_status") {
             // Join live_devices with the latest pings from location_logs.
@@ -1410,7 +1397,6 @@ async function executeTool(name, args) {
                     }
                     await pool.query('COMMIT');
                     toolResult = `SUCCESS: Table ${args.table_name} restored from backup ${args.backup_id}.`;
-                    triggerMapRefresh();
                 } else { toolResult = `ERROR: No data for table ${args.table_name} in this backup.`; }
             } else { toolResult = "ERROR: Backup not found."; }
         }
@@ -1438,51 +1424,73 @@ async function executeTool(name, args) {
             const res = await pool.query('SELECT geojson_data FROM tracks WHERE id = $1', [args.track_id]);
             if (res.rows.length > 0) {
                 const geojson = res.rows[0].geojson_data;
-                const point = turf.point([args.lng, args.lat]);
                 const line = geojson.features[0];
+                const point = turf.point([args.lng, args.lat]);
                 const snapped = turf.nearestPointOnLine(line, point);
                 const coords = line.geometry.coordinates;
                 const index = snapped.properties.index;
-                
-                // KM calculation (lineDistance style)
-                const start = turf.point(coords[0]);
-                const sliced = turf.lineSlice(start, snapped, line);
-                const km = turf.length(sliced, { units: 'kilometers' }).toFixed(3);
-                
-                // Altitude
+
+                // 1. KM Exacto
+                const startPoint = turf.point(coords[0]);
+                const sliced = turf.lineSlice(startPoint, snapped, line);
+                const km = parseFloat(turf.length(sliced, { units: 'kilometers' }).toFixed(3));
+
+                // 2. Altitud
                 const altitude = snapped.geometry.coordinates[2] || 0;
-                
-                // Turn detection (3 pts before/after)
-                let turnContext = "Straight path";
-                if (index >= 3 && index <= coords.length - 4) {
-                    const prevPt = coords[index - 3];
-                    const currPt = coords[index];
-                    const nextPt = coords[index + 3];
-                    const bearing1 = turf.bearing(turf.point(prevPt), turf.point(currPt));
-                    const bearing2 = turf.bearing(turf.point(currPt), turf.point(nextPt));
-                    let diff = Math.abs(bearing1 - bearing2);
-                    if (diff > 180) diff = 360 - diff;
-                    if (diff > 30) {
-                        const direction = (bearing2 - bearing1 + 360) % 360 > 180 ? "Giro a la izquierda" : "Giro a la derecha";
-                        turnContext = `${direction} (${diff.toFixed(1)}°)`;
-                    }
-                }
 
-                // Summit Detection (200m radius on track)
+                // 3. Análisis de Pendiente (Cimas)
+                let terrainType = "plano";
+                const checkDistance = 0.1; // 100m
                 let isSummit = true;
-                const radiusKM = 0.2;
-                for (let i = Math.max(0, index - 20); i < Math.min(coords.length, index + 21); i++) {
-                    const d = turf.distance(snapped, turf.point(coords[i]));
-                    if (d <= radiusKM && (coords[i][2] || 0) > altitude + 0.5) {
-                        isSummit = false;
-                        break;
+                let higherPointFound = false;
+                let lowerPointFound = false;
+
+                // Simple check around 100m
+                for (let i = Math.max(0, index - 10); i <= Math.min(coords.length - 1, index + 10); i++) {
+                    const dist = turf.distance(snapped, turf.point(coords[i]), { units: 'kilometers' });
+                    if (dist <= checkDistance && i !== index) {
+                        const otherAlt = coords[i][2] || 0;
+                        if (otherAlt > altitude) isSummit = false;
+                        if (otherAlt > altitude + 0.5) higherPointFound = true;
+                        if (otherAlt < altitude - 0.5) lowerPointFound = true;
                     }
                 }
-                if (isSummit && altitude > 0) turnContext += " | Summit/Cima";
 
-                toolResult = `ANALYSIS FOR TRACK ${args.track_id}:\n- Nearest Point: [${snapped.geometry.coordinates[0]}, ${snapped.geometry.coordinates[1]}]\n- Progress: ${km} km\n- Altitude: ${altitude}m\n- Context: ${turnContext}`;
+                if (isSummit && altitude > 0) terrainType = "cima/summit";
+                else if (higherPointFound && !lowerPointFound) terrainType = "bajada";
+                else if (!higherPointFound && lowerPointFound) terrainType = "subida";
+                else terrainType = "plano";
+
+                // 4. Análisis de Dirección (Giros)
+                let detectedTurn = null;
+                if (index >= 2 && index <= coords.length - 3) {
+                    const prevPt = coords[index - 2];
+                    const currPt = coords[index];
+                    const nextPt = coords[index + 2];
+                    const b1 = turf.bearing(turf.point(prevPt), turf.point(currPt));
+                    const b2 = turf.bearing(turf.point(currPt), turf.point(nextPt));
+                    let diff = b2 - b1;
+                    if (diff > 180) diff -= 360;
+                    if (diff < -180) diff += 360;
+
+                    if (Math.abs(diff) > 35) {
+                        detectedTurn = {
+                            direction: diff > 0 ? "derecha" : "izquierda",
+                            angle: Math.abs(parseFloat(diff.toFixed(1)))
+                        };
+                    }
+                }
+
+                toolResult = JSON.stringify({
+                    track_id: args.track_id,
+                    km: km,
+                    altitude: altitude,
+                    terrain: terrainType,
+                    turn: detectedTurn,
+                    coordinates: snapped.geometry.coordinates
+                });
             } else {
-                toolResult = "ERROR: Track not found.";
+                toolResult = JSON.stringify({ error: "Track not found" });
             }
         }
     } catch (err) {
