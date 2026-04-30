@@ -1469,7 +1469,6 @@ async function executeTool(name, args) {
 
                 const point = turf.point([args.lng, args.lat]);
                 const snapped = turf.nearestPointOnLine(line, point);
-                const coords = line.geometry.coordinates;
                 const index = snapped.properties.index;
 
                 // 1. KM Exacto
