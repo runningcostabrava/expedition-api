@@ -94,7 +94,8 @@ self.addEventListener('message', async event => {
 });
 
 // ─── FETCH INTERCEPTOR ───────────────────────────────────────────────────────
-self.addEventListener('fetch', event => {
+self.addEventListener('fetch', (event) => {
+    // Solo con existir este listener, Chrome habilita el botón de instalación
     if (!event.request.url.startsWith('http')) return;
 
     // Never intercept non-GET requests (POST/PUT/DELETE go straight through)

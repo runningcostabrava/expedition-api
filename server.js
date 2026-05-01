@@ -69,6 +69,15 @@ app.get('/api/config', (req, res) => {
   });
 });
 
+// Explicitly serve PWA files to ensure they are at the root
+app.get('/manifest.json', (req, res) => {
+  res.sendFile(path.join(__dirname, 'manifest.json'));
+});
+
+app.get('/sw.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'sw.js'));
+});
+
 app.use(express.static(path.join(__dirname)));
 
 const JWT_SECRET = process.env.JWT_SECRET || 'emergency_fallback_secret'; // 2. Set secret
