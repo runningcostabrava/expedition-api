@@ -786,17 +786,26 @@
 
                         const el = document.createElement('div');
                         el.className = 'custom-map-pin';
+
+                        const match = (g.title || '').match(/^(\d+)/);
+                        const seqNum = match ? match[1] : '';
+                        const markerColor = g.color || '#3498db';
+                        const isPhotoSpot = g.icon === 'ph-camera';
+
+                        const badgeHtml = seqNum ? `<div style="position: absolute; top: -15px; right: -15px; background: white; color: #0f172a; font-weight: 900; font-size: 12px; padding: 2px 6px; border-radius: 10px; border: 2px solid ${markerColor}; box-shadow: 0 2px 4px rgba(0,0,0,0.3); z-index: 2; pointer-events: none;">${seqNum}</div>` : '';
+
                         const iconHtml = window.getSafeIconHtml(g.icon, 'ph-map-pin', true);
 
-                        // Lógica de nombre corto y detección de números
-                        const shortName = (g.title || '').includes('-') ? (g.title.split('-')[1].trim().split(' ')[0]) : (g.title || '').trim().substring(0, 3);
-                        const isNumbered = !isNaN(shortName) && shortName !== '';
-                        const pinContent = isNumbered ? `<span style="font-weight:900; font-size:16px; color:white; pointer-events:none; text-shadow: 0 0 4px #0f172a;">${shortName}</span>` : iconHtml;
-
                         el.innerHTML = `
-                            <div style="background:${g.color || '#3498db'}; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.3); font-size:12px; color:white; transform: scale(1.1);">
-                                ${pinContent}
+                            ${badgeHtml}
+                            <div style="background-color: ${isPhotoSpot ? '#ef4444' : markerColor}; 
+                                        border-radius: 50%; width: 28px; height: 28px; 
+                                        display: flex; justify-content: center; align-items: center; 
+                                        border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); 
+                                        font-size: 14px; color: white; transform: ${isPhotoSpot ? 'scale(1.2)' : 'scale(1.1)'}; position: relative; z-index: 1;">
+                                ${iconHtml}
                             </div>
+                            <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid ${isPhotoSpot ? '#ef4444' : markerColor}; margin: -1px auto 0; position: relative; z-index: 1;"></div>
                         `;
                         el.dataset.anchorId = g.anchor_id;
 
