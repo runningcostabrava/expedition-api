@@ -1357,7 +1357,7 @@
 
                             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top: 15px;">
                                 ${geom.link ? `<button onclick="window.open('${geom.link.startsWith('http') ? geom.link : 'https://' + geom.link}', '_blank')" style="background:#0ea5e9; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; font-size:0.85em; box-shadow: 0 2px 4px rgba(14, 165, 233, 0.2);">🌐 Website</button>` : ''}
-                                ${geom.google_maps_url ? `<button onclick="window.open('${geom.google_maps_url}', '_blank')" style="background:#10b981; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; font-size:0.85em; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);">🗺️ Open Maps</button>` : ''}
+                                <button onclick="window.open('${geom.google_maps_url || `https://maps.google.com/?q=${geom.lat},${geom.lng}`}', '_blank')" style="background:#10b981; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; font-size:0.85em; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);">🗺️ Open Maps</button>
                                 ${geom.phone ? `<button onclick="window.open('tel:${geom.phone.replace(/[^0-9+]/g, '')}', '_self')" style="background:#8b5cf6; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; font-size:0.85em; box-shadow: 0 2px 4px rgba(139, 92, 246, 0.2);">📞 Call Now</button>` : ''}
                             </div>
 
@@ -1710,7 +1710,7 @@
 
                         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top: 15px;">
                             ${geom.link ? `<button onclick="window.open('${geom.link.startsWith('http') ? geom.link : 'https://' + geom.link}', '_blank')" style="background:#0ea5e9; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; font-size:0.85em; box-shadow: 0 2px 4px rgba(14, 165, 233, 0.2);">🌐 Website</button>` : ''}
-                            ${geom.google_maps_url ? `<button onclick="window.open('${geom.google_maps_url}', '_blank')" style="background:#10b981; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; font-size:0.85em; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);">🗺️ Open Maps</button>` : ''}
+                            <button onclick="window.open('${geom.google_maps_url || `https://maps.google.com/?q=${geom.lat},${geom.lng}`}', '_blank')" style="background:#10b981; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; font-size:0.85em; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);">🗺️ Open Maps</button>
                             ${geom.phone ? `<button onclick="window.open('tel:${geom.phone.replace(/[^0-9+]/g, '')}', '_self')" style="background:#8b5cf6; color:white; padding:10px; border-radius:6px; border:none; cursor:pointer; font-weight:bold; font-size:0.85em; box-shadow: 0 2px 4px rgba(139, 92, 246, 0.2);">📞 Call Now</button>` : ''}
                         </div>
 
