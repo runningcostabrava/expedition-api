@@ -184,7 +184,8 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       "INSERT INTO ai_memory (id, memory_text) VALUES (1, '') ON CONFLICT DO NOTHING;",
       "CREATE TABLE IF NOT EXISTS contacts (id SERIAL PRIMARY KEY, name TEXT NOT NULL, contact_type TEXT, phone TEXT, email TEXT, notes TEXT)",
       "CREATE TABLE IF NOT EXISTS waypoint_contacts (waypoint_id INTEGER REFERENCES waypoints(id) ON DELETE CASCADE, contact_id INTEGER REFERENCES contacts(id) ON DELETE CASCADE, PRIMARY KEY (waypoint_id, contact_id))",
-      "CREATE TABLE IF NOT EXISTS database_backups (id SERIAL PRIMARY KEY, backup_date TIMESTAMPTZ DEFAULT NOW(), table_name TEXT, data_json JSONB, metadata TEXT)"
+      "CREATE TABLE IF NOT EXISTS database_backups (id SERIAL PRIMARY KEY, backup_date TIMESTAMPTZ DEFAULT NOW(), table_name TEXT, data_json JSONB, metadata TEXT)",
+      "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS address TEXT"
     ];
 
     // Execute safely one by one
@@ -1928,22 +1929,22 @@ app.get('/api/contacts', async (req, res) => {
 });
 
 app.post('/api/contacts', adminAuth, async (req, res) => {
-  const { name, contact_type, phone, email, notes } = req.body;
+  const { name, contact_type, phone, email, notes, address } = req.body;
   try {
     const result = await pool.query(
-      'INSERT INTO contacts (name, contact_type, phone, email, notes) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [name, contact_type || 'Staff', phone, email, notes]
+      'INSERT INTO contacts (name, contact_type, phone, email, notes, address) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [name, contact_type || 'Staff', phone, email, notes, address]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/contacts/:id', adminAuth, async (req, res) => {
-  const { name, contact_type, phone, email, notes } = req.body;
+  const { name, contact_type, phone, email, notes, address } = req.body;
   try {
     const result = await pool.query(
-      'UPDATE contacts SET name=$1, contact_type=$2, phone=$3, email=$4, notes=$5 WHERE id=$6 RETURNING *',
-      [name, contact_type, phone, email, notes, req.params.id]
+      'UPDATE contacts SET name=$1, contact_type=$2, phone=$3, email=$4, notes=$5, address=$7 WHERE id=$6 RETURNING *',
+      [name, contact_type, phone, email, notes, req.params.id, address]
     );
     res.json(result.rows[0]);
   } catch (err) { res.status(500).json({ error: err.message }); }

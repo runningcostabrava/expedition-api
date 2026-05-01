@@ -221,6 +221,7 @@
     <header><i class="ph ph-address-book"></i> Directory</header>
 
     <div class="container">
+        <input type="text" id="contact-search" placeholder="🔍 Search contacts by name, role, or phone..." oninput="filterContacts()" style="width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #cbd5e0; box-sizing: border-box; font-size: 1em;">
         <div class="controls">
             <input type="text" id="search-input" placeholder="🔍 Search names or notes..." oninput="renderContacts()">
             <select id="type-filter" onchange="renderContacts()">
@@ -264,6 +265,9 @@
 
             <label>Email</label>
             <input type="email" id="edit-email" placeholder="contact@example.com">
+
+            <label>Physical Address</label>
+            <input type="text" id="edit-address" placeholder="e.g., Via Roma 12, Erice">
 
             <label>Notes</label>
             <textarea id="edit-notes" rows="3" placeholder="Role, location, or internal details..."></textarea>
@@ -348,7 +352,7 @@
             };
 
             container.innerHTML = filtered.map(c => `
-                <div class="contact-card">
+                <div class="contact-card" data-name="${(c.name || '').toLowerCase()}" data-role="${(c.contact_type || '').toLowerCase()}" data-phone="${(c.phone || '').replace(/[^0-9]/g, '')}">
                     <div class="contact-header">
                         <h3 class="contact-name">${c.name}</h3>
                         <span class="contact-type" style="background: ${getTypeColor(c.contact_type)}20; color: ${getTypeColor(c.contact_type)};">${c.contact_type || 'Unknown'}</span>
@@ -356,7 +360,10 @@
 
                     ${c.phone ? `<div class="contact-detail"><i class="ph ph-phone"></i> <a href="tel:${c.phone.replace(/[^0-9+]/g, '')}">${c.phone}</a></div>` : ''}
                     ${c.email ? `<div class="contact-detail"><i class="ph ph-envelope-simple"></i> <a href="mailto:${c.email}">${c.email}</a></div>` : ''}
+                    ${c.address ? `<div class="contact-detail"><i class="ph ph-map-pin"></i> ${c.address}</div>` : ''}
                     ${c.notes ? `<div class="contact-notes">${c.notes}</div>` : ''}
+
+                    ${c.address ? `<button onclick="window.open('https://maps.google.com/?q=${encodeURIComponent(c.address)}', '_blank')" style="background:#10b981; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.85em; display:inline-flex; align-items:center; gap:5px; margin-top:10px; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);">🗺️ Open in Maps</button>` : ''}
 
                     <div class="contact-actions">
                         <button class="action-btn btn-edit" onclick="openContactModal(${c.id})"><i class="ph ph-pencil-simple"></i> Edit</button>
@@ -364,6 +371,18 @@
                     </div>
                 </div>
             `).join('');
+        }
+
+        function filterContacts() {
+            const query = document.getElementById('contact-search').value.toLowerCase();
+            const cards = document.querySelectorAll('.contact-card');
+            cards.forEach(card => {
+                const name = card.dataset.name || '';
+                const role = card.dataset.role || '';
+                const phone = card.dataset.phone || '';
+                const match = name.includes(query) || role.includes(query) || phone.includes(query);
+                card.style.display = match ? 'flex' : 'none';
+            });
         }
 
         function openContactModal(id = null) {
@@ -380,6 +399,7 @@
                 document.getElementById('edit-type').value = contact.contact_type || 'Staff';
                 document.getElementById('edit-phone').value = contact.phone || '';
                 document.getElementById('edit-email').value = contact.email || '';
+                document.getElementById('edit-address').value = contact.address || '';
                 document.getElementById('edit-notes').value = contact.notes || '';
             } else {
                 titleEl.innerText = "New Contact";
@@ -389,6 +409,7 @@
                 document.getElementById('edit-type').value = 'Staff';
                 document.getElementById('edit-phone').value = '';
                 document.getElementById('edit-email').value = '';
+                document.getElementById('edit-address').value = '';
                 document.getElementById('edit-notes').value = '';
             }
         }
@@ -404,6 +425,7 @@
                 contact_type: document.getElementById('edit-type').value,
                 phone: document.getElementById('edit-phone').value.trim(),
                 email: document.getElementById('edit-email').value.trim(),
+                address: document.getElementById('edit-address').value.trim(),
                 notes: document.getElementById('edit-notes').value.trim()
             };
 
