@@ -636,34 +636,6 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
             document.getElementById('gpx-export-modal').classList.add('open');
         }
 
-        function downloadSelectedGPX() {
-            if (!currentExportTask) return;
-
-            const checkboxes = document.querySelectorAll('#gpx-export-list input[type="checkbox"]:checked');
-            if (checkboxes.length === 0) return alert("Select at least one item to download.");
-
-            let gpx = '<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="ExpeditionApp">\n';
-
-            checkboxes.forEach(cb => {
-                const index = parseInt(cb.value);
-                const g = currentExportTask.geometries[index];
-
-                if (g.kind === 'point' && g.lat) {
-                    gpx += `  <wpt lat="${g.lat}" lon="${g.lng}">\n    <name>${(g.title || 'Waypoint').replace(/&/g, '&')}</name>\n  </wpt>\n`;
-                } else if (g.geojson && g.geojson.features && g.geojson.features.length > 0) {
-                    gpx += `  <trk>\n    <name>${(g.title || 'Track').replace(/&/g, '&')}</name>\n    <trkseg>\n`;
-                    const coords = g.geojson.features[0].geometry.type === 'Polygon' ? g.geojson.features[0].geometry.coordinates[0] : g.geojson.features[0].geometry.coordinates;
-                    coords.forEach(c => {
-                        gpx += `      <trkpt lat="${c[1]}" lon="${c[0]}">${c[2] !== undefined ? `\n        <ele>${c[2]}</ele>\n      ` : ''}</trkpt>\n`;
-                    });
-                    gpx += `    </trkseg>\n  </trk>\n`;
-                }
-            });
-            gpx += '</gpx>';
-
-            triggerDownload(gpx, `${(currentExportTask.task_name || 'export').replace(/[^a-z0-9]/gi, '_')}_Compiled.gpx`);
-            document.getElementById('gpx-export-modal').classList.remove('open');
-        }
 
         function exportGeomToGPX(kind, id) {
             let geom = null;
@@ -1022,41 +994,59 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
             document.getElementById('gpx-export-modal').classList.add('open');
         };
 
-        window.downloadSelectedGPX = function() {
-            const selected = Array.from(document.querySelectorAll('.gpx-select-item:checked'));
-            if (selected.length === 0) return alert("Please select at least one item.");
+window.downloadSelectedGPX = function() {
+    const checkboxes = document.querySelectorAll('#gpx-export-list input[type="checkbox"]:checked');
+    if (checkboxes.length === 0) return alert("Please select at least one item to download.");
 
-            let gpx = '<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="ExpeditionApp">';
-            
-            selected.forEach(input => {
-                const kind = input.dataset.kind;
-                const id = parseInt(input.dataset.id);
-                
-                // Find geometry in data
-                let geom = null;
-                for (const t of fullItinerary) {
-                    if (t.geometries) {
-                        geom = t.geometries.find(g => (kind === 'point' ? g.waypoint_id : g.track_id) === id);
-                        if (geom) break;
-                    }
+    let gpx = '<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="ExpeditionApp">\\n';
+
+    checkboxes.forEach(cb => {
+        let geom = null;
+        
+        // Determine if this is a global export or a task-specific export
+        if (cb.classList.contains('gpx-select-item')) {
+            const kind = cb.dataset.kind;
+            const id = parseInt(cb.dataset.id);
+            for (const t of fullItinerary) {
+                if (t.geometries) {
+                    geom = t.geometries.find(g => (kind === 'point' ? g.waypoint_id : g.track_id) === id);
+                    if (geom) break;
                 }
+            }
+        } else {
+            const index = parseInt(cb.value);
+            if (currentExportTask && currentExportTask.geometries) {
+                geom = currentExportTask.geometries[index];
+            }
+        }
 
-                if (geom) {
-                    if (kind === 'point') {
-                        gpx += `<wpt lat="${geom.lat}" lon="${geom.lng}"><name>${(geom.title || 'Waypoint').replace(/&/g, '&')}</name></wpt>`;
-                    } else if (geom.geojson) {
-                        gpx += `<trk><name>${(geom.title || 'Track').replace(/&/g, '&')}</name><trkseg>`;
-                        const coords = geom.geojson.features[0].geometry.type === 'Polygon' ? geom.geojson.features[0].geometry.coordinates[0] : geom.geojson.features[0].geometry.coordinates;
-                        coords.forEach(c => { gpx += `<trkpt lat="${c[1]}" lon="${c[0]}"><ele>${c[2] || 0}</ele></trkpt>`; });
-                        gpx += `</trkseg></trk>`;
-                    }
-                }
-            });
+        if (geom) {
+            if (geom.kind === 'point' && geom.lat) {
+                gpx += `  <wpt lat="\${geom.lat}" lon="\${geom.lng}">\\n    <name>\${(geom.title || 'Waypoint').replace(/&/g, '&')}</name>\\n  </wpt>\\n`;
+            } else if (geom.geojson && geom.geojson.features && geom.geojson.features.length > 0) {
+                gpx += `  <trk>\\n    <name>\${(geom.title || 'Track').replace(/&/g, '&')}</name>\\n    <trkseg>\\n`;
+                const coords = geom.geojson.features[0].geometry.type === 'Polygon' ? geom.geojson.features[0].geometry.coordinates[0] : geom.geojson.features[0].geometry.coordinates;
+                coords.forEach(c => {
+                    gpx += `      <trkpt lat="\${c[1]}" lon="\${c[0]}">\${c[2] !== undefined ? \`\\n        <ele>\${c[2]}</ele>\\n      \` : ''}</trkpt>\n`;
+                });
+                gpx += `    </trkseg>\\n  </trk>\\n`;
+            }
+        }
+    });
 
-            gpx += '</gpx>';
-            triggerDownload(gpx, `Expedition_Export_${new Date().getTime()}.gpx`);
-            document.getElementById('gpx-export-modal').classList.remove('open');
-        };
+    gpx += '</gpx>';
+    
+    // Determine the correct filename based on context
+    const filename = currentExportTask 
+        ? `\${(currentExportTask.task_name || 'export').replace(/[^a-z0-9]/gi, '_')}_Compiled.gpx` 
+        : `Expedition_Global_Export_\${new Date().getTime()}.gpx`;
+        
+    triggerDownload(gpx, filename);
+    document.getElementById('gpx-export-modal').classList.remove('open');
+    
+    // Reset state for the next time
+    currentExportTask = null;
+};
 
         let currentActiveTaskIdForDiscovery = null;
 
