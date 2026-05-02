@@ -1667,7 +1667,7 @@ body.zen-mode #fleet-panel {
 
 /* DESKTOP PANEL ADJUSTMENTS: Move away from action buttons */
 @media (min-width: 769px) {
-    #right-panel, #fleet-panel, #task-detail-panel {
+    #right-panel, #fleet-panel, #task-detail-panel, #ai-multimodal-assistant {
         right: 80px !important;
     }
 }
