@@ -1245,6 +1245,7 @@
                 }
                 if (!task.geometries) return;
                 task.geometries.forEach(geom => {
+                    if (geom.is_visible === false) return; // Skip rendering hidden items globally
                     // Deduplicate geometries tied to multiple tasks
                     if (geom.anchor_id) {
                         if (renderedAnchors.has(geom.anchor_id)) return;
@@ -3283,6 +3284,7 @@
         `;
 
             if (task.geometries && task.geometries.length > 0) {
+                html += `<div class="sortable-geom-list" data-task-id="${task.task_id}">`;
                 // SORT: Parents first, then their children immediately following
                 const sortedGeoms = [];
                 const parents = task.geometries.filter(g => !g.parent_track_id);
@@ -3329,13 +3331,14 @@
                     const isChild = g.parent_track_id ? 'margin-left: 20px; border-left: 4px solid #94a3b8; background: #f8fafc; border-radius: 0 8px 8px 0;' : '';
 
                     html += `
-                        <div class="compact-geom-row" style="${isChild}" onclick="triggerGeomInfo(${task.task_id}, '${g.kind}', ${g.waypoint_id || g.track_id})">
+                        <div class="compact-geom-row" style="${isChild}" data-id="${g.waypoint_id || g.track_id}" data-kind="${g.kind}" onclick="triggerGeomInfo(${task.task_id}, '${g.kind}', ${g.waypoint_id || g.track_id})">
                             <span style="font-size: 1.4em;">${icon}</span>
                             <div class="geom-info">
                                 <div class="geom-title">${title}</div>
                                 <div class="geom-stats">${statsHtml || 'No stats recorded'}</div>
                             </div>
                             <div style="display:flex; gap:6px;">
+                                <button class="action-btn-modern" style="background: ${g.is_visible !== false ? '#10b981' : '#94a3b8'}; color: white;" title="${g.is_visible !== false ? 'Public' : 'Hidden'}" onclick="event.stopPropagation(); updateGeomMeta('${g.kind}', ${g.waypoint_id || g.track_id}, 'is_visible', ${g.is_visible !== false ? 'false' : 'true'})">${g.is_visible !== false ? '🌍' : '🙈'}</button>
                                 <button class="action-btn-modern" title="Details & Metadata" onclick="event.stopPropagation(); triggerGeomInfo(${task.task_id}, '${g.kind}', ${g.waypoint_id || g.track_id})"><i class="ph ph-info"></i></button>
                                 <button class="action-btn-modern" title="Show/Hide" onclick="event.stopPropagation(); toggleGeomVisibility('${g.kind}', '${g.track_id || g.anchor_id}', this)"><i class="ph ph-eye"></i></button>
                                 <button class="action-btn-modern" title="Edit Geometry" onclick="event.stopPropagation(); startEditGeometry(${task.task_id}, ${g.anchor_id})"><i class="ph ph-gear"></i></button>
@@ -3344,12 +3347,40 @@
                         </div>
                     `;
                 });
+                html += `</div>`;
             } else {
                 html += `<div style="color: #94a3b8; font-size: 0.95em; font-style: italic; padding: 10px 0;">No locations or tracks attached to this task.</div>`;
             }
 
             content.innerHTML = html;
             panel.classList.add('open');
+
+            // Initialize SortableJS for geometries
+            const geomList = content.querySelector('.sortable-geom-list');
+            if (geomList) {
+                new Sortable(geomList, {
+                    animation: 150,
+                    onEnd: async function(evt) {
+                        const items = Array.from(geomList.querySelectorAll('.compact-geom-row'));
+                        const payload = items.map((el, index) => {
+                            return { id: parseInt(el.dataset.id), kind: el.dataset.kind, sort_order: index };
+                        });
+                        
+                        const waypointsOnly = payload.filter(p => p.kind === 'point').map(p => ({ id: p.id, sort_order: p.sort_order }));
+                        
+                        if (waypointsOnly.length > 0) {
+                            try {
+                                await authFetch(`${API_URL}/waypoints/reorder`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ waypoints: waypointsOnly })
+                                });
+                                refreshData();
+                            } catch (e) { console.error("Geom reorder failed", e); }
+                        }
+                    }
+                });
+            }
         }
 
         function closeTaskDetailPanel() {

@@ -728,8 +728,9 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
 
             let geometryHtml = '';
             if (hasMapData) {
-                geometryHtml = `<div style="margin-top: 10px; border-top: 1px dashed #e2e8f0; padding-top: 10px;">`;
+                geometryHtml = `<div class="sortable-geom-list" data-task-id="${task.task_id}" style="margin-top: 10px; border-top: 1px dashed #e2e8f0; padding-top: 10px;">`;
                 task.geometries.forEach(g => {
+                    if (g.is_visible === false) return; // Skip rendering hidden items globally
                     const shortTitle = (g.title || '').includes('-') ? (g.title.split('-')[1].trim()) : (g.title || 'Location').trim();
 
                     let statsHtml = '';
@@ -745,7 +746,7 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
                     if (g.kind === 'line') {
                         // 🗺️ HERO TRACK DESIGN
                         geometryHtml += `
-                            <div style="background: #f0f9ff; padding: 15px; border-radius: 12px; margin-bottom: 12px; border: 2px solid #38bdf8; box-shadow: 0 4px 6px rgba(56, 189, 248, 0.15);">
+                            <div class="geom-sort-item" data-id="${g.waypoint_id || g.track_id}" data-kind="${g.kind}" style="background: #f0f9ff; padding: 15px; border-radius: 12px; margin-bottom: 12px; border: 2px solid #38bdf8; box-shadow: 0 4px 6px rgba(56, 189, 248, 0.15);">
                                 <div style="font-weight: 900; font-size: 1.1em; color: #0369a1; margin-bottom: 5px; text-transform: uppercase;">
                                     🗺️ ROUTE: ${shortTitle}
                                 </div>
@@ -777,7 +778,7 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
                         // 📍 STANDARD POINT DESIGN (Enhanced)
                         const icon = window.getSafeIconHtml(g.icon, 'ph-map-pin', true);
                         geometryHtml += `
-                            <div style="background: #ffffff; padding: 12px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.03);">
+                            <div class="geom-sort-item" data-id="${g.waypoint_id || g.track_id}" data-kind="${g.kind}" style="background: #ffffff; padding: 12px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.03);">
                                 <div style="display: flex; gap: 12px; align-items: flex-start; margin-bottom: 10px;">
                                     ${g.photo_url ? `<img src="${g.photo_url}" onclick="openLightbox('${g.photo_url}')" style="width:70px; height:70px; border-radius:8px; object-fit:cover; flex-shrink:0; cursor:zoom-in;">` : ''}
                                     <div style="flex:1; min-width:0;">
@@ -787,6 +788,9 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
                                         ${g.address ? `<div style="font-size:0.8em; color:#64748b; margin-top:2px;">📍 ${g.address}</div>` : ''}
                                         ${g.phone ? `<div style="font-size:0.8em; color:#64748b; margin-top:2px;">📞 ${g.phone}</div>` : ''}
                                     </div>
+                                    <button class="action-btn-modern" style="width: auto; height: auto; padding: 4px 8px; font-size: 0.8em; background: ${g.is_visible !== false ? '#10b981' : '#94a3b8'}; color: white; border: none; border-radius: 4px; cursor: pointer;" onclick="event.stopPropagation(); updateGeomMeta('${g.kind}', ${g.waypoint_id || g.track_id}, 'is_visible', ${g.is_visible !== false ? 'false' : 'true'})">
+                                        ${g.is_visible !== false ? '🌍 Public' : '🙈 Hidden'}
+                                    </button>
                                 </div>
                                 <div style="display: flex; flex-wrap: wrap; gap: 6px;">
                                     <button onclick="window.location.href='field.html?task_id=${task.task_id}'; event.stopPropagation();" 
@@ -913,6 +917,32 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
 
         async function initPM() {
             await loadData();
+            // Initialize SortableJS for all geometry lists
+            document.querySelectorAll('.sortable-geom-list').forEach(list => {
+                new Sortable(list, {
+                    animation: 150,
+                    draggable: ".geom-sort-item",
+                    onEnd: async function(evt) {
+                        const items = Array.from(list.querySelectorAll('.geom-sort-item'));
+                        const payload = items.map((el, index) => {
+                            return { id: parseInt(el.dataset.id), kind: el.dataset.kind, sort_order: index };
+                        });
+                        
+                        const waypointsOnly = payload.filter(p => p.kind === 'point').map(p => ({ id: p.id, sort_order: p.sort_order }));
+                        
+                        if (waypointsOnly.length > 0) {
+                            try {
+                                await authFetch(`${API_URL}/waypoints/reorder`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ waypoints: waypointsOnly })
+                                });
+                                loadData();
+                            } catch (e) { console.error("Geom reorder failed", e); }
+                        }
+                    }
+                });
+            });
             setTimeout(() => {
                 const urlParams = new URLSearchParams(window.location.search);
                 const focusTaskId = urlParams.get('task_id');

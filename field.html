@@ -735,6 +735,7 @@
 
             tasks.forEach(task => {
                 if (task.geometries) task.geometries.forEach(g => {
+                    if (g.is_visible === false) return; // Skip rendering hidden items globally
                     // Process Tracks (Lines)
                     if (g.kind === 'line' && g.geojson) {
                         // KM Marker Logic

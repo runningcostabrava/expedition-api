@@ -166,6 +166,8 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS phone TEXT",
       "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS address TEXT",
       "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS google_maps_url TEXT",
+      "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS is_visible BOOLEAN DEFAULT true",
+      "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0",
       "ALTER TABLE categories ADD COLUMN IF NOT EXISTS line_type TEXT DEFAULT 'solid'",
       "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_milestone BOOLEAN DEFAULT false",
       "ALTER TABLE categories ADD COLUMN IF NOT EXISTS marker_size INTEGER DEFAULT 28",
@@ -990,9 +992,14 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
                      'elevation_loss_m', COALESCE(w.loss, tr.loss),
                      'comments_attachments', COALESCE(w.comments, tr.comments),
                      'url_link', COALESCE(w.link, tr.link),
+                     'is_visible', COALESCE(w.is_visible, true),
+                     'sort_order', COALESCE(w.sort_order, 0),
+                     'waypoint_id', w.id,
+                     'track_id', tr.id,
                      'lat', w.lat, 'lng', w.lng,
                      'geojson', tr.geojson_data
                    )
+                   ORDER BY COALESCE(w.sort_order, 0) ASC
                  )
                  FROM task_anchors ta
                  JOIN spatial_anchors sa ON ta.anchor_id = sa.id
@@ -1820,11 +1827,11 @@ app.post('/waypoints', adminAuth, async (req, res) => {
 
 app.put('/waypoints/:id', adminAuth, async (req, res) => {
   const { id } = req.params;
-  const { title, lat, lng, description, category, tasks, color, icon, existing_task_id, link, comments, distance, gain, loss, parent_track_id, photo_url, phone, address, google_maps_url, section_id } = req.body;
+  const { title, lat, lng, description, category, tasks, color, icon, existing_task_id, link, comments, distance, gain, loss, parent_track_id, photo_url, phone, address, google_maps_url, section_id, is_visible, sort_order } = req.body;
   try {
     await pool.query(
-      'UPDATE waypoints SET title = COALESCE($1, title), lat = COALESCE($2, lat), lng = COALESCE($3, lng), description = COALESCE($4, description), category = COALESCE($5, category), color = COALESCE($6, color), icon = COALESCE($7, icon), link = COALESCE($9, link), comments = COALESCE($10, comments), distance = COALESCE($11, distance), gain = COALESCE($12, gain), loss = COALESCE($13, loss), parent_track_id = COALESCE($14, parent_track_id), photo_url = COALESCE($15, photo_url), phone = COALESCE($16, phone), address = COALESCE($17, address), google_maps_url = COALESCE($18, google_maps_url), section_id = COALESCE($19, section_id) WHERE id = $8',
-      [title, lat, lng, description, category, color, icon, id, link, comments, distance, gain, loss, parent_track_id, photo_url, phone, address, google_maps_url, section_id]
+      'UPDATE waypoints SET title = COALESCE($1, title), lat = COALESCE($2, lat), lng = COALESCE($3, lng), description = COALESCE($4, description), category = COALESCE($5, category), color = COALESCE($6, color), icon = COALESCE($7, icon), link = COALESCE($9, link), comments = COALESCE($10, comments), distance = COALESCE($11, distance), gain = COALESCE($12, gain), loss = COALESCE($13, loss), parent_track_id = COALESCE($14, parent_track_id), photo_url = COALESCE($15, photo_url), phone = COALESCE($16, phone), address = COALESCE($17, address), google_maps_url = COALESCE($18, google_maps_url), section_id = COALESCE($19, section_id), is_visible = COALESCE($20, is_visible), sort_order = COALESCE($21, sort_order) WHERE id = $8',
+      [title, lat, lng, description, category, color, icon, id, link, comments, distance, gain, loss, parent_track_id, photo_url, phone, address, google_maps_url, section_id, is_visible, sort_order]
     );
 
     let anchorId;
@@ -1861,6 +1868,27 @@ app.put('/waypoints/:id', adminAuth, async (req, res) => {
 });
 
 
+
+// Bulk update sort_order for waypoints drag-and-drop
+app.patch('/waypoints/reorder', adminAuth, async (req, res) => {
+  const { waypoints } = req.body; // Expects an array of { id, sort_order }
+  if (!waypoints || !Array.isArray(waypoints)) return res.status(400).json({ error: "Invalid payload" });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const w of waypoints) {
+      await client.query('UPDATE waypoints SET sort_order = $1 WHERE id = $2', [w.sort_order, w.id]);
+    }
+    await client.query('COMMIT');
+    res.json({ message: "Waypoints order updated successfully" });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
 
 // Bulk update sort_order for drag-and-drop
 app.patch('/tasks/reorder', adminAuth, async (req, res) => {
