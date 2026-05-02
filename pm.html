@@ -194,6 +194,28 @@
             color: white;
         }
 
+        .edit-task-link-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #f59e0b;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            font-weight: bold;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-bottom: 10px;
+        }
+
+        .edit-task-link-btn:hover {
+            background: #d97706;
+            transform: translateY(-1px);
+        }
+
         .task-desc {
             font-size: 0.85em;
             color: #475569;
@@ -284,8 +306,29 @@
             </button>
         </div>
     </header>
+    <div style="padding: 15px;">
+        <div id="google-search-container" style="position: relative; width: 100%;">
+            <input type="text" id="google-discovery-input" placeholder="🔍 Search places (restaurants, hotels...)"
+                style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ddd; outline: none; box-sizing: border-box; font-size: 16px; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+        </div>
+    </div>
+
     <div id="pm-container">
         <div style="text-align: center; padding: 40px; color: #64748b;">⏳ Syncing...</div>
+    </div>
+
+    <!-- Discovery Results Sidebar (Hidden by default) -->
+    <div id="discovery-results" style="display:none; padding:15px;">
+        <button onclick="hideDiscoveryResults()" style="background:#95a5a6; padding:8px 16px; border-radius:6px; border:none; color:white; cursor:pointer; margin-bottom:15px; font-weight:bold;">← Back to Itinerary</button>
+        <h3 id="discovery-title" style="margin-top:0; border-bottom:2px solid #eee; padding-bottom:10px; color:#0f172a;">Results</h3>
+        <div id="google-results-list"></div>
+    </div>
+
+    <div id="ai-fab-container" style="position: fixed; bottom: 160px; right: 20px; z-index: 1000;">
+        <button onclick="processAiCommand()" 
+            style="width: 56px; height: 56px; background: #8b5cf6; color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 24px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); border: none; cursor: pointer;">
+            <i class="ph ph-robot"></i>
+        </button>
     </div>
 
     <button class="fab" onclick="openTaskModal()">+</button>
@@ -625,6 +668,14 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
                 renderer.image = function (href, title, text) {
                     return `<img src="${href}" alt="${text}" onclick="openLightbox('${href}')" style="max-width:100%; max-height:200px; border-radius:8px; display:block; margin:10px 0; box-shadow:0 2px 4px rgba(0,0,0,0.1); cursor:zoom-in;">`;
                 };
+                renderer.link = function (tokenOrHref, title, text) {
+                    const href = typeof tokenOrHref === 'object' ? tokenOrHref.href : tokenOrHref;
+                    const linkText = typeof tokenOrHref === 'object' ? tokenOrHref.text : text;
+                    if (linkText && typeof linkText === 'string' && linkText.includes('📎')) {
+                        return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="display:inline-block; background:#8b5cf6; color:white; padding:4px 10px; border-radius:4px; text-decoration:none; font-weight:bold; font-size:0.9em; margin:2px 0;">${linkText}</a>`;
+                    }
+                    return `<a target="_blank" rel="noopener noreferrer" href="${href}" style="color:#3498db; text-decoration:underline;">${linkText}</a>`;
+                };
                 parsedCharacteristics = marked.parse(task.characteristics, { renderer: renderer, breaks: true });
             }
 
@@ -634,52 +685,81 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
                 task.geometries.forEach(g => {
                     const shortTitle = (g.title || '').includes('-') ? (g.title.split('-')[1].trim()) : (g.title || 'Location').trim();
 
-                    let stats = '';
-                    if (g.distance) stats += `📏 ${parseFloat(g.distance).toFixed(2)}km  `;
-                    if (g.gain) stats += `▲ ${parseFloat(g.gain).toFixed(0)}m  `;
-                    if (g.loss) stats += `▼ ${Math.abs(parseFloat(g.loss)).toFixed(0)}m`;
+                    let statsHtml = '';
+                    if (g.distance) statsHtml += `<span title="Distance">📏 ${parseFloat(g.distance).toFixed(2)}km</span> `;
+                    if (g.gain) statsHtml += `<span title="Gain" style="color:#10b981">▲ ${parseFloat(g.gain).toFixed(0)}m</span> `;
+                    if (g.loss) statsHtml += `<span title="Loss" style="color:#ef4444">▼ ${Math.abs(parseFloat(g.loss)).toFixed(0)}m</span>`;
+
+                    const offset = 0.013;
+                    const sw = (g.lat - offset).toFixed(6) + '%2C' + (g.lng - offset).toFixed(6);
+                    const ne = (g.lat + offset).toFixed(6) + '%2C' + (g.lng + offset).toFixed(6);
+                    const wikilocUrl = `https://www.wikiloc.com/wikiloc/map.do?sw=${sw}&ne=${ne}&page=1`;
 
                     if (g.kind === 'line') {
-                        // 🗺️ HERO TRACK DESIGN (Big, obvious, impossible to miss)
+                        // 🗺️ HERO TRACK DESIGN
                         geometryHtml += `
                             <div style="background: #f0f9ff; padding: 15px; border-radius: 12px; margin-bottom: 12px; border: 2px solid #38bdf8; box-shadow: 0 4px 6px rgba(56, 189, 248, 0.15);">
                                 <div style="font-weight: 900; font-size: 1.1em; color: #0369a1; margin-bottom: 5px; text-transform: uppercase;">
                                     🗺️ ROUTE: ${shortTitle}
                                 </div>
-                                ${stats ? `<div style="font-size: 0.9em; color: #0284c7; margin-bottom: 12px; font-weight: bold;">${stats}</div>` : ''}
+                                ${statsHtml ? `<div style="font-size: 0.9em; margin-bottom: 12px; font-weight: bold;">${statsHtml}</div>` : ''}
                                 
                                 <button onclick="event.stopPropagation(); openGpxExportModal(${task.task_id})" 
                                         style="width: 100%; background: #f39c12; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: 900; font-size: 1.1em; box-shadow: 0 4px 10px rgba(243, 156, 18, 0.3); display: flex; justify-content: center; align-items: center; gap: 8px; cursor: pointer;">
                                     <i class="ph ph-download-simple" style="font-size: 1.3em;"></i> DOWNLOAD GPX TRACK
                                 </button>
                                 
-                                <div style="display:flex; gap:10px; margin-top: 10px;">
+                                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top: 12px;">
                                     <button onclick="window.location.href='field.html?task_id=${task.task_id}'; event.stopPropagation();" 
-                                            style="flex: 1; background: #38bdf8; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 0.9em; cursor: pointer;">
-                                        📍 View on Map
+                                            style="flex: 1; min-width: 100px; background: #38bdf8; color: white; border: none; padding: 8px; border-radius: 6px; font-weight: bold; font-size: 0.85em; cursor: pointer;">
+                                        🗺️ Map
+                                    </button>
+                                    <button onclick="window.open('${wikilocUrl}', '_blank'); event.stopPropagation();" 
+                                            style="flex: 1; min-width: 100px; background: #84cc16; color: white; border: none; padding: 8px; border-radius: 6px; font-weight: bold; font-size: 0.85em; cursor: pointer;">
+                                        ⛰️ Wikiloc
                                     </button>
                                     ${g.link ? `
                                     <button onclick="window.open('${g.link}', '_blank'); event.stopPropagation();" 
-                                            style="flex: 1; background: #10b981; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 0.9em; cursor: pointer;">
-                                        🔗 Open Link
+                                            style="flex: 1; min-width: 100px; background: #10b981; color: white; border: none; padding: 8px; border-radius: 6px; font-weight: bold; font-size: 0.85em; cursor: pointer;">
+                                        🌐 Website
                                     </button>` : ''}
                                 </div>
                             </div>
                         `;
                     } else {
-                        // 📍 STANDARD POINT DESIGN (Compact, secondary importance)
+                        // 📍 STANDARD POINT DESIGN (Enhanced)
                         const icon = window.getSafeIconHtml(g.icon, 'ph-map-pin', true);
                         geometryHtml += `
-                            <div onclick="window.location.href='field.html?task_id=${task.task_id}'; event.stopPropagation();" 
-                                 style="background: #ffffff; padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0; cursor: pointer;">
-                                <div style="min-width: 0; flex: 1;">
-                                    <div style="font-weight: 700; font-size: 0.95em; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                        <span style="color:#e74c3c;">${icon}</span> ${shortTitle}
+                            <div style="background: #ffffff; padding: 12px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.03);">
+                                <div style="display: flex; gap: 12px; align-items: flex-start; margin-bottom: 10px;">
+                                    ${g.photo_url ? `<img src="${g.photo_url}" onclick="openLightbox('${g.photo_url}')" style="width:70px; height:70px; border-radius:8px; object-fit:cover; flex-shrink:0; cursor:zoom-in;">` : ''}
+                                    <div style="flex:1; min-width:0;">
+                                        <div style="font-weight: 700; font-size: 1em; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                            <span style="color:#e74c3c;">${icon}</span> ${shortTitle}
+                                        </div>
+                                        ${g.address ? `<div style="font-size:0.8em; color:#64748b; margin-top:2px;">📍 ${g.address}</div>` : ''}
+                                        ${g.phone ? `<div style="font-size:0.8em; color:#64748b; margin-top:2px;">📞 ${g.phone}</div>` : ''}
                                     </div>
                                 </div>
-                                <div style="display: flex; gap: 5px;">
-                                    <button onclick="event.stopPropagation(); window.open('https://maps.google.com/?q=${g.lat},${g.lng}', '_blank')" class="icon-btn" style="width:32px; height:32px; font-size:1em; background:#f0fdf4; color:#10b981; border: 1px solid #bbf7d0;" title="Open in Google Maps">🗺️</button>
-                                    <button onclick="event.stopPropagation(); openGpxExportModal(${task.task_id})" class="icon-btn" style="width:32px; height:32px; font-size:1em; background:#f1f5f9; color:#64748b;" title="Download GPX"><i class="ph ph-download-simple"></i></button>
+                                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                    <button onclick="window.location.href='field.html?task_id=${task.task_id}'; event.stopPropagation();" 
+                                            style="flex:1; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; padding: 6px; border-radius: 6px; font-weight: bold; font-size: 0.8em; cursor: pointer;">
+                                        🗺️ Map
+                                    </button>
+                                    <button onclick="event.stopPropagation(); window.open('https://www.google.com/maps/search/?api=1&query=${g.lat},${g.lng}', '_blank')" 
+                                            style="flex:1; background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; padding: 6px; border-radius: 6px; font-weight: bold; font-size: 0.8em; cursor: pointer;">
+                                        🚗 G-Maps
+                                    </button>
+                                    <button onclick="event.stopPropagation(); window.open('https://www.google.com/maps?layer=c&cbll=${g.lat},${g.lng}', '_blank')" 
+                                            style="flex:1; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; padding: 6px; border-radius: 6px; font-weight: bold; font-size: 0.8em; cursor: pointer;">
+                                        🚶‍♂️ Street
+                                    </button>
+                                    <button onclick="window.open('${wikilocUrl}', '_blank'); event.stopPropagation();" 
+                                            style="flex:1; background: #f7fee7; color: #3f6212; border: 1px solid #d9f99d; padding: 6px; border-radius: 6px; font-weight: bold; font-size: 0.8em; cursor: pointer;">
+                                        ⛰️ Wiki
+                                    </button>
+                                    ${g.link ? `<button onclick="window.open('${g.link}', '_blank'); event.stopPropagation();" style="flex:1; background: #f0f9ff; color: #075985; border: 1px solid #bae6fd; padding: 6px; border-radius: 6px; font-weight: bold; font-size: 0.8em; cursor: pointer;">🌐 Web</button>` : ''}
+                                    ${g.phone ? `<button onclick="window.open('tel:${g.phone}', '_blank'); event.stopPropagation();" style="flex:1; background: #fdf2f8; color: #9d174d; border: 1px solid #fbcfe8; padding: 6px; border-radius: 6px; font-weight: bold; font-size: 0.8em; cursor: pointer;">📞 Call</button>` : ''}
                                 </div>
                             </div>
                         `;
@@ -699,6 +779,9 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
                 </div>
 
                 <div class="task-body collapsible-content" style="padding: 0 15px 15px 30px;">
+                    <button class="edit-task-link-btn" onclick="event.stopPropagation(); openTaskModal(${task.task_id})">
+                        <i class="ph ph-pencil-simple"></i> Edit Task
+                    </button>
                     ${parsedCharacteristics ? `<div class="task-desc" style="overflow-wrap: anywhere; margin-bottom: 8px;">${parsedCharacteristics}</div>` : ''}
                     ${geometryHtml}
 
@@ -898,8 +981,138 @@ const API_URL = 'https://mapbox-api-uz9a.onrender.com';
             document.getElementById('gpx-export-modal').classList.remove('open');
         };
 
+        let currentActiveTaskIdForDiscovery = null;
+
+        window.initGoogleSearch = async () => {
+            try {
+                const configRes = await fetch(`${API_URL}/api/config`);
+                const config = await configRes.json();
+                
+                const script = document.createElement('script');
+                script.src = `https://maps.googleapis.com/maps/api/js?key=${config.GOOGLE_PLACES_API_KEY}&v=weekly&libraries=places`;
+                script.onload = () => {
+                    setupGoogleAutocomplete();
+                };
+                document.head.appendChild(script);
+            } catch (err) {
+                console.error("Google Load Failure:", err);
+            }
+        };
+
+        async function setupGoogleAutocomplete() {
+            const { Place } = await google.maps.importLibrary("places");
+            window.GooglePlaceClass = Place;
+
+            const searchInput = document.getElementById('google-discovery-input');
+            searchInput.addEventListener('keydown', async (e) => {
+                if (e.key === 'Enter') {
+                    const query = searchInput.value.trim();
+                    if (!query || !window.GooglePlaceClass) return;
+                    
+                    const { places } = await window.GooglePlaceClass.searchByText({
+                        textQuery: query,
+                        fields: ['id', 'displayName', 'location', 'photos', 'rating', 'userRatingCount', 'formattedAddress', 'websiteURI', 'googleMapsURI', 'nationalPhoneNumber'],
+                        maxResultCount: 10
+                    });
+
+                    if (places && places.length > 0) {
+                        renderDiscoveryResults(places);
+                    }
+                }
+            });
+        }
+
+        function renderDiscoveryResults(places) {
+            document.getElementById('pm-container').style.display = 'none';
+            document.getElementById('discovery-results').style.display = 'block';
+            const list = document.getElementById('google-results-list');
+            list.innerHTML = '';
+
+            places.forEach((place, index) => {
+                const photoUrl = place.photos && place.photos.length > 0
+                    ? place.photos[0].getURI({ maxWidth: 300 })
+                    : 'https://via.placeholder.com/300x300?text=No+Photo';
+
+                const row = document.createElement('div');
+                row.className = 'section-card';
+                row.style.padding = '12px';
+                row.innerHTML = `
+                    <div style="display:flex; gap:12px; align-items:flex-start;">
+                        <img src="${photoUrl}" style="width:80px; height:80px; border-radius:8px; object-fit:cover; flex-shrink:0;">
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-weight:bold; color:#0f172a; font-size:1.1em;">${place.displayName}</div>
+                            <div style="color:#f39c12; font-size:0.9em; margin:4px 0;">⭐ ${place.rating || 'New'} (${place.userRatingCount || 0})</div>
+                            <div style="font-size:0.85em; color:#64748b; margin-bottom:8px;">${place.formattedAddress}</div>
+                            <div style="display:flex; gap:8px;">
+                                <select id="task-assign-${index}" style="padding:6px; font-size:0.8em; border-radius:4px; border:1px solid #ddd; flex:1;">
+                                    <option value="">Assign to task...</option>
+                                    ${fullItinerary.map(t => `<option value="${t.task_id}">${t.task_name}</option>`).join('')}
+                                </select>
+                                <button onclick="saveDiscoveryToTask(${index})" style="background:#27ae60; color:white; border:none; padding:6px 12px; border-radius:4px; font-weight:bold; font-size:0.8em; cursor:pointer;">Add</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(row);
+                window[`place_data_${index}`] = place;
+                window[`place_photo_${index}`] = photoUrl;
+            });
+        }
+
+        window.hideDiscoveryResults = function() {
+            document.getElementById('pm-container').style.display = 'block';
+            document.getElementById('discovery-results').style.display = 'none';
+        };
+
+        async function saveDiscoveryToTask(index) {
+            const place = window[`place_data_${index}`];
+            const photoUrl = window[`place_photo_${index}`];
+            const taskId = document.getElementById(`task-assign-${index}`).value;
+            
+            if (!taskId) return alert("Please select a task.");
+
+            const payload = {
+                title: place.displayName,
+                lat: place.location.lat(),
+                lng: place.location.lng(),
+                address: place.formattedAddress,
+                phone: place.nationalPhoneNumber || '',
+                photo_url: photoUrl,
+                google_maps_url: place.googleMapsURI || '',
+                link: place.websiteURI || '',
+                icon: 'ph-map-pin',
+                color: '#e74c3c',
+                existing_task_id: taskId
+            };
+
+            try {
+                await authFetch(`${API_URL}/waypoints`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                alert("Location added to task!");
+                hideDiscoveryResults();
+                loadData();
+            } catch (e) {
+                alert("Error saving: " + e.message);
+            }
+        }
+
+        // Initialize Everything
         initPM();
+        initGoogleSearch();
+
+        // Register processAiCommand globally if not already
+        if (typeof window.processAiCommand === 'undefined') {
+            window.processAiCommand = () => {
+                if (typeof openAiChat === 'function') openAiChat();
+                else alert("AI Assistant not loaded yet.");
+            };
+        }
     </script>
+    <script src="js/store.js"></script>
+    <script src="js/api.js"></script>
 </body>
 
 </html>
