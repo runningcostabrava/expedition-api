@@ -324,11 +324,14 @@
         <div id="google-results-list"></div>
     </div>
 
-    <div id="mobile-fab-container" style="position: fixed; bottom: 85px; right: 15px; display: flex; flex-direction: column; gap: 8px; z-index: 200;">
-        <button onclick="processAiCommand()" class="action-btn-modern" style="width: 50px; height: 50px; border-radius: 50%; background: #1e293b; color: white; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-size: 1.5em; display: flex; justify-content: center; align-items: center; cursor: pointer;">
-            <i class="ph ph-robot"></i>
-        </button>
-    </div>
+<div id="mobile-fab-container" style="position: fixed; bottom: 90px; right: 20px; display: flex; flex-direction: column; gap: 15px; z-index: 1000; align-items: center;">
+    <button onclick="processAiCommand()" style="width: 50px; height: 50px; border-radius: 50%; background: #1e293b; color: white; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-size: 1.5em; display: flex; justify-content: center; align-items: center; cursor: pointer;">
+        <i class="ph ph-robot"></i>
+    </button>
+    <button onclick="openTaskModal()" style="width: 56px; height: 56px; border-radius: 50%; background: #27ae60; color: white; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-size: 1.5em; display: flex; justify-content: center; align-items: center; cursor: pointer;">
+        <i class="ph ph-plus"></i>
+    </button>
+</div>
 
     <!-- AI Chat Assistant Container -->
     <div id="ai-multimodal-assistant" class="ai-chat-hidden" style="display: none;">
@@ -378,7 +381,6 @@
         </div>
     </div>
 
-    <button class="fab" onclick="openTaskModal()">+</button>
 
 
     <div id="task-modal" class="modal">
