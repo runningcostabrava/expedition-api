@@ -111,6 +111,7 @@ app.get('/setup-db', adminAuth, async (req, res) => {
     const queries = [
       // Core Tables
       "CREATE TABLE IF NOT EXISTS location_logs (id SERIAL PRIMARY KEY, guide_id TEXT, lat DOUBLE PRECISION, lng DOUBLE PRECISION, timestamp TIMESTAMPTZ DEFAULT NOW())",
+      "ALTER TABLE location_logs ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'unknown'",
       "CREATE TABLE IF NOT EXISTS live_devices (id SERIAL PRIMARY KEY, device_identifier TEXT UNIQUE, display_name TEXT, assigned_user TEXT, color TEXT DEFAULT '#ef4444', is_visible BOOLEAN DEFAULT true)",
       "ALTER TABLE live_devices ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT '🏃‍♂️'",
       "ALTER TABLE live_devices ADD COLUMN IF NOT EXISTS icon_size INTEGER DEFAULT 28",
@@ -2204,7 +2205,7 @@ app.all('/api/location', async (req, res) => {
         if (!id || !lat || !lon) return res.status(400).send("Missing GPS parameters");
 
         await pool.query(
-            'INSERT INTO location_logs (guide_id, lat, lng) VALUES ($1, $2, $3)',
+            'INSERT INTO location_logs (guide_id, lat, lng, source) VALUES ($1, $2, $3, \'traccar\')',
             [id.toString().trim(), lat, lon]
         );
 
@@ -2223,7 +2224,7 @@ app.post('/api/fleet/telemetry', adminAuth, async (req, res) => {
     
     try {
         await pool.query(
-            'INSERT INTO location_logs (guide_id, lat, lng) VALUES ($1, $2, $3)',
+            'INSERT INTO location_logs (guide_id, lat, lng, source) VALUES ($1, $2, $3, \'pwa\')',
             [device_id.toString().trim(), lat, lng]
         );
         res.json({success: true});
@@ -2296,7 +2297,7 @@ app.get('/api/fleet/logs', async (req, res) => {
     try {
         // Fetches the last 200 GPS pings, matching them to guide names
         const query = `
-            SELECT l.id, l.guide_id, l.lat, l.lng, l.timestamp, d.display_name 
+            SELECT l.id, l.guide_id, l.lat, l.lng, l.timestamp, l.source, d.display_name
             FROM location_logs l
             LEFT JOIN live_devices d ON LOWER(l.guide_id) = LOWER(d.device_identifier) OR LOWER(l.guide_id) = LOWER(d.display_name) OR l.guide_id = d.id::text
             ORDER BY l.timestamp DESC

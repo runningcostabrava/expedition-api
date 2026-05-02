@@ -297,6 +297,8 @@
             style="width:100%; margin-bottom: 15px; background:#3498db; color:white; border:none; padding:12px; border-radius:8px; cursor:pointer; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">📊
             View Raw Data Logs</button>
 
+        <button onclick="resetBroadcastId()" style="width:100%; margin-bottom: 15px; background:#f39c12; color:white; border:none; padding:12px; border-radius:8px; cursor:pointer; font-weight:bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">🔄 Change My Broadcast ID</button>
+
         <label style="display:block; font-size:0.85em; font-weight:bold; margin-bottom:8px; color:#34495e;">Show Map
             History (Tail)</label>
         <select id="fleet-time-filter" onchange="window.forceFleetUpdate()"
@@ -1229,6 +1231,17 @@
 
             btn.innerText = "💾 Save"; btn.disabled = false;
         }
+
+        window.resetBroadcastId = async function() {
+            localStorage.removeItem('expedition_device_id');
+            myDeviceId = null;
+            if (broadcastWatchId) {
+                navigator.geolocation.clearWatch(broadcastWatchId);
+                broadcastWatchId = null;
+            }
+            alert("Your transmission ID has been wiped. The map will now ask you to identify yourself again.");
+            startLocationBroadcast();
+        };
     </script>
 </body>
 
