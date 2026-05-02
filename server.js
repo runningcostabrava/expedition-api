@@ -167,6 +167,7 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS address TEXT",
       "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS google_maps_url TEXT",
       "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS is_visible BOOLEAN DEFAULT true",
+      "ALTER TABLE tracks ADD COLUMN IF NOT EXISTS is_visible BOOLEAN DEFAULT true",
       "ALTER TABLE waypoints ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0",
       "ALTER TABLE categories ADD COLUMN IF NOT EXISTS line_type TEXT DEFAULT 'solid'",
       "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_milestone BOOLEAN DEFAULT false",
@@ -992,7 +993,7 @@ async function runAiAgent(finalPrompt, history = [], modelChoice = 'deepseek', a
                      'elevation_loss_m', COALESCE(w.loss, tr.loss),
                      'comments_attachments', COALESCE(w.comments, tr.comments),
                      'url_link', COALESCE(w.link, tr.link),
-                     'is_visible', COALESCE(w.is_visible, true),
+                     'is_visible', COALESCE(w.is_visible, tr.is_visible, true),
                      'sort_order', COALESCE(w.sort_order, 0),
                      'waypoint_id', w.id,
                      'track_id', tr.id,
@@ -1729,7 +1730,7 @@ app.post('/tracks', adminAuth, async (req, res) => {
 
 app.put('/tracks/:id', adminAuth, async (req, res) => {
   const { id } = req.params;
-  const { geojson_data, title, color, target_group, tasks, existing_task_id, link, comments, distance, duration, gain, loss, parent_track_id, section_id } = req.body;
+  const { geojson_data, title, color, target_group, tasks, existing_task_id, link, comments, distance, duration, gain, loss, parent_track_id, section_id, is_visible } = req.body;
 
   // Extract gain/loss from geojson_data if provided by modern frontend
   let finalGain = gain;
@@ -1741,8 +1742,8 @@ app.put('/tracks/:id', adminAuth, async (req, res) => {
   }
   try {
     await pool.query(
-      'UPDATE tracks SET geojson_data = COALESCE($1, geojson_data), title = COALESCE($2, title), color = COALESCE($3, color), target_group = COALESCE($4, target_group), link = COALESCE($6, link), comments = COALESCE($7, comments), distance = COALESCE($8, distance), gain = COALESCE($9, gain), loss = COALESCE($10, loss), parent_track_id = COALESCE($11, parent_track_id), duration = COALESCE($12, duration), section_id = COALESCE($13, section_id) WHERE id = $5',
-      [geojson_data, title, color, target_group, id, link, comments, distance, finalGain, finalLoss, parent_track_id, duration, section_id]
+      'UPDATE tracks SET geojson_data = COALESCE($1, geojson_data), title = COALESCE($2, title), color = COALESCE($3, color), target_group = COALESCE($4, target_group), link = COALESCE($6, link), comments = COALESCE($7, comments), distance = COALESCE($8, distance), gain = COALESCE($9, gain), loss = COALESCE($10, loss), parent_track_id = COALESCE($11, parent_track_id), duration = COALESCE($12, duration), section_id = COALESCE($13, section_id), is_visible = COALESCE($14, is_visible) WHERE id = $5',
+      [geojson_data, title, color, target_group, id, link, comments, distance, finalGain, finalLoss, parent_track_id, duration, section_id, is_visible]
     );
 
     let anchorId;
@@ -2147,10 +2148,11 @@ app.get('/itinerary', async (req, res) => {
                        'geojson', tr.geojson_data,
                        'link', COALESCE(w.link, tr.link),
                        'comments', COALESCE(w.comments, tr.comments),
-                       'distance', COALESCE(w.distance, tr.distance),
-                       'gain', COALESCE(w.gain, tr.gain),
-                       'loss', COALESCE(w.loss, tr.loss),
-                       'parent_track_id', COALESCE(w.parent_track_id, tr.parent_track_id),
+                        'distance', COALESCE(w.distance, tr.distance),
+                        'gain', COALESCE(w.gain, tr.gain),
+                        'loss', COALESCE(w.loss, tr.loss),
+                        'is_visible', COALESCE(w.is_visible, tr.is_visible, true),
+                        'parent_track_id', COALESCE(w.parent_track_id, tr.parent_track_id),
                        'photo_url', w.photo_url,
                        'phone', w.phone,
                        'address', w.address,
