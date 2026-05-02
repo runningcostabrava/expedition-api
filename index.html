@@ -508,25 +508,28 @@
             // Show a small toast or change icon to "loading"
             if (typeof showToast !== 'undefined') showToast("📡 Fetching GPS...", "info");
 
-            navigator.geolocation.getCurrentPosition((pos) => {
-                const lng = pos.coords.longitude;
-                const lat = pos.coords.latitude;
-
-                // 1. Center map on you
-                map.flyTo({ center: [lng, lat], zoom: 17 });
-
-                // 2. Open the popup with a default icon and title
-                const geom = { type: "Point", coordinates: [lng, lat] };
-                showGeometryContextPopup([lng, lat], geom, "Current Location", "📍 Captured via GPS", null, '📸');
-
-                // 3. Automatically trigger the file upload after a tiny delay so the panel is open
-                setTimeout(() => {
-                    const uploadBtn = document.getElementById('btn-upload-new-geom');
-                    if (uploadBtn) uploadBtn.click();
-                }, 500);
-            }, (err) => {
-                alert("GPS Error: " + err.message);
-            }, { enableHighAccuracy: true });
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    const lng = pos.coords.longitude;
+                    const lat = pos.coords.latitude;
+                    map.flyTo({ center: [lng, lat], zoom: 17 });
+                    const geom = { type: "Point", coordinates: [lng, lat] };
+                    showGeometryContextPopup([lng, lat], geom, "Current Location", "📍 Captured via GPS", null, '📸');
+                    setTimeout(() => {
+                        const uploadBtn = document.getElementById('btn-upload-new-geom');
+                        if (uploadBtn) uploadBtn.click();
+                    }, 500);
+                },
+                (err) => {
+                    let errorMsg = err.message;
+                    if (err.code === 1) errorMsg = "Permission Denied. Please enable Location permissions for your browser in Phone Settings.";
+                    if (err.code === 2) errorMsg = "Position Unavailable. You might be indoors or have no signal.";
+                    if (err.code === 3) errorMsg = "GPS Timeout. It took too long to find satellites.";
+                    alert("GPS Error: " + errorMsg);
+                    if (typeof showToast !== 'undefined') showToast("❌ GPS Failed", "error");
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            );
         };
 
         window.createWaypointFromContext = function (lat, lng) {
