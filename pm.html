@@ -434,7 +434,10 @@
                 allSections.forEach(s => secSelect.innerHTML += `<option value="${s.id}">${s.title}</option>`);
 
                 renderItinerary();
-            } catch (e) { document.getElementById('pm-container').innerHTML = `<div style="text-align:center; padding:20px;">Error loading data</div>`; }
+            } catch (e) {
+                console.error("Data load failed:", e);
+                document.getElementById('pm-container').innerHTML = `<div style="text-align:center; padding:20px;">Error loading data</div>`;
+            }
         }
 
         function renderItinerary() {
