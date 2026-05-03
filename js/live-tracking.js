@@ -158,6 +158,19 @@ async function fetchAndDrawTelemetry() {
             const diffMinutes = Math.floor((now - lastPing) / 60000);
             const timeLabel = diffMinutes < 1 ? 'Just now' : `${diffMinutes}m ago`;
 
+            // Generate the popup HTML
+            const popupHtml = `
+                <div style="text-align: center; padding: 5px; min-width: 140px; font-family: 'DM Sans', sans-serif;">
+                    <strong style="display:block; font-size: 1.1em; color: #0f172a; margin-bottom: 2px;">${track.name}</strong>
+                    <span style="display:block; font-size: 0.85em; color: ${diffMinutes > 15 ? '#ef4444' : '#10b981'}; margin-bottom: 10px; font-weight: bold;">
+                        ${timeLabel}
+                    </span>
+                    <button onclick="window.open('https://www.google.com/maps/search/?api=1&query=${latestCoord[1]},${latestCoord[0]}', '_blank')" style="background:#10b981; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.9em; width:100%; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);">
+                        🗺️ Navigate
+                    </button>
+                </div>
+            `;
+
             if (!liveFleetMarkers[id]) {
                 const el = document.createElement('div');
                 el.className = 'fleet-avatar-wrapper'; // Used for the CSS zoom scaling above
@@ -198,6 +211,7 @@ async function fetchAndDrawTelemetry() {
 
                 liveFleetMarkers[id] = new mapboxgl.Marker({ element: el })
                     .setLngLat(latestCoord)
+                    .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(popupHtml))
                     .addTo(map);
             } else {
                 // Update position AND time label for existing markers
@@ -206,6 +220,11 @@ async function fetchAndDrawTelemetry() {
                 if (label) {
                     label.innerText = timeLabel;
                     label.style.background = diffMinutes > 15 ? '#ef4444' : '#10b981';
+                }
+                // Update popup content if it's open
+                const popup = liveFleetMarkers[id].getPopup();
+                if (popup) {
+                    popup.setHTML(popupHtml);
                 }
             }
         });
