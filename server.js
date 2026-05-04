@@ -2222,14 +2222,16 @@ app.all('/api/location', async (req, res) => {
 
 // 2. WEB BROADCASTER (From field.html)
 app.post('/api/fleet/telemetry', adminAuth, async (req, res) => {
-    const { device_id, lat, lng } = req.body;
+    const { device_id, lat, lng, speed, altitude } = req.body;
     if (!device_id || !lat || !lng) return res.status(400).json({error: "Missing data"});
     
     try {
         await pool.query(
-            'INSERT INTO location_logs (guide_id, lat, lng, source) VALUES ($1, $2, $3, \'pwa\')',
-            [device_id.toString().trim(), lat, lng]
+            'INSERT INTO location_logs (guide_id, lat, lng, source, speed, altitude) VALUES ($1, $2, $3, \'pwa\', $4, $5)',
+            [device_id.toString().trim(), lat, lng, speed || 0, altitude || 0]
         );
+>>>>+++ REPLACE
+path:
         res.json({success: true});
     } catch (e) { 
         res.status(500).json({error: e.message}); 
