@@ -112,6 +112,9 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       // Core Tables
       "CREATE TABLE IF NOT EXISTS location_logs (id SERIAL PRIMARY KEY, guide_id TEXT, lat DOUBLE PRECISION, lng DOUBLE PRECISION, timestamp TIMESTAMPTZ DEFAULT NOW())",
       "ALTER TABLE location_logs ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'unknown'",
+      "ALTER TABLE location_logs ADD COLUMN IF NOT EXISTS speed DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS altitude DOUBLE PRECISION;",
+>>>>+++ REPLACE
+path:
       "CREATE TABLE IF NOT EXISTS live_devices (id SERIAL PRIMARY KEY, device_identifier TEXT UNIQUE, display_name TEXT, assigned_user TEXT, color TEXT DEFAULT '#ef4444', is_visible BOOLEAN DEFAULT true)",
       "ALTER TABLE live_devices ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT '🏃‍♂️'",
       "ALTER TABLE live_devices ADD COLUMN IF NOT EXISTS icon_size INTEGER DEFAULT 28",
@@ -2297,7 +2300,7 @@ app.get('/api/fleet/logs', async (req, res) => {
     try {
         // Fetches the last 200 GPS pings, matching them to guide names
         const query = `
-            SELECT l.id, l.guide_id, l.lat, l.lng, l.timestamp, l.source, d.display_name
+            SELECT l.id, l.guide_id, l.lat, l.lng, l.timestamp, l.source, d.display_name, l.speed, l.altitude
             FROM location_logs l
             LEFT JOIN live_devices d ON LOWER(l.guide_id) = LOWER(d.device_identifier) OR LOWER(l.guide_id) = LOWER(d.display_name) OR l.guide_id = d.id::text
             ORDER BY l.timestamp DESC
@@ -2307,6 +2310,23 @@ app.get('/api/fleet/logs', async (req, res) => {
         res.json(result.rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// 7. GET DEVICE HISTORY (300 logs)
+app.get('/api/fleet/history/:identifier', async (req, res) => {
+    try {
+        const query = `
+            SELECT lat, lng, timestamp, source, speed, altitude
+            FROM location_logs
+            WHERE LOWER(guide_id) = LOWER($1)
+            ORDER BY timestamp DESC
+            LIMIT 300
+        `;
+        const result = await pool.query(query, [req.params.identifier]);
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+>>>>+++ REPLACE
+path:
 
 // --- TRACCAR PROXY ENDPOINTS ---
 app.get('/api/traccar/positions', async (req, res) => {
