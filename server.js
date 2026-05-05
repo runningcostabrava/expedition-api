@@ -113,8 +113,6 @@ app.get('/setup-db', adminAuth, async (req, res) => {
       "CREATE TABLE IF NOT EXISTS location_logs (id SERIAL PRIMARY KEY, guide_id TEXT, lat DOUBLE PRECISION, lng DOUBLE PRECISION, timestamp TIMESTAMPTZ DEFAULT NOW())",
       "ALTER TABLE location_logs ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'unknown'",
       "ALTER TABLE location_logs ADD COLUMN IF NOT EXISTS speed DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS altitude DOUBLE PRECISION;",
->>>>+++ REPLACE
-path:
       "CREATE TABLE IF NOT EXISTS live_devices (id SERIAL PRIMARY KEY, device_identifier TEXT UNIQUE, display_name TEXT, assigned_user TEXT, color TEXT DEFAULT '#ef4444', is_visible BOOLEAN DEFAULT true)",
       "ALTER TABLE live_devices ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT '🏃‍♂️'",
       "ALTER TABLE live_devices ADD COLUMN IF NOT EXISTS icon_size INTEGER DEFAULT 28",
@@ -2230,8 +2228,6 @@ app.post('/api/fleet/telemetry', adminAuth, async (req, res) => {
             'INSERT INTO location_logs (guide_id, lat, lng, source, speed, altitude) VALUES ($1, $2, $3, \'pwa\', $4, $5)',
             [device_id.toString().trim(), lat, lng, speed || 0, altitude || 0]
         );
->>>>+++ REPLACE
-path:
         res.json({success: true});
     } catch (e) { 
         res.status(500).json({error: e.message}); 
@@ -2300,15 +2296,25 @@ app.get('/api/fleet/telemetry', async (req, res) => {
 // 6. RAW TELEMETRY LOGS (For the Data Inspector)
 app.get('/api/fleet/logs', async (req, res) => {
     try {
-        // Fetches the last 200 GPS pings, matching them to guide names
-        const query = `
+        const limit = parseInt(req.query.limit) || 200;
+        const guideId = req.query.guide_id;
+        
+        let query = `
             SELECT l.id, l.guide_id, l.lat, l.lng, l.timestamp, l.source, d.display_name, l.speed, l.altitude
             FROM location_logs l
             LEFT JOIN live_devices d ON LOWER(l.guide_id) = LOWER(d.device_identifier) OR LOWER(l.guide_id) = LOWER(d.display_name) OR l.guide_id = d.id::text
-            ORDER BY l.timestamp DESC
-            LIMIT 200
         `;
-        const result = await pool.query(query);
+        let params = [];
+
+        if (guideId && guideId !== 'all') {
+            query += ` WHERE LOWER(l.guide_id) = LOWER($1) OR LOWER(d.display_name) = LOWER($1)`;
+            params.push(guideId);
+        }
+
+        query += ` ORDER BY l.timestamp DESC LIMIT $${params.length + 1}`;
+        params.push(limit);
+
+        const result = await pool.query(query, params);
         res.json(result.rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2327,8 +2333,6 @@ app.get('/api/fleet/history/:identifier', async (req, res) => {
         res.json(result.rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
->>>>+++ REPLACE
-path:
 
 // --- TRACCAR PROXY ENDPOINTS ---
 app.get('/api/traccar/positions', async (req, res) => {

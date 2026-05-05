@@ -3,190 +3,118 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-    <title>Telemetría - Expedition</title>
+    <title>Connection Debugger - Expedition</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/duotone/style.css">
     <style>
         body { background: #f1f5f9; font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 0; padding-bottom: 90px; }
-        header { background: #0f172a; color: white; padding: env(safe-area-inset-top, 20px) 20px 20px 20px; font-weight: bold; font-size: 1.2em; text-align: center; position: sticky; top: 0; z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
-        .container { padding: 20px; max-width: 1000px; margin: 0 auto; }
-        .data-table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); font-size: 0.9em; }
-        .data-table th, .data-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e2e8f0; }
-        .data-table th { background: #f8fafc; font-weight: bold; color: #475569; text-transform: uppercase; font-size: 0.8em; letter-spacing: 0.5px; }
-        .data-table tr:hover { background: #f8fafc; }
-        .badge { background: #e2e8f0; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85em; color: #334155; }
-        .btn-refresh { background: #38bdf8; border: none; padding: 6px 12px; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; }
+        header { background: #0f172a; color: white; padding: 20px; font-weight: bold; font-size: 1.2em; text-align: center; display:flex; justify-content:space-between; }
+        .ph { vertical-align: middle; }
     </style>
 </head>
 <body>
-
     <header>
-        <span>📊 Data Inspector</span>
-        <div style="display:flex; gap:10px; align-items:center;">
-            <button onclick="openFleetManager()" style="background:#3498db; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; font-weight:bold; margin-left: 10px;">⚙️ Manage Users</button>
-            <button class="btn-refresh" onclick="fetchLogs()">🔄 Refresh</button>
-        </div>
+        <button onclick="window.history.back()" style="background:rgba(255,255,255,0.2); border:none; color:white; padding:5px 10px; border-radius:6px; cursor:pointer;">← Back</button>
+        <span><i class="ph ph-chart-bar"></i> Connection Debugger</span>
+        <span style="width: 60px;"></span>
     </header>
 
-    <div class="container">
-        <div style="margin-bottom: 15px; color: #64748b; font-size: 0.9em;">Showing the last 200 raw GPS transmissions.</div>
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Device / Guide</th>
-                    <th>Coordinates</th>
-                    <th>Map</th>
-                </tr>
-            </thead>
-            <tbody id="log-body">
-                <tr><td colspan="4" style="text-align: center; padding: 30px; color: #64748b;">Loading telemetry...</td></tr>
-            </tbody>
-        </table>
-    </div>
-
-    <div id="fleet-manager-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:99999; align-items:center; justify-content:center; padding:20px;">
-        <div style="background:white; width:100%; max-width:500px; border-radius:12px; padding:20px; max-height:80vh; overflow-y:auto; box-sizing:border-box;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                <h2 style="margin:0; color:#0f172a;">⚙️ Fleet Users</h2>
-                <span onclick="document.getElementById('fleet-manager-modal').style.display='none'" style="font-size:24px; cursor:pointer; color:#64748b;">&times;</span>
+    <div style="padding: 20px; max-width: 1000px; margin: 0 auto;">
+        <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
+            <div style="flex: 1; min-width: 150px;">
+                <label style="display:block; font-size:0.85em; font-weight:bold; color:#475569; margin-bottom:5px;">Filter by Device/User</label>
+                <select id="filter-user" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ddd;">
+                    <option value="all">All Transmissions</option>
+                </select>
             </div>
-            
-            <div style="background:#f8fafc; padding:15px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:20px;">
-                <h4 style="margin-top:0; color:#1e293b;">Register New Traccar User</h4>
-                <input type="text" id="new-dev-id" placeholder="Traccar Raw ID (e.g. 3)" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
-                <input type="text" id="new-dev-name" placeholder="Display Name (e.g. Pablo Guide)" style="width:100%; padding:10px; margin-bottom:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
-                <div style="display:flex; gap:10px; margin-bottom:10px;">
-                    <input type="color" id="new-dev-color" value="#e74c3c" style="height:40px; border:none; cursor:pointer; border-radius:6px; width:50px;">
-                    <input type="text" id="new-dev-icon" placeholder="Icon (e.g. ph-user)" value="ph-user" style="flex:1; padding:10px; border:1px solid #cbd5e0; border-radius:6px; box-sizing:border-box;">
-                </div>
-                <button onclick="saveNewFleetDevice()" style="width:100%; padding:12px; background:#27ae60; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">➕ Save User</button>
+            <div style="flex: 1; min-width: 150px;">
+                <label style="display:block; font-size:0.85em; font-weight:bold; color:#475569; margin-bottom:5px;">Record Limit</label>
+                <select id="filter-limit" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ddd;">
+                    <option value="200">Last 200</option>
+                    <option value="500">Last 500</option>
+                    <option value="1000">Last 1000</option>
+                    <option value="2000">Last 2000</option>
+                </select>
             </div>
+            <button onclick="loadLogs()" style="background: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; height: 39px;">
+                🔄 Refresh Data
+            </button>
+        </div>
 
-            <h4 style="margin-bottom:10px; color:#1e293b;">Registered Users</h4>
-            <div id="fleet-manager-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+        <div style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9em;">
+                <thead>
+                    <tr style="background: #f8fafc; color: #475569; border-bottom: 2px solid #e2e8f0;">
+                        <th style="padding: 12px;">Time</th>
+                        <th style="padding: 12px;">Raw ID</th>
+                        <th style="padding: 12px;">Matched Name</th>
+                        <th style="padding: 12px;">Coordinates</th>
+                        <th style="padding: 12px;">Source</th>
+                    </tr>
+                </thead>
+                <tbody id="logs-table-body">
+                    <tr><td colspan="5" style="text-align: center; padding: 20px;">Loading data...</td></tr>
+                </tbody>
+            </table>
         </div>
     </div>
-
-    <div id="app-switcher" style="position: fixed; bottom: 25px; left: 20px; z-index: 100000;">
-        <button onclick="document.getElementById('switcher-menu').classList.toggle('show')" style="width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 1.5em; cursor: pointer; display: flex; justify-content: center; align-items: center;">📱</button>
-        <div id="switcher-menu" style="display: none; position: absolute; bottom: 65px; left: 0; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 220px; flex-direction: column; gap: 8px; border: 1px solid #e2e8f0;">
-            <div style="font-size: 0.75em; font-weight: bold; color: #64748b; text-transform: uppercase; padding-left: 5px; margin-bottom: 2px;">Switch App</div>
-            <a href="index.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block;"><i class="ph ph-map-trifold"></i> Centro Comando</a>
-            <a href="field.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block;"><i class="ph ph-compass"></i> Mapa de ruta</a>
-            <a href="pm.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block;"><i class="ph ph-clipboard-text"></i> Horaris dia a dia</a>
-            <a href="telemetry.html" style="text-decoration: none; color: #1e293b; padding: 12px; border-radius: 8px; font-weight: bold; background: #f8fafc; border: 1px solid #e2e8f0; display: block;"><i class="ph ph-trend-up"></i> Telemetry</a>
-        </div>
-    </div>
-    <style>#switcher-menu.show { display: flex !important; }</style>
 
     <script>
-        const API_URL = 'https://mapbox-api-uz9a.onrender.com';
-
-        window.openFleetManager = function() {
-            document.getElementById('fleet-manager-modal').style.display = 'flex';
-            renderFleetManagerList();
-        };
-
-        window.renderFleetManagerList = async function() {
+        const API_URL = ''; // Local proxy
+        
+        async function initDebugger() {
             try {
                 const res = await fetch(`${API_URL}/api/fleet/devices`);
                 const devices = await res.json();
-                const list = document.getElementById('fleet-manager-list');
-                list.innerHTML = devices.map(d => `
-                    <div style="display:flex; justify-content:space-between; align-items:center; background:#f1f5f9; padding:12px; border-radius:8px; border:1px solid #cbd5e0;">
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <div style="width:15px; height:15px; border-radius:50%; background:${d.color};"></div>
-                            <div>
-                                <strong style="color:#0f172a;">${d.display_name}</strong> 
-                                <div style="font-size:0.8em; color:#64748b; font-weight:bold;">Traccar ID: ${d.device_identifier}</div>
-                            </div>
-                        </div>
-                        <button onclick="deleteFleetDevice(${d.id})" style="background:#fee2e2; color:#ef4444; border:1px solid #fca5a5; padding:6px 10px; border-radius:6px; cursor:pointer; font-weight:bold;">Delete</button>
-                    </div>
-                `).join('');
-            } catch (e) { console.error("Error loading devices", e); }
-        };
-
-        window.saveNewFleetDevice = async function() {
-            const payload = {
-                device_identifier: document.getElementById('new-dev-id').value.trim(),
-                display_name: document.getElementById('new-dev-name').value.trim(),
-                color: document.getElementById('new-dev-color').value,
-                icon: document.getElementById('new-dev-icon').value
-            };
-            if(!payload.device_identifier || !payload.display_name) return alert("ID and Name are required!");
-            
-            const btn = document.querySelector('button[onclick="saveNewFleetDevice()"]');
-            btn.innerText = "Saving...";
-            
-            try {
-                await fetch(`${API_URL}/api/fleet/devices`, {
-                    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
+                const select = document.getElementById('filter-user');
+                devices.forEach(d => {
+                    select.innerHTML += `<option value="${d.device_identifier}">${d.display_name} (${d.device_identifier})</option>`;
                 });
-                document.getElementById('new-dev-id').value = '';
-                document.getElementById('new-dev-name').value = '';
-                renderFleetManagerList();
-                // Si hay una función global para refrescar telemetría, llámala
-                if (typeof fetchTelemetry === 'function') fetchTelemetry();
-            } catch(e) { alert("Error saving: " + e.message); }
-            btn.innerText = "➕ Save User";
-        };
+                
+                // Add known unknown to help debugging
+                select.innerHTML += `<option value="1">Unknown (ID: 1)</option>`;
+                select.innerHTML += `<option value="2">Unknown (ID: 2)</option>`;
+                
+                loadLogs();
+            } catch(e) { console.error("Error loading devices", e); }
+        }
 
-        window.deleteFleetDevice = async function(id) {
-            if(!confirm("Are you sure you want to delete this user? Their old logs will become 'Unknown'.")) return;
+        async function loadLogs() {
+            const limit = document.getElementById('filter-limit').value;
+            const user = document.getElementById('filter-user').value;
+            const tbody = document.getElementById('logs-table-body');
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">Fetching logs...</td></tr>';
+            
             try {
-                await fetch(`${API_URL}/api/fleet/devices/${id}`, { method: 'DELETE' });
-                renderFleetManagerList();
-                if (typeof fetchTelemetry === 'function') fetchTelemetry();
-            } catch(e) { alert("Error deleting: " + e.message); }
-        };
-
-        async function fetchLogs() {
-            const tbody = document.getElementById('log-body');
-            try {
-                const res = await fetch(`${API_URL}/api/fleet/logs?_t=${Date.now()}`);
+                const res = await fetch(`${API_URL}/api/fleet/logs?limit=${limit}&guide_id=${user}`);
                 const logs = await res.json();
-
+                
                 if (logs.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #64748b;">No data found in database.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #64748b;">No connection logs found for this filter.</td></tr>';
                     return;
                 }
 
-                let html = '';
-                logs.forEach(log => {
-                    const date = new Date(log.timestamp);
-                    const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                    const dateString = date.toLocaleDateString();
-                    const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${log.lat},${log.lng}`;
-
-                    html += `
-                        <tr>
-                            <td>
-                                <strong>${timeString}</strong><br>
-                                <span style="font-size: 0.8em; color: #94a3b8;">${dateString}</span>
-                            </td>
-                            <td>
-                                <span class="badge">${log.display_name || 'Unknown'}</span><br>
-                                <span style="font-size: 0.75em; color: #94a3b8;">Raw ID: ${log.guide_id}</span>
-                            </td>
-                            <td style="font-family: monospace; color: #475569;">
-                                ${log.lat.toFixed(5)}, ${log.lng.toFixed(5)}
-                            </td>
-                            <td>
-                                <a href="${googleMapsUrl}" target="_blank" style="background: #10b981; color: white; padding: 4px 8px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 0.85em;"><i class="ph ph-map-trifold"></i> View</a>
-                            </td>
+                tbody.innerHTML = logs.map(l => {
+                    const time = new Date(l.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+                    const date = new Date(l.timestamp).toLocaleDateString();
+                    const isMatched = l.display_name ? '<span style="color:#10b981; font-weight:bold;">Yes</span>' : '<span style="color:#ef4444; font-weight:bold;">No</span>';
+                    
+                    return `
+                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                            <td style="padding: 12px; color: #64748b;">${date} <br> <strong style="color: #0f172a;">${time}</strong></td>
+                            <td style="padding: 12px; font-family: monospace; font-size: 1.1em;">${l.guide_id}</td>
+                            <td style="padding: 12px;">${l.display_name || '<span style="color:#94a3b8; font-style:italic;">Unregistered</span>'} (${isMatched})</td>
+                            <td style="padding: 12px;"><a href="https://maps.google.com/?q=${l.lat},${l.lng}" target="_blank" style="color: #3498db; text-decoration: none; font-weight:bold;">${l.lat.toFixed(5)}, ${l.lng.toFixed(5)}</a></td>
+                            <td style="padding: 12px;"><span style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 0.85em;">${l.source}</span></td>
                         </tr>
                     `;
-                });
-                tbody.innerHTML = html;
-            } catch (err) {
-                tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #ef4444;">Error fetching data: ${err.message}</td></tr>`;
+                }).join('');
+            } catch(e) { 
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px; color: red;">Error: ${e.message}</td></tr>`;
             }
         }
 
-        // Auto-refresh every 10 seconds
-        fetchLogs();
-        setInterval(fetchLogs, 10000);
+        document.addEventListener('DOMContentLoaded', initDebugger);
     </script>
 </body>
 </html>
