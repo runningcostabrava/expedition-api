@@ -313,29 +313,44 @@
     </div>
 
     <div id="pin-modal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-height: 90vh; overflow-y: auto;">
             <h3 style="margin-top:0;">Save Location</h3>
             <input type="hidden" id="pin-lat"><input type="hidden" id="pin-lng">
-            <input type="text" id="pin-title" placeholder="Location Name">
-
-            <label style="display:block; margin-bottom:5px; font-size:0.9em; font-weight:bold; color:#475569;">🔗 Link
-                to Task (Optional)</label>
-            <select id="pin-task-id"
-                style="width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 8px;">
+            
+            <label style="display:block; margin-bottom:5px; font-size:0.9em; font-weight:bold; color:#475569;">Title</label>
+            <input type="text" id="pin-title" placeholder="Location Name (e.g., Basecamp)">
+        
+            <div style="display:flex; gap:10px; margin-bottom: 12px;">
+                <div style="flex:1;">
+                    <label style="display:block; margin-bottom:5px; font-size:0.9em; font-weight:bold; color:#475569;">Map Icon</label>
+                    <select id="pin-icon" style="width:100%; padding:12px; border:1px solid #ddd; border-radius:8px; font-size: 1.1em;">
+                        <option value="ph-map-pin">📍 Pin</option>
+                        <option value="ph-warning">⚠️ Alert</option>
+                        <option value="ph-camera">📸 Photo</option>
+                        <option value="ph-fork-knife">🍽️ Food</option>
+                        <option value="ph-drop">💧 Water</option>
+                        <option value="ph-bed">🛏️ Sleep</option>
+                        <option value="ph-car">🚗 Vehicle</option>
+                        <option value="ph-first-aid">🚑 Medical</option>
+                        <option value="ph-info">ℹ️ Info</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block; margin-bottom:5px; font-size:0.9em; font-weight:bold; color:#475569;">Color</label>
+                    <input type="color" id="pin-color" value="#f39c12" style="width: 50px; height: 46px; padding: 0; border: none; border-radius: 8px; cursor: pointer;">
+                </div>
+            </div>
+        
+            <label style="display:block; margin-bottom:5px; font-size:0.9em; font-weight:bold; color:#475569;">🔗 Link to Task (Optional)</label>
+            <select id="pin-task-id" style="width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 8px;">
                 <option value="">-- No Task (Loose Waypoint) --</option>
             </select>
-
-            <label style="display:block; margin-bottom:5px; font-size:0.9em; font-weight:bold; color:#475569;">📷 Take a
-                Photo (Optional)</label>
-            <input type="file" id="pin-photo" accept="image/*" capture="environment"
-                style="padding: 0; border: none; margin-bottom: 20px;">
-
-            <button id="save-pin-btn" onclick="saveDroppedPin()"
-                style="width: 100%; background: #27ae60; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer;"><i
-                    class="ph ph-floppy-disk"></i>
-                Save</button>
-            <button onclick="document.getElementById('pin-modal').classList.remove('open')"
-                style="width: 100%; background: #94a3b8; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer; margin-top: 10px;">Cancel</button>
+        
+            <label style="display:block; margin-bottom:5px; font-size:0.9em; font-weight:bold; color:#475569;">📷 Take a Photo (Optional)</label>
+            <input type="file" id="pin-photo" accept="image/*" capture="environment" style="padding: 0; border: none; margin-bottom: 20px;">
+        
+            <button id="save-pin-btn" onclick="saveDroppedPin()" style="width: 100%; background: #27ae60; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer;"><i class="ph ph-floppy-disk"></i> Save Location</button>
+            <button onclick="document.getElementById('pin-modal').classList.remove('open')" style="width: 100%; background: #94a3b8; color: white; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 1.1em; cursor: pointer; margin-top: 10px;">Cancel</button>
         </div>
     </div>
 
@@ -1217,8 +1232,8 @@
                         lat: lat,
                         lng: lng,
                         photo_url: photoUrl,
-                        color: '#f39c12',
-                        icon: 'ph-camera',
+                        color: document.getElementById('pin-color').value,
+                        icon: document.getElementById('pin-icon').value,
                         existing_task_id: taskId ? parseInt(taskId) : null
                     })
                 });
